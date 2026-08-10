@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Tuple
 
 import numpy as np
 import pandas as pd
@@ -11,7 +10,7 @@ from euromillions_agent.lotto_lab import BiasConfig, FeatureEngine, select_and_f
 
 def _fit_probabilities(
     values: pd.DataFrame, k: int, warmup: int = 200
-) -> Tuple[np.ndarray, np.ndarray]:
+) -> tuple[np.ndarray, np.ndarray]:
     """Train the logistic agent on ``values`` and return per-number probabilities."""
 
     if len(values) <= warmup:

@@ -1,9 +1,9 @@
 import numpy as np
-import pandas as pd
 import torch
-import torch.nn as nn
-from torch.utils.data import Dataset, DataLoader
 from sklearn.metrics import roc_auc_score
+from torch import nn
+from torch.utils.data import DataLoader, Dataset
+
 
 def euler_phi_upto(m: int) -> np.ndarray:
     phi = np.arange(m + 1)

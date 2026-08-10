@@ -11,11 +11,11 @@ import matplotlib
 
 matplotlib.use("Agg")
 
-import matplotlib.gridspec as gridspec
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import statsmodels.api as sm
+from matplotlib import gridspec
 from scipy.optimize import minimize
 from scipy.special import gammaln
 from scipy.stats import jarque_bera, probplot

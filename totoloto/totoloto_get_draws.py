@@ -24,7 +24,6 @@ import re
 import sys
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
 
 import requests
 from requests.adapters import HTTPAdapter
@@ -85,9 +84,9 @@ def _session_with_retry() -> requests.Session:
     return s
 
 
-def _parse_pt_date(text: str) -> Optional[str]:
+def _parse_pt_date(text: str) -> str | None:
     """Parse 'Quinta-feira 20 de novembro de 2025' -> '2025-11-20'."""
-    m = re.search(r"(\d{1,2})\s+de\s+([A-Za-zÀ-ÿ]+)\s+de\s+(\d{4})", text, flags=re.I)
+    m = re.search(r"(\d{1,2})\s+de\s+([A-Za-zÀ-ÿ]+)\s+de\s+(\d{4})", text, flags=re.IGNORECASE)
     if not m:
         return None
     day = int(m.group(1))
@@ -109,7 +108,7 @@ class Ranges:
     bonus_min: int = 1
     bonus_max: int = 13
 
-    def check(self, balls: List[int], bonus: Optional[int]) -> bool:
+    def check(self, balls: list[int], bonus: int | None) -> bool:
         if len(balls) != 5:
             return False
         if not all(self.ball_min <= b <= self.ball_max for b in balls):
@@ -128,18 +127,18 @@ def fetch_year_html(session: requests.Session, year: int) -> str:
     return r.text
 
 
-def parse_year(html: str, year: int, ranges: Ranges) -> List[Dict]:
+def parse_year(html: str, year: int, ranges: Ranges) -> list[dict]:
     """Extract draws from a per-year page.
     Heuristic: for each date+UL pair, read 6-7 integers; the last is 'bonus', first five are 'balls'.
     If only 5 numbers exist, set bonus=None.
     Also try to capture a draw code like 'NNN/YYYY' if present.
     """
-    out: List[Dict] = []
+    out: list[dict] = []
 
     # Find blocks with a Portuguese date followed by a UL with numbers; optional code NNN/YYYY nearby.
     patt = re.compile(
         r"(?:>([A-Za-zÀ-ÿ]+\s+\d{1,2}\s+de\s+[A-Za-zÀ-ÿ]+\s+de\s+\d{4})<).*?(\d{3}/\d{4})?.*?(<ul[^>]*>.*?</ul>)",
-        flags=re.S | re.I,
+        flags=re.DOTALL | re.IGNORECASE,
     )
 
     for m in patt.finditer(html):
@@ -159,7 +158,7 @@ def parse_year(html: str, year: int, ranges: Ranges) -> List[Dict]:
         if not ranges.check(mains, bonus):
             # Try alternative: sometimes sites list bonus not last; fallback to 5 mains and ignore extras
             mains = mains[:5]
-            bonus = bonus if bonus is None else bonus
+            bonus = None if bonus is None else bonus
             if not ranges.check(mains, bonus):
                 continue
 
@@ -180,8 +179,8 @@ def parse_year(html: str, year: int, ranges: Ranges) -> List[Dict]:
     return out
 
 
-def dedupe_sort(recs: List[Dict]) -> List[Dict]:
-    best: Dict[Tuple[str, Tuple[int, ...], Optional[int]], Dict] = {}
+def dedupe_sort(recs: list[dict]) -> list[dict]:
+    best: dict[tuple[str, tuple[int, ...], int | None], dict] = {}
     for r in recs:
         key = (
             r["draw_date"],
@@ -204,7 +203,7 @@ def dedupe_sort(recs: List[Dict]) -> List[Dict]:
     return sorted(best.values(), key=lambda x: x["draw_date"])
 
 
-def filter_year_range(recs: List[Dict], start_year: int, end_year: int) -> List[Dict]:
+def filter_year_range(recs: list[dict], start_year: int, end_year: int) -> list[dict]:
     out = []
     for r in recs:
         y = int(r["draw_date"][:4])
@@ -213,7 +212,7 @@ def filter_year_range(recs: List[Dict], start_year: int, end_year: int) -> List[
     return out
 
 
-def save_csv(recs: List[Dict], path: Path) -> None:
+def save_csv(recs: list[dict], path: Path) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", newline="", encoding="utf-8") as f:
         w = csv.DictWriter(f, fieldnames=FIELDS)
@@ -223,7 +222,7 @@ def save_csv(recs: List[Dict], path: Path) -> None:
             w.writerow(row)
 
 
-def save_json(recs: List[Dict], path: Path) -> None:
+def save_json(recs: list[dict], path: Path) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", encoding="utf-8") as f:
         json.dump(recs, f, ensure_ascii=False, indent=2)

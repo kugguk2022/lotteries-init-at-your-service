@@ -1,10 +1,8 @@
 from __future__ import annotations
 
-from typing import Dict, List, Tuple
-
 import pandas as pd
 
-EXPECTED_COLUMNS: List[str] = [
+EXPECTED_COLUMNS: list[str] = [
     "draw_date",
     "ball_1",
     "ball_2",
@@ -16,7 +14,7 @@ EXPECTED_COLUMNS: List[str] = [
 ]
 
 
-def _validate_numeric_bounds(df: pd.DataFrame, bounds: Dict[str, Tuple[int, int]]) -> None:
+def _validate_numeric_bounds(df: pd.DataFrame, bounds: dict[str, tuple[int, int]]) -> None:
     """Raise ValueError when any column falls outside its configured [lo, hi] interval."""
 
     for column, (lo, hi) in bounds.items():
@@ -42,7 +40,7 @@ def validate_df(df: pd.DataFrame) -> pd.DataFrame:
     coerced = df.copy()
     coerced["draw_date"] = pd.to_datetime(coerced["draw_date"], utc=True).dt.tz_convert(None)
 
-    bounds: Dict[str, Tuple[int, int]] = {
+    bounds: dict[str, tuple[int, int]] = {
         "ball_1": (1, 50),
         "ball_2": (1, 50),
         "ball_3": (1, 50),

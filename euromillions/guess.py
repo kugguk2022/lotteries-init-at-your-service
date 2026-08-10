@@ -1,7 +1,7 @@
 from __future__ import annotations
 
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-from typing import Mapping, Sequence, Tuple
 
 import pandas as pd
 
@@ -9,7 +9,7 @@ _BALL_MIN, _BALL_MAX = 1, 50
 _STAR_MIN, _STAR_MAX = 1, 12
 
 
-def _ensure_sorted_unique(values: Sequence[int], expected_len: int, label: str) -> Tuple[int, ...]:
+def _ensure_sorted_unique(values: Sequence[int], expected_len: int, label: str) -> tuple[int, ...]:
     numeric = tuple(int(v) for v in values)
     if len(numeric) != expected_len:
         raise ValueError(
@@ -24,8 +24,8 @@ def _ensure_sorted_unique(values: Sequence[int], expected_len: int, label: str) 
 class EuroMillionsGuess:
     """Immutable representation of a 5-number + 2-star ticket."""
 
-    balls: Tuple[int, ...]
-    stars: Tuple[int, ...]
+    balls: tuple[int, ...]
+    stars: tuple[int, ...]
 
     def __init__(self, balls: Sequence[int], stars: Sequence[int]):
         sorted_balls = _ensure_sorted_unique(balls, expected_len=5, label="ball")
@@ -35,7 +35,7 @@ class EuroMillionsGuess:
         object.__setattr__(self, "stars", sorted_stars)
 
     @classmethod
-    def from_string(cls, raw: str) -> "EuroMillionsGuess":
+    def from_string(cls, raw: str) -> EuroMillionsGuess:
         """Parse a human-readable guess like ``\"1 2 3 4 5 + 6 7\"``."""
 
         sanitized = raw.replace("+", " ")
@@ -47,13 +47,13 @@ class EuroMillionsGuess:
         return cls(numbers[:5], numbers[5:])
 
     @staticmethod
-    def _validate_ranges(balls: Tuple[int, ...], stars: Tuple[int, ...]) -> None:
+    def _validate_ranges(balls: tuple[int, ...], stars: tuple[int, ...]) -> None:
         if not all(_BALL_MIN <= b <= _BALL_MAX for b in balls):
             raise ValueError(f"Ball numbers must be between {_BALL_MIN} and {_BALL_MAX}")
         if not all(_STAR_MIN <= s <= _STAR_MAX for s in stars):
             raise ValueError(f"Star numbers must be between {_STAR_MIN} and {_STAR_MAX}")
 
-    def as_dict(self) -> dict[str, Tuple[int, ...]]:
+    def as_dict(self) -> dict[str, tuple[int, ...]]:
         return {"balls": self.balls, "stars": self.stars}
 
 

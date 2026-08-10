@@ -1,7 +1,7 @@
 import pandas as pd
 
 from euromillions import lottology as lottology_mod
-from euromillions.get_draws import FetchError, PEDRO_URL, PRIMARY_URL, fetch_and_normalize
+from euromillions.get_draws import PEDRO_URL, PRIMARY_URL, FetchError, fetch_and_normalize
 
 
 def test_fetch_and_normalize_lottology(monkeypatch, tmp_path):

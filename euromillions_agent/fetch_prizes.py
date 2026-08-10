@@ -47,7 +47,7 @@ def scrape_breakdown(url: str):
         if not cols or "Match" not in cols[0]:
             continue
         cat = cols[0]
-        m = re.search(r"Match\s+(\d)(?:\s*\+\s*(\d)\s*Star[s]?)?", cat, flags=re.I)
+        m = re.search(r"Match\s+(\d)(?:\s*\+\s*(\d)\s*Star[s]?)?", cat, flags=re.IGNORECASE)
         if not m:
             continue
         km = int(m.group(1))

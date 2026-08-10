@@ -4,8 +4,8 @@ from __future__ import annotations
 import argparse
 import math
 from dataclasses import dataclass
-from pathlib import Path
 from itertools import combinations
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
@@ -170,15 +170,6 @@ def load_int_draws(path: Path, main_k: int = 5, star_k: int = 2) -> tuple[np.nda
                  if found_d:
                      stars.append(found_d)
                      
-    # If we found enough named columns, use them
-    if len(mains) == main_k:
-        # Check stars
-        if star_k > 0 and len(stars) < star_k:
-             # Maybe they aren't named standardly? 
-             # For now, if mains valid, we try to grab stars. 
-             # But if star columns missing, maybe we just fallback to positional on valid numeric cols.
-             pass
-    
     if len(mains) != main_k or (star_k > 0 and len(stars) != star_k):
         # Fallback: find ALL numeric columns
         # Drop columns that are definitely dates/strings
@@ -216,9 +207,7 @@ def load_int_draws(path: Path, main_k: int = 5, star_k: int = 2) -> tuple[np.nda
              # For robustness, if we can't find stars separate, we might return None or zeros?
              # phase2_sobol expects stars if star_k > 0.
              # Let's try to be lenient: if missing, maybe return empty if allowed, but strict here:
-             if len(stars) < star_k:
-                  # Last ditch: are there ANY other numeric columns?
-                  pass
+             # No additional numeric columns available; stars_arr will remain None.
     
     return mains_arr, stars_arr
 
@@ -312,7 +301,7 @@ def generate_sobol_tickets(n_tickets: int,
     """
     total_main = nCk(main_n, main_k)
     total_star = nCk(star_n, star_k) if star_k > 0 else 1
-    total = total_main * total_star
+    total_main * total_star
 
     pts = sobol_2d(n_tickets * oversample, seed=seed)
 
@@ -365,7 +354,7 @@ def main():
     args = ap.parse_args()
 
     if args.cmd == "features":
-        mains, stars = load_int_draws(args.infile, main_k=args.main_k, star_k=args.star_k)
+        mains, _stars = load_int_draws(args.infile, main_k=args.main_k, star_k=args.star_k)
         out = build_pair_features(mains, main_n=args.main_n, include_current=bool(args.include_current))
         args.outdir.mkdir(parents=True, exist_ok=True)
         pd.DataFrame(out.output_pairs).to_csv(args.outdir / "output_pairs.csv", index=False, header=False)

@@ -17,7 +17,8 @@ import pandas as pd
 import statsmodels.api as sm
 from scipy.optimize import brentq, minimize
 from scipy.special import expit, logsumexp
-from scipy.stats import norm, t as t_dist
+from scipy.stats import norm
+from scipy.stats import t as t_dist
 
 from euromillions.diagnostics3 import (
     annotate_match_statistics,
@@ -319,7 +320,7 @@ def evaluate_branch_mode(
         prev_ratio=float(frame["totient_ratio"].iloc[-1]),
         prev_coprime=int(frame["coprime_prev"].iloc[-1]),
     )
-    predicted_score = max(1, int(round(predicted_center)))
+    predicted_score = max(1, round(predicted_center))
 
     return {
         "frame": frame,
@@ -341,7 +342,7 @@ def evaluate_branch_mode(
             "upper_count": int((frame["model_branch"] == "upper").sum()),
             "lower_count": int((frame["model_branch"] == "lower").sum()),
             "prime_ceiling_count": int((frame["model_branch"] == "prime_ceiling").sum()),
-            "training_rows": int(len(training)),
+            "training_rows": len(training),
             "residual_model": str(residual_model),
             "current_branch": current_branch,
             "next_branch": next_branch,
@@ -402,7 +403,7 @@ def compare_branch_modes(
         abs_err = np.abs(actual - preds)
         sq_err = (actual - preds) ** 2
         shared_compare[mode] = {
-            "shared_rows": int(len(shared_training)),
+            "shared_rows": len(shared_training),
             "shared_upper_rows": int(upper_mask.sum()),
             "shared_lower_rows": int(lower_mask.sum()),
             "shared_mae": float(abs_err.mean()),
@@ -430,7 +431,7 @@ def summarize_forecast_errors(actual: np.ndarray, predicted: np.ndarray) -> dict
     err = predicted - actual
     abs_err = np.abs(err)
     return {
-        "holdout": int(len(actual)),
+        "holdout": len(actual),
         "mae": float(abs_err.mean()),
         "rmse": float(np.sqrt(np.mean(err**2))),
         "median_abs_err": float(np.median(abs_err)),
@@ -498,7 +499,7 @@ def run_branch_validity_check(
     pruned_summary = summarize_forecast_errors(actual, pruned_pred)
 
     summary = {
-        "holdout": int(len(validity_df)),
+        "holdout": len(validity_df),
         "residual_model": str(residual_model),
         "classic": classic_summary,
         "prime-pruned": pruned_summary,
@@ -725,7 +726,7 @@ def fit_branch_model(
 
     summary = BranchFitSummary(
         branch=branch_name,
-        count=int(len(subset)),
+        count=len(subset),
         regression_intercept=float(model.params["const"]),
         regression_prev_poi=float(model.params["prev_poi"]),
         regression_prev_ratio=float(model.params["prev_ratio"]),
@@ -1160,7 +1161,7 @@ def save_pruned_branch_plot(
             "prime ceiling": int(prime_mask.sum()),
         }
     )
-    shares = counts / max(int(len(branch_frame)), 1)
+    shares = counts / max(len(branch_frame), 1)
     ax4.bar(
         counts.index.tolist(),
         shares.to_numpy(dtype=float),
@@ -1196,7 +1197,7 @@ def main() -> None:
         start_date_arg=args.start_date,
     )
 
-    base_branch_frame, pair_counts, poi, main_n, star_n, eff_modulus = build_branch_frame(
+    base_branch_frame, pair_counts, _poi, main_n, star_n, eff_modulus = build_branch_frame(
         history,
         ratio_mode=args.ratio_mode,
         modulus=args.modulus,
@@ -1217,10 +1218,10 @@ def main() -> None:
         residual_model=str(args.residual_model),
     )
     pair_diag = build_pair_z_diagnostics(history)
-    upper_model = selected_eval["upper_model"]
+    selected_eval["upper_model"]
     upper_fit = selected_eval["upper_fit"]
     upper_resid = selected_eval["upper_resid"]
-    lower_model = selected_eval["lower_model"]
+    selected_eval["lower_model"]
     lower_fit = selected_eval["lower_fit"]
     lower_resid = selected_eval["lower_resid"]
 
@@ -1229,13 +1230,11 @@ def main() -> None:
     last_coprime = bool(branch_frame["coprime_prev"].iloc[-1])
     next_branch = str(selected_eval["next_branch"])
 
-    prev_poi = float(branch_frame["poi"].iloc[-1])
-    prev_ratio = float(branch_frame["totient_ratio"].iloc[-1])
-    prev_coprime = int(branch_frame["coprime_prev"].iloc[-1])
-    chosen_model = upper_model if next_branch == "upper" else lower_model
-    chosen_fit = upper_fit if next_branch == "upper" else lower_fit
+    float(branch_frame["poi"].iloc[-1])
+    float(branch_frame["totient_ratio"].iloc[-1])
+    int(branch_frame["coprime_prev"].iloc[-1])
     predicted_center = float(selected_eval["predicted_center"])
-    conditional_mean = float(selected_eval["conditional_mean"])
+    float(selected_eval["conditional_mean"])
     interval_80 = (float(selected_eval["interval_80"][0]), float(selected_eval["interval_80"][1]))
     interval_95 = (float(selected_eval["interval_95"][0]), float(selected_eval["interval_95"][1]))
     predicted_score = int(selected_eval["predicted_score"])

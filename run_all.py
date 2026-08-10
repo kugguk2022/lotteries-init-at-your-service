@@ -3,17 +3,16 @@ from __future__ import annotations
 import argparse
 import subprocess
 import sys
+from collections.abc import Sequence
 from pathlib import Path
-from typing import Dict, List, Sequence, Tuple
 
 import numpy as np
 import pandas as pd
 
+LotteryConfig = dict[str, object]
 
-LotteryConfig = Dict[str, object]
 
-
-LOTTERIES: List[LotteryConfig] = [
+LOTTERIES: list[LotteryConfig] = [
     {
         "name": "euromillions",
         "history": Path("data/euromillions.csv"),
@@ -80,7 +79,7 @@ def frequency_tables(
     main_cols: Sequence[str],
     bonus_cols: Sequence[str],
     smoothing: float,
-) -> Tuple[np.ndarray, np.ndarray]:
+) -> tuple[np.ndarray, np.ndarray]:
     subset = df[list(main_cols) + list(bonus_cols)].copy()
     for col in list(main_cols) + list(bonus_cols):
         subset[col] = pd.to_numeric(subset[col], errors="coerce")
@@ -197,7 +196,7 @@ def evaluate_walk_forward(
     seed: int | None,
     test_frac: float,
     min_train_rows: int,
-) -> Dict[str, float]:
+) -> dict[str, float]:
     rng = np.random.default_rng(seed)
 
     subset = df[list(main_cols) + list(bonus_cols)].copy()
@@ -210,7 +209,7 @@ def evaluate_walk_forward(
     main_k = len(main_cols)
     bonus_k = len(bonus_cols)
     total_rows = len(subset)
-    split_idx = max(min_train_rows, int(round((1.0 - test_frac) * total_rows)))
+    split_idx = max(min_train_rows, round((1.0 - test_frac) * total_rows))
     split_idx = min(split_idx, total_rows - 1)
     split_idx = max(split_idx, 2)
 

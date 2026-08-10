@@ -47,7 +47,7 @@ def safe_float(value) -> float | None:
 def metrics_for_picks(pred: np.ndarray, actual: np.ndarray) -> dict[str, float]:
     hits = np.array([len(set(p) & set(a)) for p, a in zip(pred, actual)], dtype=int)
     return {
-        "steps": int(len(actual)),
+        "steps": len(actual),
         "mean_hits": float(hits.mean()),
         "recall_at_5": float((hits / 5.0).mean()),
         "any_hit_rate": float(np.mean(hits >= 1)),

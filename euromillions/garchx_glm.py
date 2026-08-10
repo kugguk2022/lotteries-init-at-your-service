@@ -2,24 +2,20 @@ from __future__ import annotations
 
 import argparse
 import calendar
-import json
 import warnings
-from dataclasses import asdict, dataclass
+from dataclasses import dataclass
 from pathlib import Path
 
 import matplotlib
+
 matplotlib.use("Agg")
 
-import matplotlib.gridspec as gridspec
-import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import statsmodels.api as sm
 from scipy.optimize import minimize
 from scipy.special import gammaln
-from scipy.stats import jarque_bera, probplot, t as t_dist
-from statsmodels.graphics.tsaplots import plot_acf
-from statsmodels.stats.diagnostic import acorr_ljungbox
+from scipy.stats import t as t_dist
 
 from euromillions.garch_glm_diagnostics import save_diagnostics_plot
 
@@ -195,12 +191,12 @@ def main():
     # === GARCH on Pearson residuals (no Fourier) ===
     best_order, best_res = fit_garch(eps, args.max_garch_order, args.floor)
     params = best_res.x
-    omega_hat = float(params[0])
+    float(params[0])
     alpha_hat = float(params[1])
     betas_hat = params[2:2+best_order].astype(float)
     nu_hat = float(np.exp(params[-1]) + 2.01)
 
-    nll, sigma2 = garchx_filter(params, eps, garch_order=best_order, floor=args.floor)
+    _nll, sigma2 = garchx_filter(params, eps, garch_order=best_order, floor=args.floor)
     sigma_hat = np.sqrt(sigma2)
     std_resid = eps / sigma_hat
 

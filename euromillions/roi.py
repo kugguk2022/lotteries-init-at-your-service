@@ -23,7 +23,6 @@ import argparse
 import json
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, Optional, Tuple
 
 import numpy as np
 import pandas as pd
@@ -43,7 +42,7 @@ except Exception:
 # Optional torch for grokking
 try:
     import torch
-    import torch.nn as nn
+    from torch import nn
     from torch.utils.data import DataLoader, Dataset
 
     TORCH_OK = True
@@ -141,7 +140,7 @@ def ablate_df(df: pd.DataFrame, frac: float, mode: str) -> pd.DataFrame:
 # ----------------- Bias + Features (Agent) -----------------
 @dataclass
 class BiasConfig:
-    windows: Tuple[int, ...] = (50, 200, 500)
+    windows: tuple[int, ...] = (50, 200, 500)
     rec_cap: int = 1000
     decay_fast: float = 0.98
     decay_slow: float = 0.995
@@ -359,11 +358,11 @@ def evaluate_blocks(p: np.ndarray, y: np.ndarray, N: int, top_k: int):
 
 def cls_metrics(p: np.ndarray, y: np.ndarray):
     p_clipped = np.clip(p, 1e-15, 1 - 1e-15)
-    return dict(
-        logloss=float(log_loss(y, p_clipped)),
-        roc_auc=float(roc_auc_score(y, p)),
-        pr_auc=float(average_precision_score(y, p)),
-    )
+    return {
+        "logloss": float(log_loss(y, p_clipped)),
+        "roc_auc": float(roc_auc_score(y, p)),
+        "pr_auc": float(average_precision_score(y, p)),
+    }
 
 
 # ---------- Calibration + permutation null ----------
@@ -498,7 +497,7 @@ def poisson_binom_pmf(probs: np.ndarray):
 
 def load_prizes(path: Path):
     ext = path.suffix.lower()
-    table: Dict[Tuple[int, int], float] = {}
+    table: dict[tuple[int, int], float] = {}
     if ext == ".json":
         obj = json.loads(Path(path).read_text())
         if "prizes" in obj:
@@ -594,8 +593,8 @@ def inject_dynamic_jackpot(prizes_multi: list, jackpots: list, km=5, ks=2):
 
 def ticket_ev(
     p_main: np.ndarray,
-    p_star: Optional[np.ndarray],
-    prize_table: Dict[Tuple[int, int], float],
+    p_star: np.ndarray | None,
+    prize_table: dict[tuple[int, int], float],
     dep_corr: float = 0.95,
 ) -> float:
     p_m = np.clip(p_main * dep_corr, 0.0, 1.0)
@@ -653,7 +652,7 @@ def build_discriminator(main_df: pd.DataFrame, warmup: int, test_frac: float, de
             M[b, a] += 1
     centrality = np.vstack(centrality_rows)
     poi = np.array(poi, dtype=np.float64)
-    test_steps = int(round(test_frac * steps))
+    test_steps = round(test_frac * steps)
     train_steps = steps - test_steps
     cent_test = centrality[train_steps:, :]
     if debug:
@@ -661,15 +660,15 @@ def build_discriminator(main_df: pd.DataFrame, warmup: int, test_frac: float, de
             f"[disc] steps={steps}, train={train_steps}, test={test_steps}, N={N}; cent_test={cent_test.shape}"
         )
     phi = euler_phi_upto(len(poi))
-    return dict(
-        N=N,
-        steps=steps,
-        train_steps=train_steps,
-        test_steps=test_steps,
-        centrality_test=cent_test,
-        poi=poi,
-        phi=phi,
-    )
+    return {
+        "N": N,
+        "steps": steps,
+        "train_steps": train_steps,
+        "test_steps": test_steps,
+        "centrality_test": cent_test,
+        "poi": poi,
+        "phi": phi,
+    }
 
 
 # --------------- Grok (tiny transformer) ---------------
@@ -903,12 +902,7 @@ def train_grok(
                 outdir / "transformer_signal_next.csv", index=False, header=False
             )
     except Exception:
-        pass
-    return sig_full, best
-
-
-# --------------- RL Mixer ---------------
-def zscore(a, axis=1, eps=1e-12):
+        pass  # optional output; ignore errors
     m = a.mean(axis=axis, keepdims=True)
     s = a.std(axis=axis, keepdims=True)
     s = np.where(s < eps, 1.0, s)
@@ -944,7 +938,7 @@ def eval_policy(
     - Risk cap: max spend per 'week' window (week id = t // weekly_steps).
     - Writes an optional ledger CSV with per-draw decisions and outcomes.
     """
-    steps, N = p_agent.shape
+    steps, _N = p_agent.shape
     pa_raw = np.asarray(p_agent, dtype=np.float64)
     pp_raw = np.asarray(p_pair, dtype=np.float64)
     pa = zscore(pa_raw, axis=1)
@@ -1005,7 +999,7 @@ def eval_policy(
         )  # poisson_binom_pmf is in the global scope of the target file
         if has_stars:
             p_s_list = np.clip(ps_raw[t, picks_idx_star[t]] * dep_corr, 0.0, 1.0)
-            pm_s = poisson_binom_pmf(p_s_list)  #
+            pm_s = poisson_binom_pmf(p_s_list)
         else:
             pm_s = np.zeros(3)
             pm_s[0] = 1.0
@@ -1092,7 +1086,7 @@ def cross_entropy_search(
         cand[:, 2] = np.clip(cand[:, 2], 0.2, 3.0)
         scores = []
         for w1, w2, tau in cand:
-            hits, (cost, ret, roi), _, _ = eval_policy(
+            hits, (_cost, _ret, roi), _, _ = eval_policy(
                 p_agent,
                 truth,
                 p_pair,
@@ -1130,7 +1124,7 @@ class LabConfig:
     ticket_cost: float = 2.50
     ev_mult: float = 1.5
     dep_corr: float = 0.95
-    prizes_path: Optional[Path] = None
+    prizes_path: Path | None = None
 
 
 def dump_block(arr: np.ndarray, N: int, path: Path) -> int:
@@ -1156,12 +1150,12 @@ def poisson_binomial_pmf(p_list):
 
 def run_stars(stars_df: pd.DataFrame, cfg: LabConfig, debug=False) -> dict:
     bias_cfg = BiasConfig()
-    X, y, steps, N, feat_names = build_dataset(
+    X, y, steps, N, _feat_names = build_dataset(
         stars_df, k=2, bias_cfg=bias_cfg, min_warmup=cfg.warmup
     )
     tr_steps = int((1.0 - cfg.test_frac) * steps)
     split_idx = tr_steps * N
-    model, C, cv_loss = select_and_fit(
+    _model, C, cv_loss = select_and_fit(
         X[:split_idx],
         y[:split_idx],
         tr_steps,
@@ -1193,7 +1187,7 @@ def run_stars(stars_df: pd.DataFrame, cfg: LabConfig, debug=False) -> dict:
     dump_block(p_te_full, N, outS / "probs_star_full.csv")
     dump_block(y_full, N, outS / "truth_star_full.csv")
     steps_total = len(p_te_full) // N
-    test_steps = int(round(cfg.test_frac * steps_total))
+    test_steps = round(cfg.test_frac * steps_total)
     test_block = p_te_full[-test_steps * N :]
     truth_block = y_full[-test_steps * N :]
     dump_block(test_block, N, outS / "probs_star_test.csv")
@@ -1203,9 +1197,9 @@ def run_stars(stars_df: pd.DataFrame, cfg: LabConfig, debug=False) -> dict:
     return {"N": N, "steps": steps_total, "test_steps": test_steps}
 
 
-def run_agent(main_df: pd.DataFrame, cfg: LabConfig, debug=False) -> Dict:
+def run_agent(main_df: pd.DataFrame, cfg: LabConfig, debug=False) -> dict:
     bias_cfg = BiasConfig()
-    X, y, steps, N, feat_names = build_dataset(
+    X, y, steps, N, _feat_names = build_dataset(
         main_df, k=5, bias_cfg=bias_cfg, min_warmup=cfg.warmup
     )
     tr_steps = int((1.0 - cfg.test_frac) * steps)
@@ -1280,11 +1274,10 @@ def run_all(
         )
 
     # Agent (mains)
-    agent = run_agent(main_df, cfg, debug=debug)
+    run_agent(main_df, cfg, debug=debug)
     # Stars agent (optional)
-    stars_info = None
     if cfg.with_stars and stars_df is not None:
-        stars_info = run_stars(stars_df, cfg, debug=debug)
+        run_stars(stars_df, cfg, debug=debug)
     if mode == "agent":
         return
 
@@ -1312,7 +1305,7 @@ def run_all(
     # Grok
     grok_dir = cfg.outdir / "grok_out"
     grok_dir.mkdir(parents=True, exist_ok=True)
-    sig, best = train_grok(
+    sig, _best = train_grok(
         disc["phi"],
         disc["poi"],
         disc["steps"],
@@ -1449,7 +1442,7 @@ def run_all(
     )
     pd.DataFrame(picks_idx + 1).to_csv(outM / "mixer_picks.csv", index=False, header=False)
     if picks_star is not None:
-        pd.DataFrame((picks_star + 1)).to_csv(
+        pd.DataFrame(picks_star + 1).to_csv(
             outM / "mixer_picks_stars.csv", index=False, header=False
         )
     if debug:
@@ -1547,10 +1540,10 @@ def main():
         dep_corr=args.dep_corr,
         prizes_path=Path(args.prizes) if args.prizes else None,
     )
-    setattr(cfg, "permute_null", args.permute_null)
-    setattr(cfg, "risk_cap", args.risk_cap)
-    setattr(cfg, "weekly_steps", args.weekly_steps)
-    setattr(cfg, "jackpot_csv", args.jackpot_csv)
+    cfg.permute_null = args.permute_null
+    cfg.risk_cap = args.risk_cap
+    cfg.weekly_steps = args.weekly_steps
+    cfg.jackpot_csv = args.jackpot_csv
 
     if args.ablate_frac < 0 or args.ablate_frac > 0.8:
         print("[warn] ablate-frac should be in [0, 0.8]. Clipping.")

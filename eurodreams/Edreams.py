@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import argparse
-import os
 from itertools import combinations
 from pathlib import Path
 
@@ -72,7 +71,7 @@ def run_edreams(data: pd.DataFrame, out_dir: Path) -> None:
 
         output = np.array(z_list)
         poi = output.sum(axis=1)
-        target = int(round(poi[-1]))
+        target = round(poi[-1])
 
         main_pool_max = max_val
         bonus_pool = range(1, 6)

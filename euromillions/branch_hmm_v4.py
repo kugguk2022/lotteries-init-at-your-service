@@ -222,7 +222,7 @@ def run_analysis(args: argparse.Namespace) -> dict[str, object]:
         data_meta = {
             "history_path": None,
             "effective_start_date": None,
-            "rows": int(len(data)),
+            "rows": len(data),
             "note": "synthetic debug data",
         }
 
@@ -262,10 +262,10 @@ def run_analysis(args: argparse.Namespace) -> dict[str, object]:
 
     summary = {
         "source": args.source,
-        "rows": int(len(data)),
+        "rows": len(data),
         "seed": int(args.seed),
         "n_iter": int(args.n_iter),
-        "history_window": int(len(history)),
+        "history_window": len(history),
         "data_meta": data_meta,
         "method": _build_method_metadata(data_meta),
         "versions": {

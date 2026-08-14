@@ -4,6 +4,11 @@
 
 Lottery data playground for EuroMillions, Totoloto, and EuroDreams. The repo ships a small typed public API plus labs for modelling, bankroll experiments, and scraping. Everything is research-focused; use it responsibly.
 
+This project does not purchase, register, or transmit lottery entries; pool or
+hold funds; administer real-money syndicates; or claim that generated numbers
+are more likely to be drawn. Generated combinations are local research output,
+not registered bets. See the [product boundary](docs/PRODUCT_BOUNDARY.md).
+
 ## Best Current EuroMillions Result
 
 The best validated forecasting mode in this repo is currently the `classic` arithmetic-branch mode.

@@ -2,13 +2,10 @@
 from __future__ import annotations
 
 import re
-import csv
-import io
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Iterable, List, Optional
-import requests
 
+import requests
 
 LOTTOLOGY_ARCHIVE_URL = "https://www.lottology.com/europe/euromillions/past-draws-archive/"
 UA = {"User-Agent": "lotteries-bot/1.0 (+https://github.com/kugguk2022/lotteries)"}
@@ -17,8 +14,13 @@ UA = {"User-Agent": "lotteries-bot/1.0 (+https://github.com/kugguk2022/lotteries
 @dataclass(frozen=True)
 class EMRow:
     date: str  # YYYY-MM-DD
-    n1: int; n2: int; n3: int; n4: int; n5: int
-    star1: int; star2: int
+    n1: int
+    n2: int
+    n3: int
+    n4: int
+    n5: int
+    star1: int
+    star2: int
 
 
 def _abs(url: str) -> str:
@@ -29,9 +31,9 @@ def _abs(url: str) -> str:
     return "https://www.lottology.com/" + url
 
 
-def _find_txt_export(html: str) -> Optional[str]:
+def _find_txt_export(html: str) -> str | None:
     # naive but effective: get all hrefs, pick a .txt/.csv first
-    hrefs = re.findall(r'href="([^"]+)"', html, flags=re.I)
+    hrefs = re.findall(r'href="([^"]+)"', html, flags=re.IGNORECASE)
     for ext in (".txt", ".csv"):
         for h in hrefs:
             if ext in h.lower() and "euromillions" in h.lower():
@@ -59,7 +61,7 @@ def _parse_date(s: str) -> str:
     return datetime(y, mo, d).date().isoformat()
 
 
-def fetch_euromillions_lottology(session: Optional[requests.Session] = None) -> List[EMRow]:
+def fetch_euromillions_lottology(session: requests.Session | None = None) -> list[EMRow]:
     s = session or requests.Session()
     html = s.get(LOTTOLOGY_ARCHIVE_URL, headers=UA, timeout=30).text
     export_url = _find_txt_export(html)
@@ -69,7 +71,7 @@ def fetch_euromillions_lottology(session: Optional[requests.Session] = None) -> 
     raw = s.get(export_url, headers=UA, timeout=60).content
     text = raw.decode("utf-8", errors="replace")
 
-    rows: List[EMRow] = []
+    rows: list[EMRow] = []
     # Heuristic parser: each line should contain a date + 7 numbers (5 + 2 stars)
     for line in text.splitlines():
         nums = list(map(int, re.findall(r"\b\d+\b", line)))

@@ -671,7 +671,7 @@ def score_shortlist_returns(
     profit = float(draw_return - cost)
     roi = float(profit / cost) if cost > 0 else float("nan")
     return {
-        "shortlist_size": int(len(shortlist)),
+        "shortlist_size": len(shortlist),
         "best_ball_hits": int(best_ball_hits),
         "best_star_hits": int(best_star_hits),
         "exact_main5": int(best_ball_hits == 5),
@@ -693,7 +693,7 @@ def summarize_method(step_frame: pd.DataFrame) -> MethodSummary:
     net_profit = float(total_return - total_cost)
     roi = float(net_profit / total_cost) if total_cost > 0 else float("nan")
     return MethodSummary(
-        steps=int(len(step_frame)),
+        steps=len(step_frame),
         total_ticket_cost=total_cost,
         total_return=total_return,
         net_profit=net_profit,
@@ -790,7 +790,7 @@ def main() -> None:
                 contexts[spec.name],
                 draw_date=draw_date,
             )
-            target_score = int(round(predicted_poi))
+            target_score = round(predicted_poi)
             shortlist, target_gap = build_garch_shortlist(
                 candidate_pool,
                 pair_counts=pair_counts,
@@ -857,7 +857,7 @@ def main() -> None:
         "evaluation_start_date": evaluation_dates[0],
         "evaluation_end_date": evaluation_dates[-1],
         "requested_top_n": int(args.top_n),
-        "candidate_pool_size": int(len(candidate_pool)),
+        "candidate_pool_size": len(candidate_pool),
         "ticket_cost": float(args.ticket_cost),
         "prize_alignment_note": "Prize tables were fetched by exact draw date from lottery.co.uk and scored on the Prize Per Winner column, then cached locally.",
         "models": [spec.name for spec in TOP_GARCH_MODELS],

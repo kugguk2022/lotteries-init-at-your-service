@@ -5,15 +5,16 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import torch
-import torch.nn as nn
 from sklearn.preprocessing import StandardScaler
-from torch.utils.data import DataLoader, Dataset
 from statsmodels.tsa.ar_model import AutoReg
+from torch import nn
+from torch.utils.data import DataLoader, Dataset
+
 
 # Dual-Input Transformer Model
 class DualInputTransformer(nn.Module):
     def __init__(self, input_dim, seq_len, n_heads, hidden_dim=64, n_layers=2, dropout=0.2):
-        super(DualInputTransformer, self).__init__()
+        super().__init__()
         self.encoder_layer = nn.TransformerEncoderLayer(
             d_model=input_dim, nhead=n_heads, dim_feedforward=hidden_dim, dropout=dropout, batch_first=True
         )

@@ -47,7 +47,7 @@ def safe_float(value) -> float | None:
 def metrics_for_picks(pred: np.ndarray, actual: np.ndarray) -> dict[str, float]:
     hits = np.array([len(set(p) & set(a)) for p, a in zip(pred, actual)], dtype=int)
     return {
-        "steps": int(len(actual)),
+        "steps": len(actual),
         "mean_hits": float(hits.mean()),
         "recall_at_5": float((hits / 5.0).mean()),
         "any_hit_rate": float(np.mean(hits >= 1)),
@@ -177,7 +177,7 @@ def build_classification_table(history_path: Path, outputs_root: Path) -> tuple[
             "any_hit_rate": theory["any_hit_rate"],
             "exact_5_of_5_accuracy": theory["exact_5_of_5_accuracy"],
         },
-        "survivors": table.loc[table["survives_vs_random_95"] == True, "version"].tolist(),
+        "survivors": table.loc[table["survives_vs_random_95"], "version"].tolist(),
     }
     return table, summary
 
@@ -280,9 +280,9 @@ def build_regression_rows(outputs_root: Path, poi_window: int) -> pd.DataFrame:
 
 def build_report(classification: pd.DataFrame, regression: pd.DataFrame) -> str:
     cls_survivors = classification.loc[
-        classification["survives_vs_random_95"] == True, "version"
+        classification["survives_vs_random_95"], "version"
     ].tolist()
-    reg_survivors = regression.loc[regression["survives_min_bar"] == True, "version"].tolist()
+    reg_survivors = regression.loc[regression["survives_min_bar"], "version"].tolist()
 
     lines = [
         "# EuroMillions Model Comparison",

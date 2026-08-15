@@ -1057,7 +1057,7 @@ def main() -> None:
     phi_current = phi_full[:-1]
     phi_shifted = phi_full[1:]
 
-    raw_glm, pruned_glm, fitted, shifted_pred, resid_z, inlier_mask = fit_pruned_phi_glm(
+    _raw_glm, pruned_glm, fitted, shifted_pred, resid_z, inlier_mask = fit_pruned_phi_glm(
         poi,
         phi_current,
         phi_shifted,
@@ -1068,12 +1068,12 @@ def main() -> None:
     predicted_next_poi = float(shifted_pred[-1])
     predicted_growth_n1 = predicted_next_poi - current_expected_poi
     reverse_growth_target_value = (2.0 * current_expected_poi) - predicted_next_poi
-    reverse_growth_target_score = int(round(reverse_growth_target_value))
+    reverse_growth_target_score = round(reverse_growth_target_value)
 
     r_window = min(6, len(poi))
     trailing_mean_r = float(np.mean(poi[-r_window:]))
     trailing_mean_last_5 = float(np.mean(poi[-min(5, len(poi)) :]))
-    target_score = int(round(trailing_mean_r))
+    target_score = round(trailing_mean_r)
 
     series = pd.DataFrame(
         {
@@ -1214,9 +1214,9 @@ def main() -> None:
         trailing_mean_r_compatible=trailing_mean_r,
         trailing_mean_last_5=trailing_mean_last_5,
         target_score_r_compatible=target_score,
-        matching_guess_count=int(len(matches)),
+        matching_guess_count=len(matches),
         total_combinations_scored=total_scored,
-        reverse_growth_match_count=int(len(reverse_matches)),
+        reverse_growth_match_count=len(reverse_matches),
         least_likely_main_pair=[int(pair_diag.least_main_pair[0]), int(pair_diag.least_main_pair[1])],
         least_likely_main_pair_z=float(pair_diag.least_main_pair_z),
         most_likely_main_pair=[int(pair_diag.most_main_pair[0]), int(pair_diag.most_main_pair[1])],

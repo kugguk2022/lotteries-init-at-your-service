@@ -10,9 +10,9 @@ import pandas as pd
 from euromillions.arithmetic_branch import (
     DEFAULT_BATCH_SIZE,
     DEFAULT_HISTORY,
-    RESIDUAL_MODEL_CHOICES,
     DEFAULT_START_DATE,
     DEFAULT_THRESHOLD,
+    RESIDUAL_MODEL_CHOICES,
     build_branch_frame,
     evaluate_branch_mode,
     search_branch_candidates,
@@ -93,7 +93,7 @@ def score_ticket_rows(shortlist: pd.DataFrame, actual_draw: pd.Series) -> dict[s
             best_rank = int(rank)
 
     return {
-        "shortlist_size": int(len(shortlist)),
+        "shortlist_size": len(shortlist),
         "best_rank": int(best_rank),
         "best_ball_hits": int(best_ball_hits),
         "best_star_hits": int(best_star_hits),
@@ -122,7 +122,7 @@ def summarize_method(step_frame: pd.DataFrame) -> dict[str, float | int]:
     best_ball_hits = step_frame["best_ball_hits"].to_numpy(dtype=float)
     best_star_hits = step_frame["best_star_hits"].to_numpy(dtype=float)
     return {
-        "steps": int(len(step_frame)),
+        "steps": len(step_frame),
         "ticket_budget": int(step_frame["shortlist_size"].sum()),
         "mean_best_ball_hits": float(best_ball_hits.mean()),
         "recall_at_5": float((best_ball_hits / 5.0).mean()),
@@ -159,7 +159,7 @@ def build_diagnostics3_shortlist(
     )
     current_expected_poi = float(fitted[-1])
     predicted_next_poi = float(shifted_pred[-1])
-    reverse_growth_target_score = int(round((2.0 * current_expected_poi) - predicted_next_poi))
+    reverse_growth_target_score = round((2.0 * current_expected_poi) - predicted_next_poi)
 
     reverse_matches, _ = find_matching_full7_guesses(
         pair_counts,
@@ -270,7 +270,7 @@ def main() -> None:
 
     step_frame = pd.DataFrame(rows).sort_values(["draw_date", "method"]).reset_index(drop=True)
     benchmark = {
-        "history_rows": int(len(history)),
+        "history_rows": len(history),
         "cutoff_start_date": cutoff_start_date,
         "holdout_steps": int(eff_holdout),
         "requested_top_n": int(args.top_n),

@@ -7,7 +7,6 @@ import os
 from dataclasses import dataclass
 from io import StringIO
 from pathlib import Path
-from typing import Dict, List, Optional
 
 import pandas as pd
 import requests
@@ -15,8 +14,8 @@ from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 
 from .archive_source import fetch_euromillions_archive
+from .lottology import LOTTOLOGY_ARCHIVE_URL, EMRow, fetch_euromillions_lottology
 from .schema import validate_df
-from .lottology import EMRow, LOTTOLOGY_ARCHIVE_URL, fetch_euromillions_lottology
 
 PRIMARY_URL = "https://www.merseyworld.com/euromillions/resultsArchive.php?format=csv"
 SECONDARY_URL = "https://www.national-lottery.co.uk/results/euromillions/draw-history/csv"
@@ -64,7 +63,7 @@ def _cache_dir(custom: Path | None = None) -> Path:
     return CACHE_DIR
 
 
-def _cache_key(url: str, params: Dict[str, str], cache_dir: Path) -> Path:
+def _cache_key(url: str, params: dict[str, str], cache_dir: Path) -> Path:
     cache_dir.mkdir(parents=True, exist_ok=True)
     raw = f"{url}|{json.dumps(params, sort_keys=True)}".encode()
     digest = hashlib.sha256(raw).hexdigest()[:16]
@@ -75,10 +74,10 @@ def fetch_raw_csv(
     date_from: str | None = None,
     date_to: str | None = None,
     *,
-    session: Optional[requests.Session] = None,
+    session: requests.Session | None = None,
     cache_dir: Path | None = None,
     use_cache: bool = True,
-    urls: Optional[List[str]] = None,
+    urls: list[str] | None = None,
     min_rows_full_history: int = _MIN_ROWS_FULL_HISTORY,
     allow_partial: bool = False,
 ) -> str:
@@ -89,14 +88,14 @@ def fetch_raw_csv(
     If ``use_cache`` is False, the network is always hit.
     """
 
-    params: Dict[str, str] = {}
+    params: dict[str, str] = {}
     if date_from:
         params["from"] = date_from
     if date_to:
         params["to"] = date_to
 
     candidates = urls or [PRIMARY_URL, SECONDARY_URL]
-    errors: List[str] = []
+    errors: list[str] = []
 
     def _looks_like_numeric_row(line: str) -> bool:
         parts = [p.strip() for p in line.split(",") if p.strip()]
@@ -183,7 +182,7 @@ def _apply_date_filters(df: pd.DataFrame, date_from: str | None, date_to: str | 
     return filtered.reset_index(drop=True)
 
 
-def _em_rows_to_df(rows: List[EMRow]) -> pd.DataFrame:
+def _em_rows_to_df(rows: list[EMRow]) -> pd.DataFrame:
     """Convert EMRow list into the normalized draw dataframe shape."""
 
     df = pd.DataFrame(
@@ -278,12 +277,12 @@ def write_csv(df: pd.DataFrame, out_path: Path, append: bool) -> None:
 
 def _fetch_http_source(
     *,
-    urls: List[str],
+    urls: list[str],
     date_from: str | None,
     date_to: str | None,
     out_path: Path | None,
     append: bool,
-    session: Optional[requests.Session],
+    session: requests.Session | None,
     cache_dir: Path | None,
     use_cache: bool,
     allow_partial: bool,
@@ -314,7 +313,7 @@ def _fetch_lottology_source(
     date_to: str | None,
     out_path: Path | None,
     append: bool,
-    session: Optional[requests.Session],
+    session: requests.Session | None,
     cache_dir: Path | None,
     use_cache: bool,
 ) -> FetchResult:
@@ -345,7 +344,7 @@ def _fetch_archive_source(
     date_to: str | None,
     out_path: Path | None,
     append: bool,
-    session: Optional[requests.Session],
+    session: requests.Session | None,
     cache_dir: Path | None,
     use_cache: bool,
 ) -> FetchResult:
@@ -393,7 +392,7 @@ def fetch_and_normalize(
     date_to: str | None = None,
     out_path: Path | None = None,
     append: bool = False,
-    session: Optional[requests.Session] = None,
+    session: requests.Session | None = None,
     cache_dir: Path | None = None,
     use_cache: bool = True,
     allow_partial: bool = False,
@@ -407,7 +406,7 @@ def fetch_and_normalize(
         raise ValueError(f"Unsupported source {source!r}; choose from {SOURCE_CHOICES}.")
 
     candidates = ["merseyworld", "pedro", "archive", "lottology"] if source == "auto" else [source]
-    errors: List[str] = []
+    errors: list[str] = []
 
     for candidate in candidates:
         try:
@@ -462,7 +461,7 @@ def fetch_and_normalize(
             continue
 
     if allow_stale:
-        fallbacks: List[Path] = []
+        fallbacks: list[Path] = []
         if out_path and out_path.exists():
             fallbacks.append(out_path)
         bundled_full = Path("euromillions/euromillions_2016_2025.csv")
@@ -537,14 +536,14 @@ def main() -> None:
 
 
 __all__ = [
-    "FetchError",
     "ContentTypeError",
-    "NormalizationError",
+    "FetchError",
     "FetchResult",
+    "NormalizationError",
+    "fetch_and_normalize",
     "fetch_raw_csv",
     "normalize",
     "write_csv",
-    "fetch_and_normalize",
 ]
 
 

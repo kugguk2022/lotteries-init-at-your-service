@@ -22,7 +22,6 @@ import argparse
 import json
 from math import gcd
 from pathlib import Path
-from typing import Dict, Optional, Tuple
 
 import matplotlib
 import numpy as np
@@ -30,11 +29,13 @@ import pandas as pd
 
 matplotlib.use("Agg")
 
+import itertools
+import warnings
+
 import matplotlib.pyplot as plt
 import statsmodels.api as sm
 from scipy.special import logsumexp
 from scipy.stats import multivariate_t
-import warnings
 
 from euromillions.diagnostics3 import (
     apply_start_date_cutoff,
@@ -67,8 +68,8 @@ class BranchHMM:
                                [0.66, 0.34]])  # P(flip to lower), P(stay upper)
         # These numbers reproduce your observed 0.28 / 0.66 split when GCD-aware
 
-        self.means: Dict[int, np.ndarray] = {}      # per-state mean vector
-        self.covs: Dict[int, np.ndarray] = {}       # per-state covariance
+        self.means: dict[int, np.ndarray] = {}      # per-state mean vector
+        self.covs: dict[int, np.ndarray] = {}       # per-state covariance
         self.feature_names: list = []
 
     @staticmethod
@@ -128,7 +129,7 @@ class BranchHMM:
 
     def _estimate_transition_matrix(self, labels: np.ndarray) -> np.ndarray:
         counts = np.ones((self.n_states, self.n_states), dtype=float)
-        for prev_state, next_state in zip(labels[:-1], labels[1:]):
+        for prev_state, next_state in itertools.pairwise(labels):
             counts[int(prev_state), int(next_state)] += 1.0
         return counts / counts.sum(axis=1, keepdims=True)
 
@@ -209,7 +210,7 @@ class BranchHMM:
         return self
 
     def predict_next(self, history_df: pd.DataFrame, version: str = "no_pruning",
-                     n_ahead: int = 1) -> Dict:
+                     n_ahead: int = 1) -> dict:
         """
         Return:
           - P_upper: probability next state is upper
@@ -266,7 +267,7 @@ class BranchHMM:
     def plot_results(
         self,
         df: pd.DataFrame,
-        forecast: Dict,
+        forecast: dict,
         version: str,
         out_dir: Path,
         title_suffix: str = "",
@@ -350,7 +351,7 @@ class BranchHMM_NoPruning(BranchHMM):
         super().__init__(**kwargs)
         self.version = "no_pruning"
 
-    def _make_features(self, df: pd.DataFrame, version: str = None) -> np.ndarray:
+    def _make_features(self, df: pd.DataFrame, version: str | None = None) -> np.ndarray:
         return super()._make_features(df, "no_pruning")
 
 
@@ -363,7 +364,7 @@ class BranchHMM_MinimalPruning(BranchHMM):
         self.version = "minimal_pruning"
         self.prime_threshold = prime_threshold   # phi_ratio > this → "near prime line"
 
-    def _make_features(self, df: pd.DataFrame, version: str = None) -> np.ndarray:
+    def _make_features(self, df: pd.DataFrame, version: str | None = None) -> np.ndarray:
         df = df.copy()
         df["near_upper_bound"] = (df["phi_ratio"] > self.prime_threshold).astype(int)
         # minimal pruning: we keep the column so the model can learn to ignore these points
@@ -372,7 +373,7 @@ class BranchHMM_MinimalPruning(BranchHMM):
 
     def fit(self, df: pd.DataFrame, version: str = "minimal_pruning", **fit_kwargs):
         # Extra: give lower weight to near-upper-bound points during fitting
-        X = self._make_features(df, version)
+        self._make_features(df, version)
         # ... (the base fit already handles it via the extra feature)
         return super().fit(df, version=version, **fit_kwargs)
 
@@ -530,7 +531,7 @@ def load_real_feature_frame(history_path: Path, start_date: str) -> tuple[pd.Dat
     meta = {
         "history_path": str(history_path),
         "effective_start_date": effective_start_date,
-        "rows": int(len(frame)),
+        "rows": len(frame),
         "main_n": int(main_n),
         "star_n": int(star_n),
         "pair_system": "full21",
@@ -632,7 +633,7 @@ def run_analysis(args: argparse.Namespace) -> dict[str, object]:
         data_meta = {
             "history_path": None,
             "effective_start_date": None,
-            "rows": int(len(data)),
+            "rows": len(data),
             "note": "synthetic debug data",
         }
     history = data.iloc[-args.history_window :]
@@ -679,10 +680,10 @@ def run_analysis(args: argparse.Namespace) -> dict[str, object]:
 
     summary = {
         "source": args.source,
-        "rows": int(len(data)),
+        "rows": len(data),
         "seed": int(args.seed),
         "n_iter": int(args.n_iter),
-        "history_window": int(len(history)),
+        "history_window": len(history),
         "data_meta": data_meta,
         "versions": {
             "no_pruning": {

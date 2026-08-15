@@ -22,8 +22,8 @@ import datetime as dt
 import json
 import re
 import sys
+import traceback
 from pathlib import Path
-from typing import Dict, List, Optional
 
 import requests
 
@@ -40,7 +40,7 @@ def _weekday_name(iso_date: str) -> str:
     return dt.date(y, m, d).strftime("%a")
 
 
-def _iso_from_eng_date(text: str) -> Optional[str]:
+def _iso_from_eng_date(text: str) -> str | None:
     """Convert strings like 'November 20th 2025' -> '2025-11-20'."""
     m = re.search(r"\b([A-Za-z]+)\s+(\d{1,2})(?:st|nd|rd|th)?\s+(\d{4})\b", text)
     if not m:
@@ -67,9 +67,9 @@ def fetch_irish_archive() -> str:
     return r.text
 
 
-def parse_irish_archive(html: str) -> List[Dict]:
+def parse_irish_archive(html: str) -> list[dict]:
     """Scan for date markers, then read the next 7 <li> integers (6 mains + dream)."""
-    out: List[Dict] = []
+    out: list[dict] = []
     # Date anchors like >November 20th 2025<
     date_iter = list(re.finditer(r">\s*([A-Za-z]+\s+\d{1,2}(?:st|nd|rd|th)?\s+\d{4})\s*<", html))
     # All numbers in order of appearance
@@ -112,20 +112,20 @@ def fetch_euromillions_year(year: int) -> str:
     return r.text
 
 
-def parse_euromillions_year(html: str, year: int) -> List[Dict]:
+def parse_euromillions_year(html: str, year: int) -> list[dict]:
     """Extract Portuguese date, draw_code 'NNN/YYYY', and 7 numbers (6 + dream)."""
-    out: List[Dict] = []
+    out: list[dict] = []
 
     for m in re.finditer(
         r"(?:>([A-Za-zÀ-ÿ]+\s+\d{1,2}\s+de\s+[A-Za-zÀ-ÿ]+\s+\d{4})<).*?(\d{3}/\d{4}).*?(<ul[^>]*>.*?</ul>)",
         html,
-        flags=re.S | re.I,
+        flags=re.DOTALL | re.IGNORECASE,
     ):
         date_pt = m.group(1)
         draw_code = m.group(2)
         ul_html = m.group(3)
 
-        md = re.search(r"(\d{1,2})\s+de\s+([A-Za-zÀ-ÿ]+)\s+(\d{4})", date_pt, flags=re.I)
+        md = re.search(r"(\d{1,2})\s+de\s+([A-Za-zÀ-ÿ]+)\s+(\d{4})", date_pt, flags=re.IGNORECASE)
         if not md:
             continue
         day = int(md.group(1))
@@ -182,10 +182,10 @@ def fetch_lottery_ie_recent() -> str:
     return r.text
 
 
-def parse_lottery_ie_recent(html: str) -> List[Dict]:
+def parse_lottery_ie_recent(html: str) -> list[dict]:
     """Parse recent (last ~90 days) results from lottery.ie."""
-    out: List[Dict] = []
-    for m in re.finditer(r"(\d{1,2})/(\d{1,2})/(\d{4}).*?<ul[^>]*>(.*?)</ul>", html, flags=re.S):
+    out: list[dict] = []
+    for m in re.finditer(r"(\d{1,2})/(\d{1,2})/(\d{4}).*?<ul[^>]*>(.*?)</ul>", html, flags=re.DOTALL):
         d, mth, y = int(m.group(1)), int(m.group(2)), int(m.group(3))
         ul_html = m.group(4)
         try:
@@ -213,8 +213,8 @@ def parse_lottery_ie_recent(html: str) -> List[Dict]:
     return out
 
 
-def dedupe_keep_best(recs: List[Dict]) -> List[Dict]:
-    best: Dict[str, Dict] = {}
+def dedupe_keep_best(recs: list[dict]) -> list[dict]:
+    best: dict[str, dict] = {}
     for r in recs:
         k = r["date"]
         prev = best.get(k)
@@ -227,7 +227,7 @@ def dedupe_keep_best(recs: List[Dict]) -> List[Dict]:
     return sorted(best.values(), key=lambda x: x["date"])
 
 
-def filter_year_range(recs: List[Dict], start_year: int, end_year: int) -> List[Dict]:
+def filter_year_range(recs: list[dict], start_year: int, end_year: int) -> list[dict]:
     out = []
     for r in recs:
         y = int(r["date"][:4])
@@ -236,7 +236,7 @@ def filter_year_range(recs: List[Dict], start_year: int, end_year: int) -> List[
     return out
 
 
-def save_csv(recs: List[Dict], path: str) -> None:
+def save_csv(recs: list[dict], path: str) -> None:
     with open(path, "w", newline="", encoding="utf-8") as f:
         w = csv.DictWriter(f, fieldnames=FIELDS)
         w.writeheader()
@@ -244,12 +244,12 @@ def save_csv(recs: List[Dict], path: str) -> None:
             w.writerow({k: r.get(k) for k in FIELDS})
 
 
-def save_json(recs: List[Dict], path: str) -> None:
+def save_json(recs: list[dict], path: str) -> None:
     with open(path, "w", encoding="utf-8") as f:
         json.dump(recs, f, ensure_ascii=False, indent=2)
 
 
-def _load_existing(path: str) -> List[Dict]:
+def _load_existing(path: str) -> list[dict]:
     rows = []
     with open(path, newline="", encoding="utf-8") as f:
         reader = csv.DictReader(f)
@@ -258,10 +258,8 @@ def _load_existing(path: str) -> List[Dict]:
     return rows
 
 
-import traceback
-
-def _validate_structured_rows(rows: List[Dict]) -> List[Dict]:
-    out: List[Dict] = []
+def _validate_structured_rows(rows: list[dict]) -> list[dict]:
+    out: list[dict] = []
     for r in rows:
         # Normalize keys
         mapped = {}
@@ -281,10 +279,9 @@ def _validate_structured_rows(rows: List[Dict]) -> List[Dict]:
                 mapped[k_std] = r[k_alt]
         
         # Handle the weird fallback case where header is ball_1..5, star_1, star_2
-        if "n6" not in mapped:
-             if "star_1" in r:
-                 # Assume this is actually ball 6
-                 mapped["n6"] = r["star_1"]
+        if "n6" not in mapped and "star_1" in r:
+            # Assume this is actually ball 6
+            mapped["n6"] = r["star_1"]
         
         # Dream
         if "dream" in r:
@@ -314,7 +311,7 @@ def _validate_structured_rows(rows: List[Dict]) -> List[Dict]:
                          d, m, y = map(int, parts)
                          d_iso = dt.date(y, m, d).isoformat()
                          mapped["date"] = d_iso
-                 except:
+                 except ValueError:
                      pass
 
              rec = {
@@ -381,8 +378,8 @@ def main():
     )
     args = ap.parse_args()
 
-    recs: List[Dict] = []
-    errors: List[str] = []
+    recs: list[dict] = []
+    errors: list[str] = []
 
     def _extend(fn_fetch, fn_parse, label):
         nonlocal recs

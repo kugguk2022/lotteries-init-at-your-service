@@ -1,11 +1,12 @@
 from __future__ import annotations
 
 import argparse
+from collections.abc import Sequence
 from pathlib import Path
-from typing import Sequence
 
 import numpy as np
 import pandas as pd
+
 
 # We use simple validation here instead of the rigid schema import to allow flexibility
 def validate_df_flexible(df: pd.DataFrame) -> pd.DataFrame:
@@ -137,17 +138,15 @@ def main() -> None:
     history = load_history(args.history)
     
     # Heuristic for column names if defaults missing
-    if ball_cols[0] not in history.columns:
-        if "n1" in history.columns:
-            ball_cols = [f"n{i}" for i in range(1, args.num_balls + 1)]
+    if ball_cols[0] not in history.columns and "n1" in history.columns:
+        ball_cols = [f"n{i}" for i in range(1, args.num_balls + 1)]
     
-    if args.num_stars > 0:
-        if star_cols[0] not in history.columns:
-             # Try other common names
-             if "lucky_star_1" in history.columns:
-                 star_cols = [f"lucky_star_{i}" for i in range(1, args.num_stars + 1)]
-             elif "dream" in history.columns and args.num_stars == 1:
-                  star_cols = ["dream"]
+    if args.num_stars > 0 and star_cols[0] not in history.columns:
+         # Try other common names
+         if "lucky_star_1" in history.columns:
+             star_cols = [f"lucky_star_{i}" for i in range(1, args.num_stars + 1)]
+         elif "dream" in history.columns and args.num_stars == 1:
+              star_cols = ["dream"]
 
     candidates = generate_candidates(
         history, 

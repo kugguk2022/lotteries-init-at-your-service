@@ -5,7 +5,6 @@ import shutil
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
-
 REPO_ROOT = Path(__file__).resolve().parents[1]
 OUTPUTS_ROOT = REPO_ROOT / "outputs" / "euromillions"
 LEGACY_DIR = OUTPUTS_ROOT / "legacy"

@@ -74,8 +74,8 @@ def clean_history(history_path: Path) -> tuple[pd.DataFrame, CleaningSummary]:
         .reset_index(drop=True)
     )
     summary = CleaningSummary(
-        raw_rows=int(len(raw)),
-        cleaned_rows=int(len(cleaned)),
+        raw_rows=len(raw),
+        cleaned_rows=len(cleaned),
         duplicate_dates_removed=int(len(validated) - len(cleaned)),
         start_date=cleaned["draw_date"].min().date().isoformat(),
         end_date=cleaned["draw_date"].max().date().isoformat(),
@@ -95,11 +95,11 @@ def verify_rule_change(history: pd.DataFrame) -> RuleChangeSummary:
     ].min()
     main_max = int(history[[f"ball_{idx}" for idx in range(1, 6)]].max().max())
     return RuleChangeSummary(
-        pre_2011_rows=int(len(pre_2011)),
+        pre_2011_rows=len(pre_2011),
         pre_2011_star_max=int(pre_2011[["star_1", "star_2"]].max().max()),
-        from_2011_to_2016_rows=int(len(mid)),
+        from_2011_to_2016_rows=len(mid),
         from_2011_to_2016_star_max=int(mid[["star_1", "star_2"]].max().max()),
-        post_2016_rows=int(len(post)),
+        post_2016_rows=len(post),
         post_2016_star_max=int(post[["star_1", "star_2"]].max().max()),
         first_star_12_date=first_star_12.date().isoformat(),
         main_number_max_all_eras=main_max,
@@ -109,7 +109,7 @@ def verify_rule_change(history: pd.DataFrame) -> RuleChangeSummary:
 def main_pick_metrics(pred: np.ndarray, actual: np.ndarray) -> dict[str, float]:
     hits = np.array([len(set(p) & set(a)) for p, a in zip(pred, actual)], dtype=int)
     return {
-        "steps": int(len(actual)),
+        "steps": len(actual),
         "mean_hits": float(hits.mean()),
         "recall_at_5": float((hits / 5.0).mean()),
         "any_hit_rate": float(np.mean(hits >= 1)),

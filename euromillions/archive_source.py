@@ -2,13 +2,11 @@ from __future__ import annotations
 
 import re
 from datetime import date, datetime
-from typing import List, Optional
 
 import requests
 from bs4 import BeautifulSoup
 
 from .lottology import EMRow
-
 
 ARCHIVE_URL_TEMPLATE = "https://www.euro-millions.com/results-history-{year}"
 ARCHIVE_MIN_YEAR = 2004
@@ -16,11 +14,11 @@ UA = {"User-Agent": "lotteries/0.1 (+https://github.com/kugguk2022/lotteries)"}
 
 
 def _normalize_archive_date(text: str) -> str:
-    cleaned = re.sub(r"(\d+)\s+(st|nd|rd|th)\b", r"\1", text.strip(), flags=re.I)
+    cleaned = re.sub(r"(\d+)\s+(st|nd|rd|th)\b", r"\1", text.strip(), flags=re.IGNORECASE)
     return datetime.strptime(cleaned, "%A %d %B %Y").date().isoformat()
 
 
-def _parse_archive_year(html: str) -> List[EMRow]:
+def _parse_archive_year(html: str) -> list[EMRow]:
     soup = BeautifulSoup(html, "html.parser")
     tables = soup.find_all("table")
     for table in tables:
@@ -31,7 +29,7 @@ def _parse_archive_year(html: str) -> List[EMRow]:
         if "Result Date" not in header or "Numbers" not in header:
             continue
 
-        parsed: List[EMRow] = []
+        parsed: list[EMRow] = []
         for row in rows[1:]:
             cells = row.find_all("td")
             if len(cells) < 2:
@@ -53,11 +51,11 @@ def _parse_archive_year(html: str) -> List[EMRow]:
 
 
 def fetch_euromillions_archive(
-    session: Optional[requests.Session] = None,
+    session: requests.Session | None = None,
     *,
     start_year: int | None = None,
     end_year: int | None = None,
-) -> List[EMRow]:
+) -> list[EMRow]:
     current_year = date.today().year
     start = max(ARCHIVE_MIN_YEAR, start_year or ARCHIVE_MIN_YEAR)
     end = min(current_year, end_year or current_year)

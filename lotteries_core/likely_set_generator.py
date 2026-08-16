@@ -241,7 +241,11 @@ def generate_sets(
 
         # G for every main set with this star combo
         if cross_cols is not None:
-            cross = cross_cols[all_main].sum(axis=(1, 2))  # (num_main,)
+            # Sum over the star axis first: colsum[m] = sum_{s in s0} Wcross[m, s]. Gathering after
+            # the reduction gives an identical result while materialising (num_main, main_k) instead
+            # of (num_main, main_k, star_k) -- the latter is 162 MiB per star combo for EuroMillions.
+            colsum = cross_cols.sum(axis=1)  # (main_n,)
+            cross = colsum[all_main].sum(axis=1)  # (num_main,)
         else:
             cross = 0
         g = all_gm + cross + star_const

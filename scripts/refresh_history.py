@@ -45,6 +45,11 @@ def main(argv: list[str] | None = None) -> int:
         help="how old the newest draw may be before the history counts as stale",
     )
     ap.add_argument("--check", action="store_true", help="report status only; fetch nothing")
+    ap.add_argument(
+        "--allow-stale",
+        action="store_true",
+        help="fall back to local/bundled data when every upstream source fails",
+    )
     args = ap.parse_args(argv)
 
     out = Path(args.out)
@@ -52,17 +57,16 @@ def main(argv: list[str] | None = None) -> int:
         return _check(out, args.max_age_days)
 
     before = dataset.read(out)
-    from euromillions.get_draws import main as fetch_main
+    # Call the library entry point rather than the CLI `main()`, which parses sys.argv directly.
+    from euromillions.get_draws import fetch_and_normalize
 
+    out.parent.mkdir(parents=True, exist_ok=True)
     try:
-        fetch_main(["--out", str(out)])
-    except SystemExit as exc:  # argparse/`FetchError` surfaced by the fetcher CLI
-        if exc.code:
-            print(f"[refresh] fetch failed with exit code {exc.code}", file=sys.stderr)
-            return 1
+        result = fetch_and_normalize(out_path=out, allow_stale=args.allow_stale)
     except Exception as exc:
         print(f"[refresh] fetch failed: {exc}", file=sys.stderr)
         return 1
+    print(f"[refresh] fetched {len(result.dataframe)} rows (cache: {result.cache_path})")
 
     meta = dataset.write(out, game=args.game)
     changed = before is None or before.content_sha256 != meta.content_sha256

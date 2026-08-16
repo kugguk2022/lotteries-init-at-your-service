@@ -6,12 +6,16 @@ substrate for the new research question.
 
 ## The research question (stated honestly)
 
-> Can *coordinating many independent inference strategies* — run in a distributed way — improve
-> **combinatorial coverage** and **expected return-per-ticket** under a **fixed ticket budget**,
-> relative to any single strategy spending the same budget?
+> Can the owner's co-occurrence level-set method, alone or coordinated with independent inference
+> strategies, produce **better preregistered draw outcomes and net user returns** than matched random
+> and strongest-single-strategy controls under the same fixed ticket budget?
 
-That is the whole claim. In particular, this project does **not** claim, and its code does not try,
-to predict the outcome of a fair random draw. See [`docs/SCOPE_AND_ETHICS.md`](docs/SCOPE_AND_ETHICS.md).
+Draw prediction and a positive user outcome are research objectives, not established claims. The
+null hypothesis is that a fair draw is independent of history and the method has no edge. The
+repository therefore records portfolios before draws, settles them after official results, and
+keeps negative or inconclusive evidence. See
+[`docs/OUTCOME_TRACKING.md`](docs/OUTCOME_TRACKING.md) and
+[`docs/SCOPE_AND_ETHICS.md`](docs/SCOPE_AND_ETHICS.md).
 
 ## What is preserved
 
@@ -35,12 +39,14 @@ A small, dependency-light package that is the common substrate:
 | --- | --- |
 | `protocol.py` | `GameSpec` (combinatorial shape) and `InferenceProvider` (the interface every strategy implements). |
 | `envelope.py` | `InferenceEnvelope` — a reproducible, provenance-carrying container of proposed tickets. The unit of exchange between nodes. |
-| `popularity.py` | A model of how *other players* pick numbers (the basis of the only valid draw-game lever). |
+| `likely_set_generator.py` | Format-agnostic co-occurrence level-set generator and provider adapter. |
+| `outcome_tracker.py` | Immutable prospective record → official settlement → long-horizon verdict ledger. |
+| `popularity.py` | A secondary model of how other players pick numbers for jackpot-sharing analysis. |
 | `roi.py` | Expected return-per-ticket under pari-mutuel jackpot sharing, plus the instant-game remaining-prize EV model. Simulation-only. |
 | `coverage.py` | Combinatorial coverage and diversity metrics (first-class objectives). |
 | `aggregation.py` | Deterministic, diversity-aware, equal-budget aggregation across envelopes — the coordination step. |
 | `evaluation.py` | Forward-only, equal-budget benchmark. |
-| `providers/` | `frequency`, `unpopularity`, and a `ml_ensemble` (GLM + gradient-boosting + optional deep MLP). |
+| `providers/` | Co-occurrence level set, frequency, unpopularity, and an optional ML ensemble. |
 
 ## Key decisions
 
@@ -48,20 +54,25 @@ A small, dependency-light package that is the common substrate:
 2. **Forward-only, equal-budget evaluation** is the only accepted way to claim "better".
 3. **Provenance and reproducibility are mandatory** — every envelope records seed, data hash, git SHA,
    config, and framework version, and reproducibility is *checked*, not assumed.
-4. **Diversity / coverage are first-class metrics**, not afterthoughts.
+4. **Official hit tiers, tracked payout, and net return are primary outcomes.** Coverage, diversity,
+   and unpopularity are explanatory or selection metrics, not substitutes for wins.
 5. **Distributed operation starts as local / file exchange.** Nodes write envelopes to a shared
    directory; a coordinator reads and aggregates them.
 6. **Networking is added only after deterministic aggregation over file envelopes is validated.**
-7. **Financial outcomes are simulation-only.** No pooled funds, no ticket purchasing, no wager
-   execution, and no claim that distributed inference guarantees increased winnings.
+7. **Execution remains outside the repository.** No pooled funds, ticket purchasing, custody, or
+   wager execution. The repository may track simulated portfolio payout and a pre-draw receipt hash,
+   but it does not claim a verified cash win without external operator/payment confirmation.
+8. **Repository popularity is irrelevant evidence.** Stars, contributor activity, or self-awarded
+   endorsements never count as experimental success.
 
 ## Product boundary (non-negotiable)
 
 - ❌ No pooling of user funds.
 - ❌ No ticket purchasing or wager execution.
-- ❌ No claim of guaranteed or positive expected winnings.
-- ✅ Reproducible, forward-only simulation and measurement.
-- ✅ Coverage, diversity, and expected-conditional-ROI as the reported quantities.
+- ❌ No guaranteed-winnings claim and no presentation of an unvalidated edge as established.
+- ✅ Explicitly test draw-prediction performance and the possibility of positive net user outcomes.
+- ✅ Reproducible forward-only recording, official settlement, matched controls, and honest verdicts.
+- ✅ Report hit tiers, payout and net return before secondary coverage/popularity metrics.
 
 ## Implementation passes
 
@@ -70,8 +81,12 @@ A small, dependency-light package that is the common substrate:
 - [x] **Pass 1 — protocol & envelopes.** `GameSpec`, `InferenceProvider`, `InferenceEnvelope`.
 - [x] **Pass 2 — the honest ROI lever.** Popularity model, expected-conditional-ROI, coverage,
       diversity-aware equal-budget aggregation, instant-game remaining-prize EV.
-- [x] **Pass 3 — wrap strategies as providers.** Frequency baseline, unpopularity, GLM+GBM(+DL) ensemble.
-- [x] **Pass 4 — forward-only equal-budget benchmark + regression fixtures + causal POI fix.**
+- [ ] **Pass 3 — wrap strategies as providers.** Co-occurrence, frequency, unpopularity and ML exist;
+      branch-classic, Sobol and uniform adapters remain required.
+- [x] **Pass 4 — prospective outcome instrument.** Pre-draw record, matched control, integrity hash,
+      official settlement, tier/payout tracking and cumulative verdict CLI.
+- [ ] **Pass 4 evidence gate — three-year prospective ledger.** Infrastructure completion is not a
+      positive result; the verdict remains unknown until evidence accumulates.
 - [ ] **Pass 5 — file-based distributed runner** (multiple nodes → shared envelope directory → coordinator).
 - [ ] **Pass 6 — real, sales-normalised popularity calibration data** (see `docs/GEOGRAPHY.md`).
 - [ ] **Pass 7 — networking layer**, only after Pass 5 aggregation is proven deterministic.

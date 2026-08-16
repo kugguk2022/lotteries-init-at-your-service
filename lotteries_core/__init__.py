@@ -1,24 +1,21 @@
 """lotteries_core: a research framework for coordinated, distributed inference over lottery draws.
 
 This package is the common substrate for the repository's pivot (see ``repurpose.md``)
-from a collection of one-off lottery-analysis experiments toward a reproducible framework
-for studying whether *coordinating many independent inference strategies* can improve
-**combinatorial coverage** and **expected return-per-ticket** under a **fixed ticket budget**.
+from a collection of one-off lottery-analysis experiments toward a reproducible, prospective
+experiment: record fixed-budget portfolios before each draw, settle them against official results,
+and test whether the owner's co-occurrence method or coordinated providers outperform a matched
+random control over a long horizon.
 
 Read ``docs/SCOPE_AND_ETHICS.md`` before using anything here. The short version:
 
-* Fair number-draw lotteries (EuroMillions, Totoloto, EuroDreams) are *provably random*.
-  No model in this package can predict which numbers will be drawn, and none tries to.
-* The lottery is a **negative-sum** game. Nothing here produces a guaranteed positive ROI,
-  and the framework never claims otherwise.
-* The *only* mathematically valid levers this framework studies are:
-    1. **Unpopularity / jackpot-sharing** -- for a pari-mutuel (shared) jackpot, choosing
-       number combinations that few other players pick raises the *expected payout
-       conditional on winning*. This does not change the probability of winning.
-    2. **Instant-game remaining-prize EV** -- for finite-pool scratch/instant games with
-       officially published remaining-prize inventories, expected value is computable and
-       occasionally favourable. This is the honest core of the "Joan Ginther" advantage-play
-       story (see ``docs/GEOGRAPHY.md``).
+* Licensed number draws are designed to be independent and fixed-odds; that is the null hypothesis.
+  The package nevertheless tests draw-prediction methods prospectively rather than declaring an
+  edge—or impossibility—without outcome evidence.
+* The baseline game is negative-sum for users. The research objective is to test whether coordinated
+  selection can produce a repeatable predictive edge and positive net user outcome. It makes no
+  guaranteed or pre-evidence positive-ROI claim.
+* The primary question is outcome-based: do preregistered portfolios beat an equal-budget random
+  control on holdout hit tiers and tracked payout? Coverage and unpopularity are secondary metrics.
 * The framework is **simulation-only**. It never moves money, pools funds, buys tickets,
   or executes wagers.
 
@@ -39,9 +36,9 @@ from .protocol import GameSpec, InferenceProvider, Ticket
 
 __all__ = [
     "GameSpec",
+    "InferenceEnvelope",
     "InferenceProvider",
     "Ticket",
-    "InferenceEnvelope",
     "__version__",
 ]
 

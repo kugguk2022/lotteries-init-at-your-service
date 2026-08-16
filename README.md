@@ -44,16 +44,24 @@ reproducible **envelopes**, and be combined by a **deterministic, diversity-awar
 framework is evaluated **forward-only** and on the levers we actually control — coverage, diversity,
 and expected *conditional* ROI (jackpot-sharing) — never on an assumption of predictive power.
 
+Use `data/euromillions.csv` (current through 2026-08-14; refresh with
+`python -m euromillions.get_draws --out data/euromillions.csv`). The bundled
+`euromillions/euromillions_2016_2025.csv` ends 2025-08-12 and is for offline examples only.
+
 ```bash
 # Forward-only, equal-budget benchmark: single providers vs coordinated aggregation.
 python -m lotteries_core.benchmark \
-    --history euromillions/euromillions_2016_2025.csv \
-    --game euromillions --budget 25 --holdout 20 \
-    --out outputs/euromillions/distributed_inference_benchmark.json
+    --history data/euromillions.csv \
+    --game euromillions --budget 25 --holdout 40 --with-spectral --with-parallax \
+    --out outputs/euromillions/competition_benchmark.json
 
 # Include the GLM + gradient-boosting (+ optional deep MLP) popularity ensemble:
-python -m lotteries_core.benchmark --history euromillions/euromillions_2016_2025.csv --with-ml
+python -m lotteries_core.benchmark --history data/euromillions.csv --with-ml
 ```
+
+PowerShell users: the `\` above is a bash line-continuation. Either put the command on one line or
+use a backtick (`` ` ``) instead — PowerShell parses a leading `--` on a fresh line as a unary
+operator and fails with "Missing expression after unary operator '--'".
 
 The reported metrics are `pair_coverage` / `number_coverage` / `mean_jaccard_diversity` (coverage &
 spread), `unpopularity_lift` and `expected_roi_per_ticket` (the shared-jackpot lever; ROI stays

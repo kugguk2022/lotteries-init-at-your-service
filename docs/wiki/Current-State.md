@@ -74,11 +74,23 @@ linted only changed files. Both gates are now repository-wide and blocking.
 
 ## Open
 
-### 1. Aggregation underperformed the best single provider
+### 1. Aggregation underperforms the best single provider on pair coverage
 
-On the 40-draw benchmark, aggregated pair coverage came in below the best single provider, contrary
-to the framework's headline claim that coordination should not reduce coverage. This is a research
-question, not a build failure. See [Methods and Findings](Methods-and-Findings.md).
+On the 40-draw benchmark, aggregated pair coverage is 0.17745 against `parallax_guard`'s 0.20394 —
+a shortfall of 0.02649 — contrary to the framework's headline claim that coordination should not
+reduce coverage.
+
+**This is pre-existing, not a regression.** `lotteries_core/aggregation.py` has not been modified
+since commit `203e0f1`, which introduced it; no provider added since has touched it. An earlier
+40-draw run made before any of the current providers existed showed the same shortfall at the same
+magnitude (aggregated 0.1578 vs best single 0.1850, −0.0272). Adding stronger providers raises both
+numbers and leaves the gap intact, which is what a fixed property of the aggregator looks like.
+
+`tests/test_core_inference.py::test_aggregation_coverage_not_worse_than_single_provider` asserts only
+that aggregation beats the **weakest** provider (`min(single_cov)`), which is why this has never
+tripped a gate. The defensible fix is a coverage floor in the aggregator — keep the best single
+provider's portfolio unless the blend genuinely beats it — plus tightening that test to `max`. Until
+then the README/`repurpose.md` claim is stronger than the evidence supports.
 
 ### 2. `euromillions/roi.py` is a documented stub
 

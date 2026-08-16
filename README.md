@@ -4,6 +4,29 @@
 
 Lottery data playground for EuroMillions, Totoloto, and EuroDreams. The repo ships a small typed public API plus labs for modelling, bankroll experiments, and scraping. Everything is research-focused; use it responsibly.
 
+## 📖 Start with the wiki
+
+**New here? Read [`docs/wiki/Home.md`](docs/wiki/Home.md).** It explains what this project does and
+refuses to do, how to run it, which parts are maintained versus experimental, and what condition the
+repository is actually in.
+
+| | |
+|---|---|
+| [Scope and Honesty](docs/wiki/Scope-and-Honesty.md) | What is claimed, what is refused, and why |
+| [Getting Started](docs/wiki/Getting-Started.md) | Install plus commands verified to run today |
+| [Repository Map](docs/wiki/Repository-Map.md) | Maintained core vs labs vs legacy |
+| [Methods and Findings](docs/wiki/Methods-and-Findings.md) | Every method and how it has scored |
+| [Outcome Tracking](docs/wiki/Outcome-Tracking.md) | The prospective ledger — the real experiment |
+| [Current State](docs/wiki/Current-State.md) | Known issues, staleness, and the path to green |
+| [Documentation Standard](docs/wiki/Documentation-Standard.md) | The bar this repo is held to |
+
+> **Status, verified 2026-08-16.** The maintained core (`lotteries_core/`) is green and gated in CI.
+> The wider repository is not: a bare `pytest` fails at collection on two modules, repository-wide
+> `ruff` reports 61 errors, and the bundled draw history ends 2025-08-12. Run
+> `pytest -q tests/test_core_inference.py tests/test_outcome_tracking.py tests/test_benchmark_regression.py tests/test_causal_poi.py`
+> (24 passed) rather than `make test`. Details and fixes in
+> [Current State](docs/wiki/Current-State.md).
+
 > **Scope & honesty (please read).** This project is a **research framework**, not a betting system.
 > The lottery is a **negative-sum** game and fair draws are **unpredictable** — nothing here predicts
 > which numbers will be drawn, and nothing here claims a guaranteed or positive expected ROI. What it
@@ -74,7 +97,11 @@ python -m venv .venv
 python -m pip install -U pip
 pip install -e ".[dev]"
 
-# Quality gate (lint + tests)
+# Quality gate for the maintained core -- this is the one that passes today
+pytest -q tests/test_core_inference.py tests/test_outcome_tracking.py \
+         tests/test_benchmark_regression.py tests/test_causal_poi.py
+
+# Full gate -- currently RED; see docs/wiki/Current-State.md
 make test     # or: ruff check . && pytest -q
 
 # 1) Fetch EuroMillions history (cached and normalized)
@@ -180,7 +207,7 @@ Current fair benchmark snapshot on the last 3 draws:
 Shortlist benchmark artifacts:
 
 - [outputs/euromillions/branch_shortlist_benchmark_fair_holdout3/branch_shortlist_benchmark.json](outputs/euromillions/branch_shortlist_benchmark_fair_holdout3/branch_shortlist_benchmark.json)
-- [outputs/euromillions/branch_shortlist_benchmark_fair_holdout3/branch_shortlist_benchmark_steps.csv](outputs/euromillions/branch_shortlist_benchmark_fair_holdout3/branch_shortlist_benchmark_steps.csv)
+- Per-step CSV (`branch_shortlist_benchmark_steps.csv`) is written by the command above but is not committed; re-run the benchmark to regenerate it.
 
 These shortlist numbers should be treated as directional only until the same-budget benchmark is extended to a larger holdout window.
 

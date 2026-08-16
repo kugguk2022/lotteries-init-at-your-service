@@ -62,25 +62,23 @@ def _spec_from_config(cfg: GameConfig) -> GameSpec:
     return GameSpec(cfg.name, cfg.main_n, cfg.main_k, cfg.star_n, cfg.star_k)
 
 
-def _make_provider(method: str):
-    """Instantiate a registered provider. Imported lazily so the CLI stays light."""
-    from .providers import (
-        FrequencyProvider,
-        ParallaxGuardProvider,
-        PerronFrobeniusProvider,
-        UnpopularityProvider,
-    )
+#: Ledger CLI names kept stable for existing ledgers, mapped onto :mod:`lotteries_core.registry`.
+#: The registry is the single list of providers; this only preserves the shorter CLI spellings.
+_REGISTRY_ALIASES = {
+    "perron_frobenius": "perron_frobenius_contrarian",
+    "parallax_ablation": "parallax_guard_ablation",
+}
 
-    factories = {
-        "frequency": lambda: FrequencyProvider(),
-        "unpopularity": lambda: UnpopularityProvider(),
-        "perron_frobenius": lambda: PerronFrobeniusProvider(orientation="contrarian"),
-        "parallax_guard": lambda: ParallaxGuardProvider(mode="guarded"),
-        "parallax_ablation": lambda: ParallaxGuardProvider(mode="ablation"),
-    }
-    if method not in factories:
-        raise ValueError(f"unknown provider method {method!r}; choose from {PROVIDER_METHODS}")
-    return factories[method]()
+
+def _make_provider(method: str):
+    """Instantiate a registered provider by its ledger CLI name."""
+    from . import registry
+
+    name = _REGISTRY_ALIASES.get(method, method)
+    try:
+        return registry.create(name)
+    except KeyError as exc:
+        raise ValueError(f"unknown provider method {method!r}; choose from {PROVIDER_METHODS}") from exc
 
 
 def _portfolio_for_method(method: str, df: pd.DataFrame, cfg: GameConfig, args) -> tuple[str, list, float | None]:

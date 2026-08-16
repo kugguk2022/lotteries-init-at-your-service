@@ -17,6 +17,7 @@ repository is actually in.
 | [Repository Map](docs/wiki/Repository-Map.md) | Maintained core vs labs vs legacy |
 | [Methods and Findings](docs/wiki/Methods-and-Findings.md) | Every method and how it has scored |
 | [Outcome Tracking](docs/wiki/Outcome-Tracking.md) | The prospective ledger and the live competition |
+| [HTTP API](docs/wiki/HTTP-API.md) | REST layer: pick a provider, get a portfolio |
 | [Contributing a Provider](docs/wiki/Contributing-a-Provider.md) | Enter a new strategy — one file plus two registry lines |
 | [Current State](docs/wiki/Current-State.md) | Honest status: what works, what is open, what was fixed |
 | [Documentation Standard](docs/wiki/Documentation-Standard.md) | The bar this repo is held to |

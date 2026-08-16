@@ -16,6 +16,7 @@ the diff showing up.
 | [Repository Map](Repository-Map.md) | Which directories are maintained, which are labs, which are legacy. |
 | [Methods and Findings](Methods-and-Findings.md) | Every method in the repo, what it does, and how it has scored so far. |
 | [Outcome Tracking](Outcome-Tracking.md) | The prospective ledger and the live competition. |
+| [HTTP API](HTTP-API.md) | REST layer: pick a provider, get a portfolio, inspect provenance. |
 | [Contributing a Provider](Contributing-a-Provider.md) | How to enter a new strategy — one file plus two registry lines. |
 | [Current State](Current-State.md) | Honest status: what works, what is open, what was fixed. |
 | [Documentation Standard](Documentation-Standard.md) | The bar this and sibling repositories are being held to. |

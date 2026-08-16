@@ -8,10 +8,11 @@ An honest status page. Everything below was verified by running it, not inferred
 
 | Area | State |
 |---|---|
-| `pytest` (whole suite, no arguments) | **Green** — 54 passed. |
-| `ruff check .` (whole repository) | **Green** — all checks passed. |
-| `make test` | **Green** — both of the above. |
-| CI | **Blocks on both, repository-wide.** No `continue-on-error` audit step remains. |
+| `pytest` (whole suite, no arguments) | **Green locally** — 85 passed. |
+| `ruff check .` (whole repository) | **Green locally** — all checks passed. |
+| `make test` | **Green locally** — both of the above. |
+| CI | **Blocks on both, repository-wide.** Was **red** on 2026-08-16 from linter version drift, not from repository code — see Open item 1. |
+| HTTP API | **Working** — `lotto-serve`, 9 selectable providers, OpenAPI schema, 15 tests. |
 | Draw history | **Current and tracked** — `data/euromillions.csv`, 1,972 draws through 2026-08-14, with a metadata sidecar and a scheduled refresh workflow. |
 | Data fetchers | **Working**, including the offline `--allow-stale` fallback. |
 | Public API | **Exists and is tested** — `euromillions` exports resolve; `lotteries_core` is the stable surface. |
@@ -117,22 +118,44 @@ Covered by `tests/test_dataset_metadata.py`.
 
 ## Open
 
-### 1. `euromillions/roi.py` is a documented stub
+### 1. CI and local development run different dependency stacks
+
+Every runtime floor in `pyproject.toml` is open-ended (`pandas>=2.0`, `numpy>=1.25`, …), so CI
+resolves the newest release of everything while development happens on whatever was installed months
+ago. Observed on the 2026-08-16 run:
+
+| package | local | CI |
+|---|---|---|
+| ruff | 0.14.5 | 0.16.3 |
+| pandas | 2.3.3 | 3.0.5 |
+| numpy | 1.26.4 | 2.4.6 |
+| scikit-learn | 1.7.2 | 1.9.0 |
+
+**This is why a green local gate did not mean a green CI gate.** The ruff half is fixed — the linter
+is pinned to a minor line and the rule set is now selected explicitly — but the pandas and numpy
+major-version gaps remain, and the test step has still never been observed passing against pandas 3 /
+numpy 2 (the lint step failed first, so pytest never ran).
+
+A scan found no removed numpy 2 aliases and no `DataFrame.append` usage, which is encouraging but is
+not the same as a passing run. The options are to pin the runtime stack, add a CI matrix covering
+both, or accept the drift knowingly. Until one is chosen, treat "passes locally" as weak evidence.
+
+### 2. `euromillions/roi.py` is a documented stub
 
 Its CLI errors by design. Disclosed in the README; listed here so it is not mistaken for a regression.
 
-### 2. The per-file-ignore queue
+### 3. The per-file-ignore queue
 
 Nine files carry `F841` or `E402` ignores. Each is a small cleanup for whoever next works in that
 script with the context to judge whether an unused local was a deliberate intermediate.
 
-### 3. The bundled CSV is still the stale one
+### 4. The bundled CSV is still the stale one
 
 `euromillions/euromillions_2016_2025.csv` (ends 2025-08-12) is unchanged and is still what a few
 offline examples use. `data/euromillions.csv` is the canonical file — current, metadata-tracked, and
 what the ledger and published results use.
 
-### 4. The 2016 rules cutoff is enforced per-provider, not repository-wide
+### 5. The 2016 rules cutoff is enforced per-provider, not repository-wide
 
 `parallax_guard` restricts residual inference to draws under the current game matrix
 (`_current_rules_history`, from 2016-09-27), and a test covers it. Nothing enforces the same cutoff

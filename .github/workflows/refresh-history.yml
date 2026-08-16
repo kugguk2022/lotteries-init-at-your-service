@@ -1,0 +1,80 @@
+name: refresh-history
+
+# Keeps data/euromillions.csv and its metadata sidecar current.
+#
+# The failure this prevents: the repository's documented benchmark results were once computed on a
+# history that had silently been a year stale, and a prospective ledger entry recorded against stale
+# history is invalid -- the method never sees the draws immediately before the one it predicts.
+#
+# It opens a pull request rather than pushing. Draw data is an input to published results and to a
+# sealed ledger, so a human should see the diff before it lands.
+
+on:
+  schedule:
+    # EuroMillions draws Tuesday and Friday evenings; check the mornings after (UTC).
+    - cron: "0 6 * * 3,6"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install project
+        run: |
+          python -m pip install -U pip
+          pip install -e ".[dev]"
+
+      - name: Refresh history and metadata
+        run: python scripts/refresh_history.py --out data/euromillions.csv --game euromillions
+
+      - name: Detect change
+        id: diff
+        run: |
+          if git diff --quiet -- data/euromillions.csv data/euromillions.meta.json; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "History already current; nothing to do."
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            python - <<'PY' >> "$GITHUB_STEP_SUMMARY"
+          from lotteries_core import dataset
+          meta = dataset.read("data/euromillions.csv")
+          print(f"- **{meta.rows}** draws, `{meta.first_draw}` .. `{meta.last_draw}`")
+          print(f"- sha256 `{meta.content_sha256[:16]}`")
+          PY
+          fi
+
+      # The refreshed data must not break the suite before a PR is opened.
+      - name: Gate
+        if: steps.diff.outputs.changed == 'true'
+        run: |
+          ruff check .
+          pytest -q --disable-warnings
+
+      - name: Open pull request
+        if: steps.diff.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          branch="chore/refresh-history-$(date -u +%Y%m%d)"
+          last=$(python -c "from lotteries_core import dataset; print(dataset.read('data/euromillions.csv').last_draw)")
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -b "$branch"
+          git add data/euromillions.csv data/euromillions.meta.json
+          git commit -m "Refresh EuroMillions history through ${last}"
+          git push -u origin "$branch"
+          gh pr create \
+            --title "Refresh EuroMillions history through ${last}" \
+            --body "Automated refresh by \`scripts/refresh_history.py\`. Lint and the full test suite passed against the new data. Metadata sidecar regenerated." \
+            --base "${GITHUB_REF_NAME}" || echo "PR already open for ${branch}"

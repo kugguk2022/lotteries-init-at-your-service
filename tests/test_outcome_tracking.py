@@ -6,7 +6,8 @@ import pandas as pd
 import pytest
 
 from lotteries_core.likely_set_generator import CooccurrenceLevelSetProvider
-from lotteries_core.outcome_tracker import PENDING, RESULTS, main as tracker_main
+from lotteries_core.outcome_tracker import PENDING, RESULTS
+from lotteries_core.outcome_tracker import main as tracker_main
 from lotteries_core.protocol import GameSpec
 
 

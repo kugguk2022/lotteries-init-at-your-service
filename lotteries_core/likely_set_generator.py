@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """likely_set_generator.py -- generalized, vectorized "co-occurrence level-set" ticket generator.
 
 A clean, format-agnostic evolution of the EuroDreams script (the lineage: R pair-co-occurrence ->
@@ -343,7 +342,7 @@ def build_portfolio(
         drawn_star = (
             tuple(sorted(int(v) for v in df.iloc[-1][star_cols].to_numpy())) if star_cols else ()
         )
-        observed = (drawn_main, drawn_star, int(round(target)))
+        observed = (drawn_main, drawn_star, round(target))
         ranked = [observed] + [t for t in ranked if (t[0], t[1]) != (drawn_main, drawn_star)]
     if max_shared_main is None:
         max_shared_main = max(1, cfg.main_k - 2)
@@ -378,7 +377,7 @@ class CooccurrenceLevelSetProvider(InferenceProvider):
 
     def fit(
         self, history: pd.DataFrame, spec: GameSpec | None = None
-    ) -> "CooccurrenceLevelSetProvider":
+    ) -> CooccurrenceLevelSetProvider:
         self._history = history.copy()
         return self
 

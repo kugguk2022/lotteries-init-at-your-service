@@ -36,9 +36,9 @@ from .protocol import GameSpec, InferenceProvider, Ticket
 
 __all__ = [
     "GameSpec",
+    "InferenceEnvelope",
     "InferenceProvider",
     "Ticket",
-    "InferenceEnvelope",
     "__version__",
 ]
 

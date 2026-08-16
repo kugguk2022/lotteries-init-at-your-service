@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """outcome_tracker.py -- forward-only, long-horizon evidence ledger for the lottery repo.
 
 Purpose (stated plainly): this repo's hypothesis is that coordinated, coverage-and-co-occurrence-aware
@@ -63,8 +62,7 @@ def _score_portfolio(tickets, actual_main: set[int], actual_stars: set[int], cfg
         best_main = max(best_main, mh)
         best_star = max(best_star, sh)
         mean_main += mh
-        if (mh, sh) > top_tier:
-            top_tier = (mh, sh)
+        top_tier = max(top_tier, (mh, sh))
         tier = f"{mh}+{sh}"
         tier_counts[tier] = tier_counts.get(tier, 0) + 1
         if mh == cfg.main_k and sh == cfg.star_k:
@@ -83,7 +81,7 @@ def _score_portfolio(tickets, actual_main: set[int], actual_stars: set[int], cfg
 
 
 def _random_control(cfg: GameConfig, n_sets: int, draw_key: str) -> list[tuple]:
-    seed_bytes = hashlib.sha256(f"control:{cfg.name}:{draw_key}".encode("utf-8")).digest()[:8]
+    seed_bytes = hashlib.sha256(f"control:{cfg.name}:{draw_key}".encode()).digest()[:8]
     seed = int.from_bytes(seed_bytes, "big")
     rng = np.random.default_rng(seed)
     out: list[tuple] = []
@@ -158,7 +156,7 @@ def cmd_record(args) -> None:
         "control_tickets": [
             [list(m), list(s)] for m, s in _random_control(cfg, len(pf["tickets"]), args.draw_key)
         ],
-        "generated_from_rows": int(len(df)),
+        "generated_from_rows": len(df),
         "history_sha256": data_sha256(df),
         "created_utc": datetime.now(timezone.utc).isoformat(),
         "ticket_proof_sha256": args.ticket_proof_sha256 or None,

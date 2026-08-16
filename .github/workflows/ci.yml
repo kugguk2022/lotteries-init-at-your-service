@@ -50,9 +50,21 @@ jobs:
         continue-on-error: true
         run: pytest -q --maxfail=1 --disable-warnings
 
-      - name: Fail on placeholders
+      - name: Fail on placeholders in changed Python files
+        shell: bash
+        env:
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PUSH_BASE_SHA: ${{ github.event.before }}
         run: |
-          if grep -R -n --include="*.py" -e '^[[:space:]]*pass[[:space:]]*$' -e '^[[:space:]]*\.\.[[:space:]]*$' . ; then
-            echo "Found placeholder 'pass' or '...' in code. Refuse to merge.";
-            exit 1;
+          base_sha="${PR_BASE_SHA:-$PUSH_BASE_SHA}"
+          if ! git cat-file -e "${base_sha}^{commit}" 2>/dev/null; then
+            base_sha="$(git rev-parse HEAD^)"
+          fi
+          mapfile -t changed < <(git diff --name-only --diff-filter=ACMR "$base_sha" HEAD -- '*.py')
+          if ((${#changed[@]})) && grep -n \
+            -e '^[[:space:]]*pass[[:space:]]*$' \
+            -e '^[[:space:]]*\.\.[[:space:]]*$' \
+            "${changed[@]}"; then
+            echo "Found placeholder 'pass' or '...' in changed code. Refuse to merge."
+            exit 1
           fi

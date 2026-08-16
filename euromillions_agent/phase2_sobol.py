@@ -4,8 +4,8 @@ from __future__ import annotations
 import argparse
 import math
 from dataclasses import dataclass
-from pathlib import Path
 from itertools import combinations
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
@@ -230,6 +230,13 @@ def build_pair_features(mains: np.ndarray, main_n: int | None = None, include_cu
       then for the current draw emit the 10 F-values for its 10 pairs -> output[t, :]
       poi[t] = sum(output[t, :])
     The include_current=True matches your R behavior (counts include current draw).
+
+    NOTE (draw picking): this legacy feature is a fine *descriptive* diagnostic (and is used as such
+    by the branch strategies), but it is NOT suitable as a forecasting predictor: with
+    ``include_current=True`` it leaks the current draw into its own feature, and its ``g``/``g1``
+    baseline regresses ``poi`` on ``euler_phi(t)``, a number-theoretic artifact of the row index
+    with no bearing on draw dynamics. For forecasting use :func:`build_causal_pair_features`, which
+    removes both issues without changing this function's behaviour.
     """
     mains = np.asarray(mains, dtype=int)
     T, k = mains.shape
@@ -264,6 +271,70 @@ def build_pair_features(mains: np.ndarray, main_n: int | None = None, include_cu
     X = np.c_[np.ones(T), g]
     beta, *_ = np.linalg.lstsq(X, poi, rcond=None)
     g1 = (X @ beta).astype(np.float64)
+    resid = (poi - g1).astype(np.float64)
+
+    return FeatureOut(output_pairs=out, poi=poi, g=g, g1=g1, resid=resid, pair_counts=M)
+
+
+def build_causal_pair_features(
+    mains: np.ndarray,
+    main_n: int | None = None,
+    baseline_window: int = 26,
+) -> FeatureOut:
+    """Causal (no-look-ahead) POI features for *forecasting* / draw picking.
+
+    This is the honest forecasting counterpart to :func:`build_pair_features`. It fixes the two
+    issues that make the legacy POI unsuitable as a *predictor* (it remains fine as a descriptive
+    diagnostic, which is how the branch strategies use it):
+
+    1. **No look-ahead.** The pair co-occurrence counts emitted for draw ``t`` are computed from
+       history strictly *before* ``t`` (equivalent to ``include_current=False``). The legacy default
+       counts the current draw into its own feature, which leaks the label into the predictor.
+
+    2. **A justified time baseline instead of Euler-phi.** The legacy baseline regresses ``poi`` on
+       ``euler_phi(t)`` -- a deterministic number-theoretic artifact of the row index with no
+       statistical relationship to draw dynamics. Here the baseline ``g1[t]`` is a *causal trailing
+       mean* of past ``poi`` (a real one-step-ahead detrending using only information available
+       before ``t``), and ``g`` is simply the draw index as an honest time axis. ``resid = poi - g1``
+       is therefore a leak-free surprise signal suitable for downstream modelling.
+
+    The returned :class:`FeatureOut` has the same shape/fields as the legacy function, so it is a
+    drop-in replacement wherever a *forecasting* (rather than descriptive) feature set is wanted.
+    """
+    mains = np.asarray(mains, dtype=int)
+    T, k = mains.shape
+    if k != 5:
+        raise ValueError("This feature code mirrors the R logic: 5 mains per draw.")
+
+    main_n = int(main_n) if main_n is not None else int(mains.max())
+    M = np.zeros((main_n + 1, main_n + 1), dtype=np.int32)
+    pair_list = list(combinations(range(5), 2))
+    out = np.zeros((T, len(pair_list)), dtype=np.int32)
+
+    for t in range(T):
+        draw = np.sort(mains[t])
+        # Emit pair counts from history BEFORE this draw (strictly causal), THEN update history.
+        for j, (i1, i2) in enumerate(pair_list):
+            a, b = int(draw[i1]), int(draw[i2])
+            out[t, j] = M[a, b]
+        for a, b in combinations(draw.tolist(), 2):
+            M[a, b] += 1
+            M[b, a] += 1
+
+    poi = out.sum(axis=1).astype(np.float64)
+    g = np.arange(1, T + 1, dtype=np.float64)  # honest time axis (NOT Euler-phi)
+
+    # Causal trailing-mean baseline: g1[t] uses only poi[:t]. This is a legitimate one-step-ahead
+    # detrending with zero leakage (contrast the legacy full-sample lstsq fit).
+    poi_series = pd.Series(poi)
+    g1 = (
+        poi_series.shift(1)
+        .rolling(window=baseline_window, min_periods=1)
+        .mean()
+        .bfill()
+        .to_numpy()
+        .astype(np.float64)
+    )
     resid = (poi - g1).astype(np.float64)
 
     return FeatureOut(output_pairs=out, poi=poi, g=g, g1=g1, resid=resid, pair_counts=M)
@@ -312,7 +383,6 @@ def generate_sobol_tickets(n_tickets: int,
     """
     total_main = nCk(main_n, main_k)
     total_star = nCk(star_n, star_k) if star_k > 0 else 1
-    total = total_main * total_star
 
     pts = sobol_2d(n_tickets * oversample, seed=seed)
 

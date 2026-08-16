@@ -1,0 +1,40 @@
+{
+  "aggregated": {
+    "expected_roi_per_ticket": -0.7233799008016988,
+    "hit_recall": 0.10760000000000003,
+    "mean_jaccard_diversity": 0.8723895502645502,
+    "number_coverage": 0.748,
+    "pair_coverage": 0.13779591836734692,
+    "unpopularity_lift": 1.1502196542569503
+  },
+  "budget": 25,
+  "game": "euromillions",
+  "headline": {
+    "aggregated_pair_coverage": 0.13779591836734692,
+    "aggregated_unpopularity_lift": 1.1502196542569503,
+    "best_single_pair_coverage": 0.18604081632653063,
+    "best_single_pair_coverage_provider": "frequency",
+    "best_single_unpopularity_lift": 1.1889623783693917,
+    "coverage_improvement": -0.048244897959183713
+  },
+  "holdout": 20,
+  "providers": {
+    "frequency": {
+      "expected_roi_per_ticket": -0.7480320179600157,
+      "hit_recall": 0.09600000000000002,
+      "mean_jaccard_diversity": 0.9429074074074073,
+      "number_coverage": 0.9309999999999998,
+      "pair_coverage": 0.18604081632653063,
+      "unpopularity_lift": 1.047713185071521
+    },
+    "unpopularity": {
+      "expected_roi_per_ticket": -0.7140625359422719,
+      "hit_recall": 0.11280000000000004,
+      "mean_jaccard_diversity": 0.7531798941798942,
+      "number_coverage": 0.31900000000000006,
+      "pair_coverage": 0.07612244897959183,
+      "unpopularity_lift": 1.1889623783693917
+    }
+  },
+  "seed": 1234
+}

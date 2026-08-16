@@ -53,10 +53,12 @@ lotto-get-draws = "euromillions.get_draws:main"
 # lotto-roi = "euromillions.roi:main"
 
 [tool.setuptools.packages.find]
-include = ["euromillions", "totoloto", "eurodreams", "euromillions_agent"]
+include = ["euromillions", "totoloto", "eurodreams", "euromillions_agent", "lotteries_core", "lotteries_core.*"]
 
 [tool.ruff]
 line-length = 100
+
+[tool.ruff.lint]
 extend-select = ["I"]
 
 [tool.mypy]

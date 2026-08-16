@@ -4,6 +4,41 @@
 
 Lottery data playground for EuroMillions, Totoloto, and EuroDreams. The repo ships a small typed public API plus labs for modelling, bankroll experiments, and scraping. Everything is research-focused; use it responsibly.
 
+> **Scope & honesty (please read).** This project is a **research framework**, not a betting system.
+> The lottery is a **negative-sum** game and fair draws are **unpredictable** — nothing here predicts
+> which numbers will be drawn, and nothing here claims a guaranteed or positive expected ROI. What it
+> studies is whether **coordinating many independent inference strategies** can improve
+> **combinatorial coverage** and **expected return-per-ticket** (via the pari-mutuel *unpopularity*
+> lever and instant-game *remaining-prize EV*) under a **fixed ticket budget** — in **simulation
+> only**. It never pools funds, buys tickets, or executes wagers. See
+> [`repurpose.md`](repurpose.md), [`docs/SCOPE_AND_ETHICS.md`](docs/SCOPE_AND_ETHICS.md), and
+> [`docs/GEOGRAPHY.md`](docs/GEOGRAPHY.md).
+
+## Distributed-inference framework (`lotteries_core/`)
+
+The pivot described in [`repurpose.md`](repurpose.md) adds a small, dependency-light package that
+lets many strategies ("providers") propose tickets under a **shared budget**, exchange them as
+reproducible **envelopes**, and be combined by a **deterministic, diversity-aware aggregator**. The
+framework is evaluated **forward-only** and on the levers we actually control — coverage, diversity,
+and expected *conditional* ROI (jackpot-sharing) — never on an assumption of predictive power.
+
+```bash
+# Forward-only, equal-budget benchmark: single providers vs coordinated aggregation.
+python -m lotteries_core.benchmark \
+    --history euromillions/euromillions_2016_2025.csv \
+    --game euromillions --budget 25 --holdout 20 \
+    --out outputs/euromillions/distributed_inference_benchmark.json
+
+# Include the GLM + gradient-boosting (+ optional deep MLP) popularity ensemble:
+python -m lotteries_core.benchmark --history euromillions/euromillions_2016_2025.csv --with-ml
+```
+
+The reported metrics are `pair_coverage` / `number_coverage` / `mean_jaccard_diversity` (coverage &
+spread), `unpopularity_lift` and `expected_roi_per_ticket` (the shared-jackpot lever; ROI stays
+negative — the goal is *less* negative), and a high-variance `hit_recall`. The "Joan Ginther"-style
+advantage-play kernel lives honestly in `lotteries_core.roi.InstantGamePool` (finite-deck remaining
+EV) — see [`docs/SCOPE_AND_ETHICS.md`](docs/SCOPE_AND_ETHICS.md).
+
 ## Best Current EuroMillions Result
 
 The best validated forecasting mode in this repo is currently the `classic` arithmetic-branch mode.

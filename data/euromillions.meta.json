@@ -1,0 +1,20 @@
+{
+  "columns": [
+    "draw_date",
+    "ball_1",
+    "ball_2",
+    "ball_3",
+    "ball_4",
+    "ball_5",
+    "star_1",
+    "star_2"
+  ],
+  "content_sha256": "857727f639e408f21dd9451dbc377579899cdd5f66b59a42a0861596c52fbb89",
+  "fetched_utc": "2026-08-16T17:39:35+00:00",
+  "first_draw": "2004-02-13",
+  "game": "euromillions",
+  "last_draw": "2026-08-14",
+  "path": "data/euromillions.csv",
+  "rows": 1972,
+  "source": "euromillions.get_draws"
+}

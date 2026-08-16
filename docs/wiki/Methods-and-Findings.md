@@ -145,11 +145,15 @@ Reproduce with the command in [Getting Started](Getting-Started.md).
    honest one, but it is a trade.
 3. **`parallax_guard` wins coverage** by a clear margin (0.2039 vs 0.1850 for the next best) with
    perfect number coverage and balanced star usage.
-4. **Aggregation underperformed.** Aggregated pair coverage (0.1774) came in **0.0265 below** the best
-   single provider, contrary to the framework's headline claim that coordination should not reduce
-   coverage. It does lift `unpopularity_lift` above every entrant except `unpopularity` itself, so it
-   is trading coverage for the ROI lever rather than failing outright — but the claim as stated is not
-   supported by this run. Open question, not a settled result.
+4. **Aggregation underperformed on coverage in this run, and has since been fixed.** The table above
+   was produced before the fix: aggregated pair coverage (0.1774) came in **0.0265 below** the best
+   single provider, contrary to the framework's headline claim. The cause was a scaling bug —
+   marginal coverage was divided by the game's entire pair universe, capping that term near 0.008
+   against 0–1 for the other levers, so the coverage lever carried about a hundredth of its
+   configured weight. After the fix, aggregated pair coverage is **0.18851 against 0.18502** for the
+   best single provider (**+0.00349**), i.e. coordination now beats every single provider outright.
+   Full account in [Current State](Current-State.md). The rows above are left as measured; rerun the
+   benchmark to refresh them.
 5. **`hit_recall` says nothing.** All eight rows land between 0.095 and 0.106, which is what a fair
    draw looks like. Do not read a ranking into it.
 

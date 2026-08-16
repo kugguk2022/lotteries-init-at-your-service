@@ -14,15 +14,15 @@ uniform-random control generated from the same draw key, so "did the method beat
 Workflow
 --------
     # 1. Before a draw: generate and log this draw's portfolio (history must NOT contain the draw).
-    python outcome_tracker.py record --history history.csv --preset euromillions \
+    python -m lotteries_core.outcome_tracker record --history history.csv --preset euromillions \
         --draw-key 2026-08-18 --ledger ./ledger --n-sets 20
 
     # 2. After the draw: settle it with the official result.
-    python outcome_tracker.py settle --ledger ./ledger --draw-key 2026-08-18 \
+    python -m lotteries_core.outcome_tracker settle --ledger ./ledger --draw-key 2026-08-18 \
         --actual-main 4,17,23,38,45 --actual-stars 3,9
 
     # 3. Any time: read the cumulative verdict.
-    python outcome_tracker.py report --ledger ./ledger
+    python -m lotteries_core.outcome_tracker report --ledger ./ledger
 """
 
 from __future__ import annotations
@@ -35,7 +35,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from likely_set_generator import PRESETS, GameConfig, build_portfolio, resolve_config
+from .likely_set_generator import PRESETS, GameConfig, build_portfolio, resolve_config
 
 PENDING = "pending_predictions.jsonl"
 SETTLED = "settled_predictions.jsonl"

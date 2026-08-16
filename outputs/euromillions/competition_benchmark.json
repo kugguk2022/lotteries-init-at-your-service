@@ -1,0 +1,80 @@
+{
+  "aggregated": {
+    "expected_roi_per_ticket": -0.7254791583498574,
+    "hit_recall": 0.10200000000000001,
+    "mean_jaccard_diversity": 0.9372923280423281,
+    "number_coverage": 0.952,
+    "pair_coverage": 0.17744897959183675,
+    "unpopularity_lift": 1.1414906887976892
+  },
+  "budget": 25,
+  "game": "euromillions",
+  "headline": {
+    "aggregated_pair_coverage": 0.17744897959183675,
+    "aggregated_unpopularity_lift": 1.1414906887976892,
+    "best_single_pair_coverage": 0.2039387755102041,
+    "best_single_pair_coverage_provider": "parallax_guard",
+    "best_single_unpopularity_lift": 1.1889662614631793,
+    "coverage_improvement": -0.026489795918367337
+  },
+  "holdout": 40,
+  "providers": {
+    "frequency": {
+      "expected_roi_per_ticket": -0.748727095191707,
+      "hit_recall": 0.1052,
+      "mean_jaccard_diversity": 0.9409616402116402,
+      "number_coverage": 0.933,
+      "pair_coverage": 0.18502040816326532,
+      "unpopularity_lift": 1.0448229703133203
+    },
+    "parallax_guard": {
+      "expected_roi_per_ticket": -0.7372700424571313,
+      "hit_recall": 0.1026,
+      "mean_jaccard_diversity": 0.9471041666666666,
+      "number_coverage": 1.0,
+      "pair_coverage": 0.2039387755102041,
+      "unpopularity_lift": 1.0924627740490578
+    },
+    "parallax_guard_ablation": {
+      "expected_roi_per_ticket": -0.7372700424571313,
+      "hit_recall": 0.1026,
+      "mean_jaccard_diversity": 0.9471041666666666,
+      "number_coverage": 1.0,
+      "pair_coverage": 0.2039387755102041,
+      "unpopularity_lift": 1.0924627740490578
+    },
+    "perron_frobenius_affinity": {
+      "expected_roi_per_ticket": -0.7286599352531624,
+      "hit_recall": 0.09820000000000001,
+      "mean_jaccard_diversity": 0.9510664682539682,
+      "number_coverage": 1.0,
+      "pair_coverage": 0.161,
+      "unpopularity_lift": 1.128264635735778
+    },
+    "perron_frobenius_contrarian": {
+      "expected_roi_per_ticket": -0.7276917520221002,
+      "hit_recall": 0.09700000000000002,
+      "mean_jaccard_diversity": 0.9502232142857142,
+      "number_coverage": 1.0,
+      "pair_coverage": 0.15977551020408165,
+      "unpopularity_lift": 1.1322904580983515
+    },
+    "perron_frobenius_uniform": {
+      "expected_roi_per_ticket": -0.7291192212633953,
+      "hit_recall": 0.09480000000000002,
+      "mean_jaccard_diversity": 0.9511111111111111,
+      "number_coverage": 1.0,
+      "pair_coverage": 0.16,
+      "unpopularity_lift": 1.1263548692458298
+    },
+    "unpopularity": {
+      "expected_roi_per_ticket": -0.714061602084304,
+      "hit_recall": 0.10280000000000003,
+      "mean_jaccard_diversity": 0.7498998015873016,
+      "number_coverage": 0.31900000000000006,
+      "pair_coverage": 0.07446938775510205,
+      "unpopularity_lift": 1.1889662614631793
+    }
+  },
+  "seed": 1234
+}

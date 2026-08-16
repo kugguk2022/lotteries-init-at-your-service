@@ -111,16 +111,20 @@ establish.
 
 ## Head-to-head results
 
-Forward-only, EuroMillions, budget 25, 40-draw holdout, seed 1234:
+Forward-only, EuroMillions, budget 25, 40-draw holdout, seed 1234, on `data/euromillions.csv`
+(1,972 draws through 2026-08-14). Artifact:
+[`outputs/euromillions/competition_benchmark.json`](../../outputs/euromillions/competition_benchmark.json).
 
-| provider | pair_cov | number_cov | unpop_lift | ROI/ticket |
-|---|---|---|---|---|
-| `frequency` | **0.1850** | 0.921 | 1.0437 | −0.7490 |
-| `perron_frobenius_affinity` | 0.1590 | **1.000** | 1.1313 | −0.7279 |
-| `perron_frobenius_contrarian` | 0.1641 | **1.000** | 1.1322 | −0.7277 |
-| `perron_frobenius_uniform` *(ablation)* | 0.1600 | **1.000** | 1.1264 | −0.7291 |
-| `unpopularity` | 0.0754 | 0.319 | **1.1890** | **−0.7141** |
-| *aggregated* | 0.1578 | 0.954 | 1.1496 | −0.7231 |
+| provider | pair_cov | number_cov | unpop_lift | ROI/ticket | hit_recall |
+|---|---|---|---|---|---|
+| `parallax_guard` | **0.2039** | **1.000** | 1.0925 | −0.7373 | 0.1026 |
+| `parallax_guard_ablation` | **0.2039** | **1.000** | 1.0925 | −0.7373 | 0.1026 |
+| `frequency` | 0.1850 | 0.933 | 1.0448 | −0.7487 | 0.1052 |
+| *aggregated* | 0.1774 | 0.952 | 1.1415 | −0.7255 | 0.1020 |
+| `perron_frobenius_affinity` | 0.1610 | **1.000** | 1.1283 | −0.7287 | 0.0982 |
+| `perron_frobenius_uniform` *(ablation)* | 0.1600 | **1.000** | 1.1264 | −0.7291 | 0.0948 |
+| `perron_frobenius_contrarian` | 0.1598 | **1.000** | 1.1323 | −0.7277 | 0.0970 |
+| `unpopularity` | 0.0745 | 0.319 | **1.1890** | **−0.7141** | 0.1028 |
 
 `cooccurrence_level_set`, measured separately on a 5-draw holdout because of its enumeration cost:
 0.1690 / 0.840 / 1.0749 / −0.7415.
@@ -129,14 +133,25 @@ Reproduce with the command in [Getting Started](Getting-Started.md).
 
 ### What to take from this
 
-1. **`unpopularity` wins the only lever that is real.** Best `unpopularity_lift` and best ROI.
-2. **The spectral signal contributes nothing.** affinity, contrarian, and the sampler-only ablation
-   land within ~0.005 of each other on every metric. What gains the `perron_frobenius` rows show come
-   from the deterministic low-discrepancy (golden-ratio Kronecker) sampler underneath — which does
-   achieve perfect number coverage and is worth keeping on those grounds alone.
-3. **Aggregation underperformed here.** It came in *below* the best single provider on pair coverage
-   (−0.027). The framework's headline claim is that coordination should not reduce coverage. On this
-   run it did. Open question, not a settled result.
+1. **Both ablations matched their live modes.** `parallax_guard` and `parallax_guard_ablation` agree
+   to four decimals on *every* metric, and the three `perron_frobenius` orientations — including the
+   sampler-only control — sit within 0.0012 of each other on pair coverage. Two contributed methods,
+   two unrelated statistics, one conclusion: **the measured value is portfolio construction, not
+   signal.** Neither would have shown this without an ablation, which is why the repository asks for
+   one.
+2. **`unpopularity` wins the only lever that is real** — best `unpopularity_lift` (1.1890) and best
+   expected ROI (−0.7141) — while being *worst* on coverage (0.0745 pair, 0.319 number). It buys
+   conditional payout by concentrating on a narrow band of unpopular numbers. That trade is the
+   honest one, but it is a trade.
+3. **`parallax_guard` wins coverage** by a clear margin (0.2039 vs 0.1850 for the next best) with
+   perfect number coverage and balanced star usage.
+4. **Aggregation underperformed.** Aggregated pair coverage (0.1774) came in **0.0265 below** the best
+   single provider, contrary to the framework's headline claim that coordination should not reduce
+   coverage. It does lift `unpopularity_lift` above every entrant except `unpopularity` itself, so it
+   is trading coverage for the ROI lever rather than failing outright — but the claim as stated is not
+   supported by this run. Open question, not a settled result.
+5. **`hit_recall` says nothing.** All eight rows land between 0.095 and 0.106, which is what a fair
+   draw looks like. Do not read a ranking into it.
 
 ## Forecasting-mode results (EuroMillions lab)
 

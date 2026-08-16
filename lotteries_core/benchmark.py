@@ -21,7 +21,12 @@ import pandas as pd
 
 from .evaluation import evaluate_forward
 from .protocol import GameSpec
-from .providers import CooccurrenceLevelSetProvider, FrequencyProvider, UnpopularityProvider
+from .providers import (
+    CooccurrenceLevelSetProvider,
+    FrequencyProvider,
+    PerronFrobeniusProvider,
+    UnpopularityProvider,
+)
 
 _GAMES = {
     "euromillions": GameSpec.euromillions,
@@ -30,10 +35,20 @@ _GAMES = {
 }
 
 
-def build_providers(include_ml: bool, include_cooccurrence: bool = False):
+def build_providers(
+    include_ml: bool,
+    include_cooccurrence: bool = False,
+    include_spectral: bool = False,
+):
     providers = [FrequencyProvider(), UnpopularityProvider()]
     if include_cooccurrence:
         providers.append(CooccurrenceLevelSetProvider())
+    if include_spectral:
+        # Both orientations enter the field (the ranking may be informative in either direction),
+        # plus the sampler-only ablation so a win can be attributed to the spectral signal or denied it.
+        providers.append(PerronFrobeniusProvider(orientation="affinity"))
+        providers.append(PerronFrobeniusProvider(orientation="contrarian"))
+        providers.append(PerronFrobeniusProvider(orientation="uniform"))
     if include_ml:
         from .providers import load_ml_ensemble
 
@@ -54,12 +69,17 @@ def main(argv: list[str] | None = None) -> None:
         action="store_true",
         help="Include the owner's forward-only pair-co-occurrence level-set provider",
     )
+    ap.add_argument(
+        "--with-spectral",
+        action="store_true",
+        help="Include the Perron-Frobenius (PageRank) co-occurrence providers, both orientations",
+    )
     ap.add_argument("--out", default=None, help="Optional path to write the JSON summary")
     args = ap.parse_args(argv)
 
     history = pd.read_csv(args.history)
     spec = _GAMES[args.game]()
-    providers = build_providers(args.with_ml, args.with_cooccurrence)
+    providers = build_providers(args.with_ml, args.with_cooccurrence, args.with_spectral)
     summary = evaluate_forward(
         history, spec, providers, budget=args.budget, holdout=args.holdout, seed=args.seed
     )

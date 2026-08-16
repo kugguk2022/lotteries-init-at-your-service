@@ -129,23 +129,47 @@ def test_aggregation_is_deterministic_and_legal():
         spec.validate_ticket(t)
 
 
-def test_aggregation_coverage_not_worse_than_single_provider():
-    """Coordinated aggregation should not lose combinatorial coverage vs either single provider."""
-    spec = GameSpec.euromillions()
-    hist = _synthetic_history()
+def _envelopes_for_coverage_test(spec, hist, budget=25, seed=11):
     provs = [FrequencyProvider().fit(hist, spec), UnpopularityProvider()]
-    envs = []
-    single_cov = []
+    envs, single_cov = [], []
     for p in provs:
-        res = p.propose(spec, budget=25, rng=np.random.default_rng(11))
+        res = p.propose(spec, budget=budget, rng=np.random.default_rng(seed))
         single_cov.append(pair_coverage(spec, res.tickets))
         envs.append(
             InferenceEnvelope.build(
-                provider=p.name, game=spec, result=res, seed=11, training_data=hist, created_utc=""
+                provider=p.name, game=spec, result=res, seed=seed, training_data=hist,
+                created_utc="",
             )
         )
+    return envs, single_cov
+
+
+def test_aggregation_coverage_not_worse_than_best_single_provider():
+    """The framework's headline promise: coordination must not lose combinatorial reach.
+
+    This asserts against ``max`` -- the *best* single provider. It previously asserted against
+    ``min``, which is satisfied by almost anything and let a real 0.026 shortfall go unnoticed
+    through the whole benchmark history.
+    """
+    spec = GameSpec.euromillions()
+    hist = _synthetic_history()
+    envs, single_cov = _envelopes_for_coverage_test(spec, hist)
     agg = aggregate(envs, spec, budget=25)
-    assert pair_coverage(spec, agg) >= min(single_cov) - 1e-9
+    assert len(agg) == 25
+    assert pair_coverage(spec, agg) >= max(single_cov) - 1e-9
+
+
+def test_coverage_floor_can_be_disabled_and_is_what_guarantees_the_promise():
+    """With the floor off the guarantee is the objective's to keep; with it on it is unconditional."""
+    spec = GameSpec.euromillions()
+    hist = _synthetic_history()
+    envs, single_cov = _envelopes_for_coverage_test(spec, hist)
+    floored = aggregate(envs, spec, budget=25, coverage_floor=True)
+    unfloored = aggregate(envs, spec, budget=25, coverage_floor=False)
+    assert pair_coverage(spec, floored) >= pair_coverage(spec, unfloored) - 1e-9
+    assert pair_coverage(spec, floored) >= max(single_cov) - 1e-9
+    for t in floored:
+        spec.validate_ticket(t)
 
 
 def test_instant_game_advantage_detection():

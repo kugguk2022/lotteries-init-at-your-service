@@ -20,6 +20,7 @@ the aggregator never invents tickets, moves money, or assumes predictive power.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from itertools import combinations
 
 import numpy as np
 
@@ -67,6 +68,26 @@ def build_consensus(envelopes: list[InferenceEnvelope]) -> dict[Ticket, float]:
     return consensus
 
 
+def _best_single_portfolio(
+    envelopes: list[InferenceEnvelope], spec: GameSpec, budget: int
+) -> tuple[list[Ticket] | None, float]:
+    """Highest-pair-coverage single-provider portfolio at the identical budget.
+
+    Only envelopes that can actually field ``budget`` tickets are eligible, so the comparison the
+    floor makes is equal-budget by construction. Ties keep the earliest envelope, for determinism.
+    """
+    best_tickets: list[Ticket] | None = None
+    best_cov = -1.0
+    for env in envelopes:
+        tickets = list(env.tickets)[:budget]
+        if len(tickets) < budget:
+            continue
+        cov = pair_coverage(spec, tickets)
+        if cov > best_cov:
+            best_cov, best_tickets = cov, tickets
+    return best_tickets, best_cov
+
+
 def aggregate(
     envelopes: list[InferenceEnvelope],
     spec: GameSpec,
@@ -75,16 +96,23 @@ def aggregate(
     weights: AggregationWeights | None = None,
     jackpot: JackpotModel | None = None,
     popularity: PopularityModel | None = None,
+    coverage_floor: bool = True,
 ) -> list[Ticket]:
     """Select ``budget`` distinct tickets from the union of envelope proposals.
 
     Deterministic greedy maximisation of::
 
         gain(t | S) = w_consensus * consensus[t]
-                    + w_coverage  * marginal_pair_coverage(t | S)
+                    + w_coverage  * new_pair_fraction(t | S)
                     + w_unpopularity * normalised_unpopularity_payout(t)
 
     Ties are broken by a stable key so results are reproducible.
+
+    ``coverage_floor`` enforces the framework's headline promise: coordination must not *lose*
+    combinatorial reach against a single provider spending the same budget. If the greedy blend ends
+    up below the best single-provider portfolio on pair coverage, that portfolio is returned instead.
+    The floor is a backstop, not the mechanism -- the objective above is what should normally win --
+    so a run where it fires often is a signal that the weights need attention.
     """
     weights = weights or AggregationWeights()
     jackpot = jackpot or JackpotModel()
@@ -106,18 +134,24 @@ def aggregate(
     )
     u_norm = payouts / payouts.max() if payouts.max() > 0 else payouts
 
-    total_pairs = spec.main_n * (spec.main_n - 1) // 2
     chosen: list[Ticket] = []
     chosen_idx: list[int] = []
     remaining = set(range(len(candidates)))
 
+    # Marginal reach as the fraction of *this ticket's own* pairs that are new, so the term lives on
+    # 0..1 like the consensus and unpopularity terms. Dividing the new-pair count by the game's total
+    # pair universe instead (as this did originally) caps the term near 0.008 for a 5-of-50 game,
+    # which silently reduced the coverage lever to roughly a hundredth of the weight it was given.
+    ticket_pairs: list[frozenset[tuple[int, int]]] = [
+        frozenset(combinations(t[0], 2)) for t in candidates
+    ]
+    covered_pairs: set[tuple[int, int]] = set()
+
     def marginal_coverage(idx: int) -> float:
-        if not chosen:
-            base = 0.0
-        else:
-            base = pair_coverage(spec, chosen) * total_pairs
-        after = pair_coverage(spec, chosen + [candidates[idx]]) * total_pairs
-        return (after - base) / total_pairs
+        pairs = ticket_pairs[idx]
+        if not pairs:
+            return 0.0
+        return len(pairs - covered_pairs) / len(pairs)
 
     while len(chosen) < budget and remaining:
         best_idx = -1
@@ -138,6 +172,12 @@ def aggregate(
                 best_idx = idx
         chosen.append(candidates[best_idx])
         chosen_idx.append(best_idx)
+        covered_pairs |= ticket_pairs[best_idx]
         remaining.discard(best_idx)
+
+    if coverage_floor:
+        floor_tickets, floor_cov = _best_single_portfolio(envelopes, spec, budget)
+        if floor_tickets is not None and pair_coverage(spec, chosen) < floor_cov - 1e-12:
+            return floor_tickets
 
     return chosen

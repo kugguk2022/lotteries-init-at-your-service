@@ -6,10 +6,16 @@ where possible so optional heavy dependencies (xgboost, torch) never break a bas
 
 from __future__ import annotations
 
+from ..likely_set_generator import CooccurrenceLevelSetProvider
 from .frequency import FrequencyProvider
 from .unpopularity import UnpopularityProvider
 
-__all__ = ["FrequencyProvider", "UnpopularityProvider", "load_ml_ensemble"]
+__all__ = [
+    "CooccurrenceLevelSetProvider",
+    "FrequencyProvider",
+    "UnpopularityProvider",
+    "load_ml_ensemble",
+]
 
 
 def load_ml_ensemble():

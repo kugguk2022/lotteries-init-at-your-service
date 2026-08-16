@@ -21,7 +21,7 @@ import pandas as pd
 
 from .evaluation import evaluate_forward
 from .protocol import GameSpec
-from .providers import FrequencyProvider, UnpopularityProvider
+from .providers import CooccurrenceLevelSetProvider, FrequencyProvider, UnpopularityProvider
 
 _GAMES = {
     "euromillions": GameSpec.euromillions,
@@ -30,8 +30,10 @@ _GAMES = {
 }
 
 
-def build_providers(include_ml: bool):
+def build_providers(include_ml: bool, include_cooccurrence: bool = False):
     providers = [FrequencyProvider(), UnpopularityProvider()]
+    if include_cooccurrence:
+        providers.append(CooccurrenceLevelSetProvider())
     if include_ml:
         from .providers import load_ml_ensemble
 
@@ -47,12 +49,17 @@ def main(argv: list[str] | None = None) -> None:
     ap.add_argument("--holdout", type=int, default=20)
     ap.add_argument("--seed", type=int, default=1234)
     ap.add_argument("--with-ml", action="store_true", help="Include the GLM+GBM(+DL) ensemble provider")
+    ap.add_argument(
+        "--with-cooccurrence",
+        action="store_true",
+        help="Include the owner's forward-only pair-co-occurrence level-set provider",
+    )
     ap.add_argument("--out", default=None, help="Optional path to write the JSON summary")
     args = ap.parse_args(argv)
 
     history = pd.read_csv(args.history)
     spec = _GAMES[args.game]()
-    providers = build_providers(args.with_ml)
+    providers = build_providers(args.with_ml, args.with_cooccurrence)
     summary = evaluate_forward(
         history, spec, providers, budget=args.budget, holdout=args.holdout, seed=args.seed
     )

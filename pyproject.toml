@@ -43,12 +43,14 @@ dev = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/kugguk2022/lotteries"
-Issues = "https://github.com/kugguk2022/lotteries/issues"
-Discussions = "https://github.com/kugguk2022/lotteries/discussions"
+Homepage = "https://github.com/kugguk2022/lotteries-init-at-your-service"
+Issues = "https://github.com/kugguk2022/lotteries-init-at-your-service/issues"
+Discussions = "https://github.com/kugguk2022/lotteries-init-at-your-service/discussions"
 
 [project.scripts]
 lotto-get-draws = "euromillions.get_draws:main"
+lotto-likely-sets = "lotteries_core.likely_set_generator:main"
+lotto-track = "lotteries_core.outcome_tracker:main"
 # Enable later when implemented:
 # lotto-roi = "euromillions.roi:main"
 

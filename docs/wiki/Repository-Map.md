@@ -26,8 +26,21 @@ The distributed-inference framework. This is the part with a stable contract.
 | [`outcome_tracker.py`](../../lotteries_core/outcome_tracker.py) | The prospective ledger. See [Outcome Tracking](Outcome-Tracking.md). |
 | [`benchmark.py`](../../lotteries_core/benchmark.py) | CLI entry point for `evaluation.py`. |
 
-Gated in CI by `tests/test_core_inference.py`, `tests/test_outcome_tracking.py`,
-`tests/test_benchmark_regression.py`, `tests/test_causal_poi.py`.
+### `lotteries_core/providers/`
+
+| Provider | Module | Role |
+|---|---|---|
+| `frequency` | [`frequency.py`](../../lotteries_core/providers/frequency.py) | Smoothed-frequency baseline. The reference every method must beat. |
+| `unpopularity` | [`unpopularity.py`](../../lotteries_core/providers/unpopularity.py) | Crowd-avoidance for the jackpot-sharing lever. Current champion on expected ROI. |
+| `cooccurrence_level_set` | [`../likely_set_generator.py`](../../lotteries_core/likely_set_generator.py) | The owner's pair-co-occurrence level-set method. |
+| `perron_frobenius` | [`spectral.py`](../../lotteries_core/providers/spectral.py) | PageRank stationary ranking, with a sampler-only ablation and a fair-draw null band. |
+| `parallax_guard` | [`parallax.py`](../../lotteries_core/providers/parallax.py) | Replication-guarded residuals plus a coverage-first portfolio optimizer, with a signal-off ablation. |
+| `ml_ensemble` | [`ml_ensemble.py`](../../lotteries_core/providers/ml_ensemble.py) | GLM + gradient boosting (+ optional MLP) aimed at crowd popularity, never at the draw. |
+
+Adding one is documented in [Contributing a Provider](Contributing-a-Provider.md).
+
+CI gates the whole test suite and the whole tree's lint; `tests/test_core_inference.py` is where
+provider contracts are enforced.
 
 ## Labs
 
@@ -87,7 +100,11 @@ HTML-scraping heuristics; they break when upstream markup drifts.
 
 ## Packaging note
 
-`lotteries_core` is a proper package. `euromillions/`, `totoloto/`, `eurodreams/`, and
-`euromillions_agent/` have **no `__init__.py`** — they resolve as implicit namespace packages. Module
-execution (`python -m euromillions.infer`) works; package-level imports
-(`from euromillions import ...`) do not.
+`lotteries_core` and `euromillions` are proper packages with tested public surfaces. `euromillions`
+exports **lazily** (PEP 562): `from euromillions import EuroMillionsGuess` works, while
+`python -m euromillions.get_draws` does not double-import the submodule.
+
+`totoloto/`, `eurodreams/`, and `euromillions_agent/` still have no `__init__.py` and resolve as
+implicit namespace packages. Module execution (`python -m totoloto.totoloto_get_draws`) works;
+package-level imports do not. That is fine for lab code — add an `__init__.py` only when a package
+gains a surface worth promising.

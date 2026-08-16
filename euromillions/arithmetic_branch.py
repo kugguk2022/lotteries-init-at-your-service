@@ -17,7 +17,8 @@ import pandas as pd
 import statsmodels.api as sm
 from scipy.optimize import brentq, minimize
 from scipy.special import expit, logsumexp
-from scipy.stats import norm, t as t_dist
+from scipy.stats import norm
+from scipy.stats import t as t_dist
 
 from euromillions.diagnostics3 import (
     annotate_match_statistics,

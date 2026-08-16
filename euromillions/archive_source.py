@@ -9,7 +9,6 @@ from bs4 import BeautifulSoup
 
 from .lottology import EMRow
 
-
 ARCHIVE_URL_TEMPLATE = "https://www.euro-millions.com/results-history-{year}"
 ARCHIVE_MIN_YEAR = 2004
 UA = {"User-Agent": "lotteries/0.1 (+https://github.com/kugguk2022/lotteries)"}

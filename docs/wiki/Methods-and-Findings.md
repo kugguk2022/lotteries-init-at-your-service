@@ -79,6 +79,36 @@ There is also a structural reason PageRank cannot express the intuition it is us
 uniform. So "these numbers always come up together" cannot, on its own, lift a number in this ranking.
 This is captured as a regression test (`test_isolated_clique_gets_no_pagerank_boost`).
 
+### `parallax_guard` — replicated residuals, coverage-first portfolio
+
+An externally contributed provider ([`providers/parallax.py`](../../lotteries_core/providers/parallax.py)).
+Two ideas, deliberately separated.
+
+**The admission rule.** History is split into two disjoint, interleaved halves. A number or pair is
+admitted only when both views show the **same signed deviation** from the exact fair-draw expectation
+*and* the weaker view clears a family-wise (Bonferroni) normal threshold. A one-window hot streak
+therefore contributes exactly zero. It also restricts to draws under the **current game matrix**
+(EuroMillions moved to a 12-star pool on 2016-09-27); older rows are valid records but are not
+observations of today's null.
+
+**The portfolio objective.** Candidates are selected as one set by greedy marginal utility over new
+main pairs, balanced main and star usage, new star pairs, low crowd popularity, and the admitted
+residual — with pair reach weighted to dominate, so no signal can outvote gross duplication.
+
+`mode="ablation"` runs the identical generator and objective with the residual forced to zero.
+
+**Result on real data.** Fitted on 1,972 EuroMillions draws (927 of them under current rules), the
+guard admits **zero** residuals — `evidence_nonzero = 0`, `evidence_max_abs = 0.0`. Guarded and
+ablation are therefore the *same estimator*, and produce identical portfolios. Independent of the
+PageRank null test above, and by a completely different statistic, this is the same verdict: there is
+no replicable structure in the draw history.
+
+Its portfolio construction, however, is the strongest in the repository — a single 25-ticket portfolio
+reaches `pair_coverage` 0.2041 and `number_coverage` 1.000, with star usage spread across the pool
+within one (4–5 uses each), fixing the pinned-star concentration the level-set generator exhibits.
+That value is entirely attributable to the optimizer, which is exactly what the ablation was built to
+establish.
+
 ## Head-to-head results
 
 Forward-only, EuroMillions, budget 25, 40-draw holdout, seed 1234:

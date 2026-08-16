@@ -21,34 +21,16 @@ jobs:
           python -m pip install -U pip
           pip install -e ".[dev]"
 
-      - name: Ruff changed Python files
-        shell: bash
-        env:
-          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
-          PUSH_BASE_SHA: ${{ github.event.before }}
-        run: |
-          base_sha="${PR_BASE_SHA:-$PUSH_BASE_SHA}"
-          if ! git cat-file -e "${base_sha}^{commit}" 2>/dev/null; then
-            base_sha="$(git rev-parse HEAD^)"
-          fi
-          mapfile -t changed < <(git diff --name-only --diff-filter=ACMR "$base_sha" HEAD -- '*.py')
-          if ((${#changed[@]})); then
-            ruff check "${changed[@]}"
-          else
-            echo "No changed Python files."
-          fi
+      # Repository-wide. The former changed-files-only gate existed because `ruff check .` was red;
+      # the legacy debt is now either fixed or scoped to explicit per-file-ignores in pyproject.toml,
+      # so the whole tree is gated and cannot silently regress.
+      - name: Ruff (whole repository)
+        run: ruff check .
 
-      - name: Pytest maintained core (with coverage)
-        run: |
-          pytest -q --maxfail=1 --disable-warnings --cov=lotteries_core \
-            tests/test_outcome_tracking.py \
-            tests/test_core_inference.py \
-            tests/test_benchmark_regression.py \
-            tests/test_causal_poi.py
-
-      - name: Legacy full-suite audit (non-blocking until baseline debt is repaired)
-        continue-on-error: true
-        run: pytest -q --maxfail=1 --disable-warnings
+      # Also repository-wide. Previously only four files blocked and the full suite ran with
+      # continue-on-error; both uncollectable modules are fixed, so the real suite is the gate.
+      - name: Pytest (whole suite, with core coverage)
+        run: pytest -q --maxfail=1 --disable-warnings --cov=lotteries_core
 
       - name: Fail on placeholders in changed Python files
         shell: bash

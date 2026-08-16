@@ -2,13 +2,11 @@
 from __future__ import annotations
 
 import re
-import csv
-import io
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Iterable, List, Optional
-import requests
+from typing import List, Optional
 
+import requests
 
 LOTTOLOGY_ARCHIVE_URL = "https://www.lottology.com/europe/euromillions/past-draws-archive/"
 UA = {"User-Agent": "lotteries-bot/1.0 (+https://github.com/kugguk2022/lotteries)"}
@@ -17,8 +15,13 @@ UA = {"User-Agent": "lotteries-bot/1.0 (+https://github.com/kugguk2022/lotteries
 @dataclass(frozen=True)
 class EMRow:
     date: str  # YYYY-MM-DD
-    n1: int; n2: int; n3: int; n4: int; n5: int
-    star1: int; star2: int
+    n1: int
+    n2: int
+    n3: int
+    n4: int
+    n5: int
+    star1: int
+    star2: int
 
 
 def _abs(url: str) -> str:

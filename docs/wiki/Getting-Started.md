@@ -25,18 +25,12 @@ Python 3.10+ is required. The optional `ml` extra (`pip install -e ".[dev,ml]"`)
 
 ## Verify your install **[verified]**
 
-Run the maintained core, which is what CI gates:
-
 ```bash
-pytest -q tests/test_core_inference.py tests/test_outcome_tracking.py \
-          tests/test_benchmark_regression.py tests/test_causal_poi.py
+make test     # or: ruff check . && pytest -q
 ```
 
-Expected: **24 passed**.
-
-> Do **not** start with `make test`. It runs `ruff check .` across the whole repository and currently
-> reports 61 errors, so it fails for reasons unrelated to your install. See
-> [Current State](Current-State.md).
+Expected: **all ruff checks pass, 54 tests pass**. This is the same gate CI blocks on, repository-wide.
+If it fails on a clean checkout, that is a bug — please open an issue.
 
 ## The main thing this repo does **[verified]**
 
@@ -122,11 +116,21 @@ Fetches (unless `--skip-fetch`) all three lotteries, generates candidates, and r
 baseline evaluation with a permutation test. Windows one-click equivalents exist as
 `start_euromillions.bat`, `start_totoloto.bat`, `start_eurodreams.bat`.
 
+## Enter the competition **[verified]**
+
+Record every registered method for an upcoming draw, each against the same shared random control:
+
+```bash
+python -m lotteries_core.outcome_tracker record \
+    --history data/euromillions.csv --preset euromillions \
+    --draw-key 2026-08-18 --ledger ledger/euromillions \
+    --methods all --n-sets 20 --ticket-price 2.50
+```
+
+Adding your own entrant is [one file plus two registry lines](Contributing-a-Provider.md).
+
 ## Known-failing entry points **[broken]**
 
-- `make test` — repository-wide lint failures (61) and two uncollectable test modules.
-- `pytest -q` with no arguments — fails at collection on `tests/test_infer.py` and
-  `tests/test_end_to_end_paths.py`.
-- `from euromillions import EuroMillionsGuess, evaluate_guess, normalize` — the package-level API
-  advertised in `CONTRIBUTING.md` does not exist.
 - `python -m euromillions.roi` — documented as planned, not implemented; the CLI errors by design.
+
+That is the whole list. Anything else that fails on a clean checkout is a bug worth reporting.

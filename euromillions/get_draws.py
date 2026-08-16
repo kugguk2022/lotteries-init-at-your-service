@@ -15,8 +15,8 @@ from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 
 from .archive_source import fetch_euromillions_archive
+from .lottology import LOTTOLOGY_ARCHIVE_URL, EMRow, fetch_euromillions_lottology
 from .schema import validate_df
-from .lottology import EMRow, LOTTOLOGY_ARCHIVE_URL, fetch_euromillions_lottology
 
 PRIMARY_URL = "https://www.merseyworld.com/euromillions/resultsArchive.php?format=csv"
 SECONDARY_URL = "https://www.national-lottery.co.uk/results/euromillions/draw-history/csv"
@@ -216,42 +216,59 @@ def _normalize_headerless(csv_text: str) -> pd.DataFrame:
     return _finalize_dataframe(df)
 
 
+#: Every column spelling seen across upstream sources and bundled files, mapped to the canonical
+#: schema. ``n1..n5`` / ``star1`` / ``star2`` are the bundled ``euromillions_2016_2025.csv`` spelling.
+COLUMN_ALIASES = {
+    "date": "draw_date",
+    "draw_date": "draw_date",
+    "drawdate": "draw_date",
+    "ball1": "ball_1",
+    "ball_1": "ball_1",
+    "n1": "ball_1",
+    "ball2": "ball_2",
+    "ball_2": "ball_2",
+    "n2": "ball_2",
+    "ball3": "ball_3",
+    "ball_3": "ball_3",
+    "n3": "ball_3",
+    "ball4": "ball_4",
+    "ball_4": "ball_4",
+    "n4": "ball_4",
+    "ball5": "ball_5",
+    "ball_5": "ball_5",
+    "n5": "ball_5",
+    "lucky_star1": "star_1",
+    "lucky_star_1": "star_1",
+    "star_1": "star_1",
+    "star1": "star_1",
+    "lucky_star2": "star_2",
+    "lucky_star_2": "star_2",
+    "star_2": "star_2",
+    "star2": "star_2",
+}
+
+CANONICAL_COLUMNS = ["draw_date", "ball_1", "ball_2", "ball_3", "ball_4", "ball_5", "star_1", "star_2"]
+
+
+def canonicalize_columns(df: pd.DataFrame) -> pd.DataFrame:
+    """Lower-case, de-space, and alias column names onto the canonical schema.
+
+    Shared by :func:`normalize` and the stale-fallback loader so both accept every spelling the
+    repository actually produces.
+    """
+    df = df.rename(columns={column: str(column).lower().strip().replace(" ", "_") for column in df.columns})
+    return df.rename(columns={key: value for key, value in COLUMN_ALIASES.items() if key in df.columns})
+
+
 def normalize(csv_text: str) -> pd.DataFrame:
     try:
         df = pd.read_csv(StringIO(csv_text))
     except Exception as exc:
         raise NormalizationError(f"Failed to parse CSV payload: {exc}") from exc
 
-    rename = {}
-    for column in df.columns:
-        norm = column.lower().strip().replace(" ", "_")
-        rename[column] = norm
-    df = df.rename(columns=rename)
+    df = canonicalize_columns(df)
 
-    mapping = {
-        "date": "draw_date",
-        "draw_date": "draw_date",
-        "drawdate": "draw_date",
-        "ball1": "ball_1",
-        "ball_1": "ball_1",
-        "ball2": "ball_2",
-        "ball_2": "ball_2",
-        "ball3": "ball_3",
-        "ball_3": "ball_3",
-        "ball4": "ball_4",
-        "ball_4": "ball_4",
-        "ball5": "ball_5",
-        "ball_5": "ball_5",
-        "lucky_star1": "star_1",
-        "lucky_star_1": "star_1",
-        "star_1": "star_1",
-        "lucky_star2": "star_2",
-        "lucky_star_2": "star_2",
-        "star_2": "star_2",
-    }
-    df = df.rename(columns={key: value for key, value in mapping.items() if key in df.columns})
-
-    keep = ["draw_date", "ball_1", "ball_2", "ball_3", "ball_4", "ball_5", "star_1", "star_2"]
+    keep = list(CANONICAL_COLUMNS)
     missing = [col for col in keep if col not in df.columns]
     if missing:
         # Retry assuming header-less numeric payload
@@ -377,9 +394,19 @@ def _fetch_archive_source(
 
 
 def _load_existing(path: Path, out_path: Path | None = None) -> FetchResult:
-    """Load an already-normalized CSV and return a FetchResult."""
+    """Load a local CSV as a FetchResult, accepting any known column spelling.
 
-    df = pd.read_csv(path, parse_dates=["draw_date"])
+    Used by ``--allow-stale``. It must tolerate the bundled ``euromillions_2016_2025.csv``
+    (``date`` / ``n1..n5`` / ``star1``) as well as already-normalized output, so columns are
+    canonicalized before the date is parsed rather than assumed.
+    """
+
+    df = canonicalize_columns(pd.read_csv(path))
+    missing = [column for column in CANONICAL_COLUMNS if column not in df.columns]
+    if missing:
+        raise NormalizationError(f"{path} is missing columns {missing} after aliasing")
+    df = df[CANONICAL_COLUMNS].copy()
+    df["draw_date"] = pd.to_datetime(df["draw_date"], errors="coerce")
     df = _finalize_dataframe(df)
     raw_csv = df.to_csv(index=False)
     if out_path and out_path != path:

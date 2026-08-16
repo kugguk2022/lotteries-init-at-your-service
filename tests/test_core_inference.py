@@ -19,9 +19,11 @@ from lotteries_core.popularity import PopularityModel
 from lotteries_core.protocol import GameSpec
 from lotteries_core.providers import (
     FrequencyProvider,
+    ParallaxGuardProvider,
     PerronFrobeniusProvider,
     UnpopularityProvider,
     null_tv_band,
+    replicated_evidence,
     stationary_distribution,
 )
 from lotteries_core.roi import (
@@ -313,6 +315,111 @@ def test_single_bonus_ball_falls_back_to_the_cross_marginal():
     assert len(res.tickets) == 15
     for t in res.tickets:
         spec.validate_ticket(t)
+
+
+def _dated_history(n: int = 400, seed: int = 13, planted: int | None = None) -> pd.DataFrame:
+    """Fair history under the current EuroMillions matrix, optionally with one number planted.
+
+    Dates start after 2016-09-27 so the whole frame survives the current-rules filter.
+    """
+    rng = np.random.default_rng(seed)
+    start = pd.Timestamp("2017-01-03")
+    rows = []
+    for i in range(n):
+        if planted is None:
+            mains = sorted(int(v) for v in rng.choice(np.arange(1, 51), 5, replace=False))
+        else:
+            others = rng.choice([v for v in range(1, 51) if v != planted], 4, replace=False)
+            mains = sorted([planted, *(int(v) for v in others)])
+        stars = sorted(int(v) for v in rng.choice(np.arange(1, 13), 2, replace=False))
+        rows.append(
+            {
+                "draw_date": (start + pd.Timedelta(days=4 * i)).date().isoformat(),
+                **{f"ball_{j+1}": mains[j] for j in range(5)},
+                **{f"star_{j+1}": stars[j] for j in range(2)},
+            }
+        )
+    return pd.DataFrame(rows)
+
+
+# ----------------------------------------------------------------------------------------------
+# Parallax Guard provider
+# ----------------------------------------------------------------------------------------------
+
+
+def test_parallax_guard_rejects_noise_on_a_fair_history():
+    """The admission rule's whole purpose: a fair generator must yield zero admitted residuals."""
+    spec = GameSpec.euromillions()
+    evidence = replicated_evidence(_dated_history(), spec)
+    assert evidence.nonzero == 0
+    assert evidence.max_abs == pytest.approx(0.0)
+
+
+def test_parallax_guard_admits_a_planted_signal():
+    """A bias large enough to replicate in both folds and clear Bonferroni must get through."""
+    spec = GameSpec.euromillions()
+    evidence = replicated_evidence(_dated_history(planted=7), spec)
+    assert evidence.nonzero > 0
+    assert evidence.main_number[6] > 0  # number 7, 0-based
+    assert evidence.main_number[6] == evidence.main_number.max()
+
+
+def test_parallax_guard_needs_the_signal_in_both_folds():
+    """A one-window hot streak must contribute exactly zero, even if it is locally extreme."""
+    spec = GameSpec.euromillions()
+    hist = _dated_history(n=400, seed=31)
+    # Folds are the alternating rows, so writing 11 into every even row saturates fold A and leaves
+    # fold B untouched. The evidence is overwhelming in one view and absent from the other -- exactly
+    # the shape of a hot streak, and exactly what the guard exists to reject.
+    hist.loc[::2, "ball_1"] = 11
+    evidence = replicated_evidence(hist, spec)
+    assert evidence.main_number[10] == pytest.approx(0.0)
+
+
+def test_parallax_modes_are_legal_distinct_and_star_balanced():
+    spec = GameSpec.euromillions()
+    hist = _dated_history()
+    for mode in ("guarded", "ablation"):
+        prov = ParallaxGuardProvider(mode=mode).fit(hist, spec)
+        res = prov.propose(spec, budget=25, rng=np.random.default_rng(3))
+        assert len(res.tickets) == 25
+        assert len(set(res.tickets)) == 25
+        for t in res.tickets:
+            spec.validate_ticket(t)
+        # No pinned-star concentration: usage across the star pool stays within one of itself.
+        spread = res.diagnostics["star_usage_max"] - res.diagnostics["star_usage_min"]
+        assert spread <= 1, f"{mode} star usage spread {spread}"
+
+
+def test_parallax_guarded_equals_ablation_when_no_signal_is_admitted():
+    """With nothing admitted the two modes are the same estimator, which is what makes the
+    ablation interpretable: any observed gap is signal, never sampler drift."""
+    spec = GameSpec.euromillions()
+    hist = _dated_history()
+    guarded = ParallaxGuardProvider(mode="guarded").fit(hist, spec)
+    ablation = ParallaxGuardProvider(mode="ablation").fit(hist, spec)
+    assert guarded.propose(spec, 20, np.random.default_rng(8)).diagnostics["evidence_nonzero"] == 0
+    a = guarded.propose(spec, 20, np.random.default_rng(8)).tickets
+    b = ablation.propose(spec, 20, np.random.default_rng(8)).tickets
+    assert a == b
+
+
+def test_parallax_restricts_to_the_current_rules_regime():
+    """EuroMillions changed its star pool in 2016; older rows are not observations of today's null."""
+    spec = GameSpec.euromillions()
+    old = _dated_history(n=100, seed=4)
+    old["draw_date"] = [
+        (pd.Timestamp("2013-01-04") + pd.Timedelta(days=4 * i)).date().isoformat()
+        for i in range(len(old))
+    ]
+    recent = _dated_history(n=300, seed=5)
+    prov = ParallaxGuardProvider().fit(pd.concat([old, recent], ignore_index=True), spec)
+    res = prov.propose(spec, 10, np.random.default_rng(0))
+    assert res.diagnostics["source_history_rows"] == 400
+    assert res.diagnostics["history_rows"] == 300  # the pre-2016 rows are excluded
+
+    with pytest.raises(ValueError, match="no euromillions rows under the current rules"):
+        ParallaxGuardProvider().fit(old, spec)
 
 
 def test_pagerank_signal_on_a_fair_history_sits_inside_the_null_band():

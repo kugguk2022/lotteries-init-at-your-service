@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import argparse
-import os
 from itertools import combinations
 from pathlib import Path
 

@@ -22,7 +22,7 @@ import argparse
 import json
 from math import gcd
 from pathlib import Path
-from typing import Dict, Optional, Tuple
+from typing import Dict
 
 import matplotlib
 import numpy as np
@@ -30,11 +30,12 @@ import pandas as pd
 
 matplotlib.use("Agg")
 
+import warnings
+
 import matplotlib.pyplot as plt
 import statsmodels.api as sm
 from scipy.special import logsumexp
 from scipy.stats import multivariate_t
-import warnings
 
 from euromillions.diagnostics3 import (
     apply_start_date_cutoff,

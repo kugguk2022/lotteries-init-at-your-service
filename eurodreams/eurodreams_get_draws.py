@@ -260,6 +260,7 @@ def _load_existing(path: str) -> List[Dict]:
 
 import traceback
 
+
 def _validate_structured_rows(rows: List[Dict]) -> List[Dict]:
     out: List[Dict] = []
     for r in rows:
@@ -314,7 +315,7 @@ def _validate_structured_rows(rows: List[Dict]) -> List[Dict]:
                          d, m, y = map(int, parts)
                          d_iso = dt.date(y, m, d).isoformat()
                          mapped["date"] = d_iso
-                 except:
+                 except Exception:
                      pass
 
              rec = {

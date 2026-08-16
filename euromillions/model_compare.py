@@ -177,7 +177,7 @@ def build_classification_table(history_path: Path, outputs_root: Path) -> tuple[
             "any_hit_rate": theory["any_hit_rate"],
             "exact_5_of_5_accuracy": theory["exact_5_of_5_accuracy"],
         },
-        "survivors": table.loc[table["survives_vs_random_95"] == True, "version"].tolist(),
+        "survivors": table.loc[table["survives_vs_random_95"].eq(True), "version"].tolist(),
     }
     return table, summary
 
@@ -280,9 +280,9 @@ def build_regression_rows(outputs_root: Path, poi_window: int) -> pd.DataFrame:
 
 def build_report(classification: pd.DataFrame, regression: pd.DataFrame) -> str:
     cls_survivors = classification.loc[
-        classification["survives_vs_random_95"] == True, "version"
+        classification["survives_vs_random_95"].eq(True), "version"
     ].tolist()
-    reg_survivors = regression.loc[regression["survives_min_bar"] == True, "version"].tolist()
+    reg_survivors = regression.loc[regression["survives_min_bar"].eq(True), "version"].tolist()
 
     lines = [
         "# EuroMillions Model Comparison",

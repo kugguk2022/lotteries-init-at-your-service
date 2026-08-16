@@ -66,6 +66,25 @@ line-length = 100
 [tool.ruff.lint]
 extend-select = ["I"]
 
+# Acknowledged legacy debt, scoped to the exact files that carry it, so `ruff check .` is a real
+# gate for everything else instead of being permanently red. Each entry is a promise to clean up,
+# not a blanket exemption: do not add new files here, and delete an entry once its file is fixed.
+#
+# F841: research scripts that compute intermediates for interactive inspection and no longer use
+#       them. Removing them blind risks deleting a deliberate calculation, so they are left for
+#       whoever next works in that script with the context to judge.
+# E402: single-file scripts that interleave module-level analysis code with imports.
+[tool.ruff.lint.per-file-ignores]
+"euromillions/arithmetic_branch.py" = ["F841"]
+"euromillions/branch_hmm_v3.py" = ["F841"]
+"euromillions/garch_glm_diagnostics.py" = ["F841"]
+"euromillions/garchx_glm.py" = ["F841"]
+"euromillions/roi.py" = ["F841"]
+"euromillions_agent/lotto_lab.py" = ["F841"]
+"eurodreams/eurodreams_get_draws.py" = ["E402"]
+"grok.py" = ["E402"]
+"totoloto/grok.py" = ["E402"]
+
 [tool.mypy]
 python_version = "3.11"
 warn_unused_ignores = true

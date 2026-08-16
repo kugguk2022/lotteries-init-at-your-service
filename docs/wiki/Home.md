@@ -15,8 +15,9 @@ the diff showing up.
 | [Getting Started](Getting-Started.md) | Install, then a set of commands verified to actually run today. |
 | [Repository Map](Repository-Map.md) | Which directories are maintained, which are labs, which are legacy. |
 | [Methods and Findings](Methods-and-Findings.md) | Every method in the repo, what it does, and how it has scored so far. |
-| [Outcome Tracking](Outcome-Tracking.md) | The prospective ledger: the actual experiment being run. |
-| [Current State](Current-State.md) | Honest status: what is broken, what is stale, what the path to green is. |
+| [Outcome Tracking](Outcome-Tracking.md) | The prospective ledger and the live competition. |
+| [Contributing a Provider](Contributing-a-Provider.md) | How to enter a new strategy — one file plus two registry lines. |
+| [Current State](Current-State.md) | Honest status: what works, what is open, what was fixed. |
 | [Documentation Standard](Documentation-Standard.md) | The bar this and sibling repositories are being held to. |
 
 ## The project in five sentences
@@ -34,11 +35,11 @@ The full argument, including which techniques are mathematically incapable of he
 
 ## Current state in one line
 
-The maintained core (`lotteries_core/`) is green and gated in CI. The wider repository is **not** —
-the full test suite has two modules that fail to import, repository-wide lint reports 61 errors, and
-the bundled draw history is roughly a year stale. See [Current State](Current-State.md) for the
-specifics and the prioritized path to fixing it. This is stated up front deliberately: a reader
-should learn a repository's real condition from its documentation, not from a failing command.
+`ruff check .` and `pytest` both pass across the whole repository, CI blocks on both, the draw history
+is current through 2026-08-14, and six methods are entered in the live prospective competition for the
+next draw. See [Current State](Current-State.md), which also keeps a record of what was broken and
+what was done about it — a status page that only ever shows green teaches a reader nothing about
+whether to trust it.
 
 ## Sibling repositories
 

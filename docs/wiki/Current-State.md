@@ -8,106 +8,96 @@ An honest status page. Everything below was verified by running it, not inferred
 
 | Area | State |
 |---|---|
-| Maintained core (`lotteries_core/`) | **Green.** 24/24 tests pass, lint clean, gated in CI. |
-| Full test suite | **Red at collection.** 49 pass once 2 modules are excluded; those 2 cannot be imported. |
-| Repository-wide lint | **Red.** 61 `ruff` errors, 37 auto-fixable. |
-| Advertised quality gate (`make test`) | **Fails**, for both reasons above. |
-| Bundled draw history | **Stale.** Ends 2025-08-12. |
-| Data fetchers | **Working**, with one dead upstream source and a broken offline fallback. |
-| Public API promised in `CONTRIBUTING.md` | **Does not exist.** |
+| `pytest` (whole suite, no arguments) | **Green** — 54 passed. |
+| `ruff check .` (whole repository) | **Green** — all checks passed. |
+| `make test` | **Green** — both of the above. |
+| CI | **Blocks on both, repository-wide.** No `continue-on-error` audit step remains. |
+| Draw history | **Current** — `data/euromillions.csv`, 1,972 draws through 2026-08-14. |
+| Data fetchers | **Working**, including the offline `--allow-stale` fallback. |
+| Public API | **Exists and is tested** — `euromillions` exports resolve; `lotteries_core` is the stable surface. |
+| Prospective ledger | **Live** — six entrants recorded for the 2026-08-18 draw. |
 
-CI currently reflects this honestly rather than hiding it: only the four maintained-core test files
-block, and a full-suite audit runs with `continue-on-error: true`. That is a reasonable containment
-strategy, but it is a holding position, not a destination.
+The repository was red on the first four of those rows as recently as this morning. What follows is
+what was wrong and what was done, kept as a record rather than deleted.
 
-## Issues, in the order worth fixing
+## Resolved
 
-### 1. Two test modules cannot be imported — blocks `pytest` with no arguments
+### Two test modules could not be imported
 
-```
-tests/test_end_to_end_paths.py
-  ImportError: cannot import name 'EuroMillionsGuess' from 'euromillions' (unknown location)
-tests/test_infer.py
-  ImportError: cannot import name 'random_candidates' from 'euromillions.infer'
-```
+`tests/test_end_to_end_paths.py` and `tests/test_infer.py` failed at collection, so a bare `pytest`
+never ran anything.
 
-**Cause.** `euromillions/` has no `__init__.py`, so it resolves as an implicit namespace package with
-no package-level exports. `random_candidates` is genuinely absent from `euromillions/infer.py` (which
-defines `probability_tables`, `generate_candidates`, `load_history`, `save_candidates`, `main`).
+- `euromillions/` had no `__init__.py`, so `from euromillions import EuroMillionsGuess, ...` could not
+  resolve. Added one, with **lazy PEP 562 exports** — eager imports would make
+  `python -m euromillions.get_draws` import the module twice and emit a `RuntimeWarning`.
+- `euromillions/infer.py` was missing `random_candidates`, and `generate_candidates` /
+  `probability_tables` had been generalized to require explicit game-shape arguments that the tests
+  did not pass. Added `random_candidates` (the uniform control) and gave the shape parameters
+  EuroMillions defaults, so both the general and the simple call sites work.
 
-**Fix.** Add `euromillions/__init__.py` re-exporting the intended public surface, and either implement
-`random_candidates` (a uniform control sampler, which is what the test uses it as) or update the test.
-Both are small. This one change turns a bare `pytest` from *red* to *green*.
+### `CONTRIBUTING.md` documented an API that did not exist
 
-**Why it matters most.** A contributor's first command is `pytest`. Right now it fails at collection
-before running anything, which reads as "this repository is abandoned".
+It named `euromillions` exports as the stable surface. Corrected to `lotteries_core`, with the
+history noted rather than quietly rewritten.
 
-### 2. `CONTRIBUTING.md` documents an API that does not exist
+### Repository-wide lint was red (61 errors)
 
-It states that "`euromillions` exports are the stable surface". There are no package-level exports.
-Fixed by item 1, or by correcting the sentence. Until then the document is actively misleading.
+36 auto-fixed (import ordering, unused imports). Semicolon statements, `== True` comparisons, and a
+bare `except` were fixed by hand. The remaining 15 are unused locals in long research scripts and
+module-level imports in single-file analysis scripts; they are scoped to **explicit per-file-ignores
+in `pyproject.toml`**, each annotated with why. That list is a cleanup queue, not an exemption — do
+not add to it.
 
-### 3. Repository-wide lint is red
+### `--allow-stale` fallback was broken
 
-61 errors, dominated by import ordering (`I001`) and module-level imports after code (`E402`, e.g.
-`totoloto/grok.py:143`). 37 are auto-fixable with `ruff check --fix .`.
+`_load_existing` read the fallback CSV with `parse_dates=["draw_date"]`, but the bundled file's column
+is `date`, so the documented offline path failed exactly when it was needed. Column aliasing is now
+shared between `normalize` and the fallback loader via `canonicalize_columns`, and the alias table
+covers the bundled `n1..n5` / `star1` spelling.
 
-**Recommended approach.** Fix the maintained core and any actively developed lab to zero, then add
-per-file ignores for legacy scripts rather than rewriting them. Do not run a blanket auto-fix across
-lab code without checking that `E402` imports were not deliberately placed after configuration.
+### Two coexisting CSV schemas
 
-### 4. Bundled history is a year stale
+Still two spellings on disk, but they now converge through one alias table
+(`COLUMN_ALIASES` / `CANONICAL_COLUMNS` in `euromillions/get_draws.py`) instead of through ad-hoc
+prefix sniffing in each loader.
 
-`euromillions/euromillions_2016_2025.csv` ends **2025-08-12** (1,004 draws). Every example in the
-README uses it, so every documented result is computed on year-old data. Refresh before recording any
-prospective prediction to the ledger.
+### Silent uniform stars in `infer.py`
 
-### 5. `--allow-stale` fallback is broken
+When a history used an unrecognized star column, `probability_tables` skipped it and returned
+**uniform** star probabilities instead of failing — a wrong answer rather than an error. It now tries
+the known spellings and exits with the available columns listed if none match.
 
-When all network sources fail, `get_draws` falls back to the bundled CSV and raises:
+### CI only gated four files
 
-```
-Missing column provided to 'parse_dates': 'draw_date'
-```
+The workflow ran four test files as blocking and the real suite with `continue-on-error: true`, and
+linted only changed files. Both gates are now repository-wide and blocking.
 
-**Cause.** `euromillions/get_draws.py:382` reads the fallback with `parse_dates=["draw_date"]`, but the
-bundled file's date column is named `date`. So the documented offline path fails precisely when it is
-needed. **Fix:** normalize the column before parsing, or sniff the name as the other loaders do.
+## Open
 
-**Note:** the fetcher itself works. The `merseyworld` source 404s and `pedro` returns the wrong content
-type, but the `archive` source succeeds and results are cached under `.cache/euromillions`.
+### 1. Aggregation underperformed the best single provider
 
-### 6. Two coexisting CSV schemas
+On the 40-draw benchmark, aggregated pair coverage came in below the best single provider, contrary
+to the framework's headline claim that coordination should not reduce coverage. This is a research
+question, not a build failure. See [Methods and Findings](Methods-and-Findings.md).
 
-`date`/`n1..n5`/`star1` (bundled) versus `draw_date`/`ball_1..ball_5`/`star_1` (fetcher output).
-Loaders paper over this by prefix-sniffing column names. It is the root cause of item 5 and a standing
-trap. Worth choosing one canonical schema and converting the other at the boundary.
+### 2. `euromillions/roi.py` is a documented stub
 
-### 7. `euromillions/roi.py` is a documented stub
+Its CLI errors by design. Disclosed in the README; listed here so it is not mistaken for a regression.
 
-Its CLI errors by design. Correctly disclosed in the README; listed here so it is not mistaken for a
-regression.
+### 3. The per-file-ignore queue
 
-### 8. Aggregation underperformed the best single provider
+Nine files carry `F841` or `E402` ignores. Each is a small cleanup for whoever next works in that
+script with the context to judge whether an unused local was a deliberate intermediate.
 
-On the 40-draw benchmark, aggregated pair coverage came in 0.027 *below* the best single provider,
-contrary to the framework's headline claim. See [Methods and Findings](Methods-and-Findings.md). This
-is a research question, not a build failure, but it should not sit undocumented.
+### 4. The bundled CSV is still the stale one
 
-## Path to green
-
-1. Add `euromillions/__init__.py`; resolve `random_candidates`. → bare `pytest` passes.
-2. Lint the maintained core and active labs to zero; per-file-ignore the legacy scripts. → `make test`
-   passes.
-3. Fix the `--allow-stale` fallback and pick one canonical CSV schema.
-4. Refresh the bundled history and re-run the documented benchmarks so published numbers are current.
-5. Promote the full suite from `continue-on-error` to blocking in CI.
-
-Steps 1–3 are small and mechanical. Step 5 is the one that makes the standard stick, because after it
-the repository can no longer quietly drift back.
+`euromillions/euromillions_2016_2025.csv` (ends 2025-08-12) is unchanged and is still what the
+documentation's offline examples use. `data/euromillions.csv` is the current file; prefer it for
+anything real, and always for ledger records.
 
 ## How to keep this page honest
 
 Re-verify on any change to the build, the entry points, or the data schema. If a command is listed as
 working, someone ran it. If it is broken, it stays listed as broken until it is fixed — deleting the
-entry is not the same as resolving it.
+entry is not the same as resolving it. The resolved section stays too: a status page that only ever
+shows green teaches a reader nothing about whether to trust it.

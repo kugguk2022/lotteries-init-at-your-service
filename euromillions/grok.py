@@ -7,8 +7,9 @@ import pandas as pd
 import torch
 import torch.nn as nn
 from sklearn.preprocessing import StandardScaler
-from torch.utils.data import DataLoader, Dataset
 from statsmodels.tsa.ar_model import AutoReg
+from torch.utils.data import DataLoader, Dataset
+
 
 # Dual-Input Transformer Model
 class DualInputTransformer(nn.Module):

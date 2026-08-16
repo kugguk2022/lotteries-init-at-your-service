@@ -24,6 +24,7 @@ from .protocol import GameSpec
 from .providers import (
     CooccurrenceLevelSetProvider,
     FrequencyProvider,
+    ParallaxGuardProvider,
     PerronFrobeniusProvider,
     UnpopularityProvider,
 )
@@ -39,10 +40,16 @@ def build_providers(
     include_ml: bool,
     include_cooccurrence: bool = False,
     include_spectral: bool = False,
+    include_parallax: bool = False,
 ):
     providers = [FrequencyProvider(), UnpopularityProvider()]
     if include_cooccurrence:
         providers.append(CooccurrenceLevelSetProvider())
+    if include_parallax:
+        # Guarded and ablation together: identical machinery, signal on vs off, so any gap is the
+        # replicated residual and anything they share is the portfolio optimiser.
+        providers.append(ParallaxGuardProvider(mode="guarded"))
+        providers.append(ParallaxGuardProvider(mode="ablation"))
     if include_spectral:
         # Both orientations enter the field (the ranking may be informative in either direction),
         # plus the sampler-only ablation so a win can be attributed to the spectral signal or denied it.
@@ -74,12 +81,28 @@ def main(argv: list[str] | None = None) -> None:
         action="store_true",
         help="Include the Perron-Frobenius (PageRank) co-occurrence providers, both orientations",
     )
+    ap.add_argument(
+        "--with-parallax",
+        action="store_true",
+        help="Include the Parallax Guard providers (guarded + signal-off ablation)",
+    )
+    ap.add_argument(
+        "--all-providers",
+        action="store_true",
+        help="Enable every optional provider (equivalent to all --with-* flags)",
+    )
     ap.add_argument("--out", default=None, help="Optional path to write the JSON summary")
     args = ap.parse_args(argv)
 
     history = pd.read_csv(args.history)
     spec = _GAMES[args.game]()
-    providers = build_providers(args.with_ml, args.with_cooccurrence, args.with_spectral)
+    every = args.all_providers
+    providers = build_providers(
+        args.with_ml or every,
+        args.with_cooccurrence or every,
+        args.with_spectral or every,
+        args.with_parallax or every,
+    )
     summary = evaluate_forward(
         history, spec, providers, budget=args.budget, holdout=args.holdout, seed=args.seed
     )

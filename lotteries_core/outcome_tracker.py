@@ -38,10 +38,73 @@ import pandas as pd
 
 from .envelope import data_sha256
 from .likely_set_generator import PRESETS, GameConfig, build_portfolio, resolve_config
+from .protocol import GameSpec
 
 PENDING = "pending_predictions.jsonl"
 SETTLED = "settled_predictions.jsonl"
 RESULTS = "results.csv"
+
+#: Methods that can be entered into the tracked competition. ``cooccurrence`` is the owner's
+#: level-set generator and stays the default so existing ledgers keep their method label. The rest
+#: are :class:`~lotteries_core.protocol.InferenceProvider` implementations, recorded through the
+#: same protocol so any future contribution joins by adding one registry entry.
+PROVIDER_METHODS = (
+    "frequency",
+    "unpopularity",
+    "perron_frobenius",
+    "parallax_guard",
+    "parallax_ablation",
+)
+METHOD_CHOICES = ("cooccurrence", *PROVIDER_METHODS)
+
+
+def _spec_from_config(cfg: GameConfig) -> GameSpec:
+    return GameSpec(cfg.name, cfg.main_n, cfg.main_k, cfg.star_n, cfg.star_k)
+
+
+def _make_provider(method: str):
+    """Instantiate a registered provider. Imported lazily so the CLI stays light."""
+    from .providers import (
+        FrequencyProvider,
+        ParallaxGuardProvider,
+        PerronFrobeniusProvider,
+        UnpopularityProvider,
+    )
+
+    factories = {
+        "frequency": lambda: FrequencyProvider(),
+        "unpopularity": lambda: UnpopularityProvider(),
+        "perron_frobenius": lambda: PerronFrobeniusProvider(orientation="contrarian"),
+        "parallax_guard": lambda: ParallaxGuardProvider(mode="guarded"),
+        "parallax_ablation": lambda: ParallaxGuardProvider(mode="ablation"),
+    }
+    if method not in factories:
+        raise ValueError(f"unknown provider method {method!r}; choose from {PROVIDER_METHODS}")
+    return factories[method]()
+
+
+def _portfolio_for_method(method: str, df: pd.DataFrame, cfg: GameConfig, args) -> tuple[str, list, float | None]:
+    """Return ``(method_label, tickets, target)`` for one entrant.
+
+    The RNG is seeded from the draw key so a recorded portfolio is reproducible from the ledger
+    alone; providers that ignore the RNG are deterministic anyway.
+    """
+    if method == "cooccurrence":
+        pf = build_portfolio(
+            df, cfg, target_mode=args.target_mode, window=args.window,
+            pairing=args.pairing, n_sets=args.n_sets,
+        )
+        return f"cooccurrence:{args.target_mode}:{args.pairing}", pf["tickets"], pf["target"]
+
+    provider = _make_provider(method)
+    spec = _spec_from_config(cfg)
+    try:
+        provider.fit(df, spec)
+    except TypeError:
+        provider.fit(df)
+    seed = int.from_bytes(hashlib.sha256(f"record:{method}:{args.draw_key}".encode()).digest()[:8], "big")
+    result = provider.propose(spec, args.n_sets, np.random.default_rng(seed % (2**32)))
+    return provider.name, list(result.tickets), None
 
 
 # ------------------------------------------------------------------------------------------------
@@ -137,44 +200,61 @@ def _rewrite_jsonl(path: Path, records: list[dict]) -> None:
 # ------------------------------------------------------------------------------------------------
 
 
+def _resolve_methods(raw: str) -> list[str]:
+    if raw.strip().lower() == "all":
+        return list(METHOD_CHOICES)
+    methods = [m.strip() for m in raw.split(",") if m.strip()]
+    unknown = [m for m in methods if m not in METHOD_CHOICES]
+    if unknown:
+        raise SystemExit(f"unknown method(s) {unknown}; choose from {list(METHOD_CHOICES)} or 'all'")
+    return methods
+
+
 def cmd_record(args) -> None:
     cfg = resolve_config(args)
     ledger = Path(args.ledger)
     df = pd.read_csv(args.history)
-    pf = build_portfolio(
-        df, cfg, target_mode=args.target_mode, window=args.window,
-        pairing=args.pairing, n_sets=args.n_sets,
-    )
-    record = {
-        "draw_key": args.draw_key,
-        "game": cfg.name,
-        "config": asdict(cfg),
-        "method": f"cooccurrence:{args.target_mode}:{args.pairing}",
-        "target": pf["target"],
-        "n_sets": len(pf["tickets"]),
-        "tickets": [[list(m), list(s)] for m, s in pf["tickets"]],
-        "control_tickets": [
-            [list(m), list(s)] for m, s in _random_control(cfg, len(pf["tickets"]), args.draw_key)
-        ],
-        "generated_from_rows": len(df),
-        "history_sha256": data_sha256(df),
-        "created_utc": datetime.now(timezone.utc).isoformat(),
-        "ticket_proof_sha256": args.ticket_proof_sha256 or None,
-        "ticket_price": args.ticket_price,
-    }
-    record["record_sha256"] = _record_digest(record)
-    # guard against double-recording the same draw key
+    methods = _resolve_methods(args.methods)
+
+    # One control per draw key, shared by every entrant, so the competition is paired: all methods
+    # are judged against the identical luck baseline on the identical draw.
+    control = _random_control(cfg, args.n_sets, args.draw_key)
+    history_hash = data_sha256(df)
     pending = _read_jsonl(ledger / PENDING)
     settled = _read_jsonl(ledger / SETTLED)
-    if any(
-        r["draw_key"] == args.draw_key and r["method"] == record["method"]
-        for r in pending + settled
-    ):
-        print(f"[skip] draw_key {args.draw_key} already recorded for this method")
-        return
-    _append_jsonl(ledger / PENDING, record)
-    print(f"[record] {record['n_sets']} sets logged for draw {args.draw_key} "
-          f"({cfg.name}, target={pf['target']:.1f}) -> {ledger / PENDING}")
+    already = {(r["draw_key"], r["method"]) for r in pending + settled}
+
+    recorded = 0
+    for method in methods:
+        label, tickets, target = _portfolio_for_method(method, df, cfg, args)
+        if (args.draw_key, label) in already:
+            print(f"[skip] {label} already recorded for draw {args.draw_key}")
+            continue
+        record = {
+            "draw_key": args.draw_key,
+            "game": cfg.name,
+            "config": asdict(cfg),
+            "method": label,
+            "target": target,
+            "n_sets": len(tickets),
+            "tickets": [[list(m), list(s)] for m, s in tickets],
+            "control_tickets": [[list(m), list(s)] for m, s in control[: len(tickets)]],
+            "generated_from_rows": len(df),
+            "history_sha256": history_hash,
+            "created_utc": datetime.now(timezone.utc).isoformat(),
+            "ticket_proof_sha256": args.ticket_proof_sha256 or None,
+            "ticket_price": args.ticket_price,
+        }
+        record["record_sha256"] = _record_digest(record)
+        _append_jsonl(ledger / PENDING, record)
+        already.add((args.draw_key, label))
+        recorded += 1
+        target_note = f", target={target:.1f}" if target is not None else ""
+        print(f"[record] {label}: {len(tickets)} sets for draw {args.draw_key} "
+              f"({cfg.name}{target_note})")
+
+    if recorded:
+        print(f"[record] {recorded} entrant(s) -> {ledger / PENDING}")
 
 
 def _parse_nums(s: str) -> set[int]:
@@ -286,6 +366,27 @@ def _permutation_pvalue(diffs: np.ndarray, iters: int = 10000, seed: int = 0) ->
     return (count + 1) / (iters + 1)
 
 
+def _print_leaderboard(df: pd.DataFrame) -> None:
+    """Per-method standings. Only meaningful once several entrants share settled draws."""
+    methods = sorted(df["method"].dropna().unique())
+    if len(methods) < 2:
+        return
+    print("competition standings (paired against the same control per draw)")
+    print(f"  {'method':34}{'draws':>7}{'mean lift':>12}{'best main':>11}{'p(lift>0)':>11}")
+    rows = []
+    for method in methods:
+        sub = df[df["method"] == method]
+        diffs = sub["lift_mean_main"].to_numpy(dtype=float)
+        rows.append((float(np.nanmean(diffs)), method, len(sub), float(sub["m_best_main"].mean()),
+                     _permutation_pvalue(diffs, iters=2000)))
+    for lift, method, draws, best, pval in sorted(rows, reverse=True):
+        print(f"  {method:34}{draws:>7}{lift:>+12.4f}{best:>11.3f}{pval:>11.4f}")
+    print("-" * 60)
+    print("  Standings are evidence, not a ranking of predictive power. On a fair draw every")
+    print("  entrant's true edge is zero, so early leads are luck until the window is long.")
+    print("-" * 60)
+
+
 def cmd_report(args) -> None:
     ledger = Path(args.ledger)
     path = ledger / RESULTS
@@ -308,6 +409,7 @@ def cmd_report(args) -> None:
     print("=" * 60)
     print(f"Outcome report  ({ledger})")
     print("=" * 60)
+    _print_leaderboard(df)
     print(f"settled draws              : {n}")
     print(f"method mean best-main hits : {method_best:.3f}")
     print(f"control mean best-main hits: {control_best:.3f}")
@@ -358,6 +460,14 @@ def main(argv: list[str] | None = None) -> None:
     rec.add_argument("--draw-key", required=True)
     rec.add_argument("--ledger", default="./ledger")
     rec.add_argument("--n-sets", type=int, default=20)
+    rec.add_argument(
+        "--methods",
+        default="cooccurrence",
+        help=(
+            "comma-separated entrants, or 'all'. Choices: " + ", ".join(METHOD_CHOICES) +
+            ". Every entrant is scored against the same shared random control for the draw."
+        ),
+    )
     rec.add_argument("--target-mode", choices=["observed", "predicted"], default="predicted")
     rec.add_argument("--pairing", choices=["cross", "main", "pooled"], default="cross")
     rec.add_argument("--window", type=int, default=26)

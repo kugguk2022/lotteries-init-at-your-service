@@ -7,6 +7,7 @@ from typing import Sequence
 import numpy as np
 import pandas as pd
 
+
 # We use simple validation here instead of the rigid schema import to allow flexibility
 def validate_df_flexible(df: pd.DataFrame) -> pd.DataFrame:
     if "draw_date" in df.columns:
@@ -20,15 +21,37 @@ def _counts(values: pd.Series, max_value: int) -> np.ndarray:
     return counts.astype(float)
 
 
+#: EuroMillions is the default game for this module; other shapes are passed explicitly.
+DEFAULT_MAX_BALL = 50
+DEFAULT_MAX_STAR = 12
+DEFAULT_BALL_K = 5
+DEFAULT_STAR_K = 2
+
+
+def default_columns(ball_k: int = DEFAULT_BALL_K, star_k: int = DEFAULT_STAR_K):
+    """Canonical normalized column names: ``ball_1..ball_k`` and ``star_1..star_k``."""
+    return (
+        [f"ball_{i}" for i in range(1, ball_k + 1)],
+        [f"star_{i}" for i in range(1, star_k + 1)],
+    )
+
+
 def probability_tables(
-    history: pd.DataFrame, 
-    max_ball: int, 
-    max_star: int,
-    ball_cols: list[str],
-    star_cols: list[str],
-    smoothing: float = 1.0
+    history: pd.DataFrame,
+    max_ball: int = DEFAULT_MAX_BALL,
+    max_star: int = DEFAULT_MAX_STAR,
+    ball_cols: list[str] | None = None,
+    star_cols: list[str] | None = None,
+    smoothing: float = 1.0,
 ) -> tuple[np.ndarray, np.ndarray]:
-    """Return smoothed probability tables for balls and stars."""
+    """Return smoothed probability tables for balls and stars.
+
+    Game shape defaults to EuroMillions; pass the explicit arguments for any other game.
+    """
+    if ball_cols is None or star_cols is None:
+        default_ball, default_star = default_columns()
+        ball_cols = default_ball if ball_cols is None else ball_cols
+        star_cols = default_star if star_cols is None else star_cols
     df = validate_df_flexible(history)
 
     ball_counts = np.zeros(max_ball, dtype=float)
@@ -58,16 +81,24 @@ def _sample_numbers(
 def generate_candidates(
     history: pd.DataFrame,
     n: int,
-    max_ball: int, 
-    max_star: int,
-    ball_cols: list[str],
-    star_cols: list[str],
-    ball_k: int,
-    star_k: int,
+    max_ball: int = DEFAULT_MAX_BALL,
+    max_star: int = DEFAULT_MAX_STAR,
+    ball_cols: list[str] | None = None,
+    star_cols: list[str] | None = None,
+    ball_k: int = DEFAULT_BALL_K,
+    star_k: int = DEFAULT_STAR_K,
     smoothing: float = 1.0,
     seed: int | None = None,
 ) -> pd.DataFrame:
-    """Generate `n` candidate tickets using frequency-weighted sampling."""
+    """Generate `n` candidate tickets using frequency-weighted sampling.
+
+    Game shape defaults to EuroMillions. On a fair draw this has no predictive edge over
+    :func:`random_candidates`; it is the reference baseline, not a strategy.
+    """
+    if ball_cols is None or star_cols is None:
+        default_ball, default_star = default_columns(ball_k, star_k)
+        ball_cols = default_ball if ball_cols is None else ball_cols
+        star_cols = default_star if star_cols is None else star_cols
     ball_probs, star_probs = probability_tables(
         history, max_ball, max_star, ball_cols, star_cols, smoothing=smoothing
     )
@@ -90,6 +121,48 @@ def generate_candidates(
                  row[col] = int(stars[i])
         rows.append(row)
         
+    return pd.DataFrame(rows)
+
+
+def random_candidates(
+    n: int,
+    max_ball: int = DEFAULT_MAX_BALL,
+    max_star: int = DEFAULT_MAX_STAR,
+    ball_cols: list[str] | None = None,
+    star_cols: list[str] | None = None,
+    ball_k: int = DEFAULT_BALL_K,
+    star_k: int = DEFAULT_STAR_K,
+    seed: int | None = None,
+) -> pd.DataFrame:
+    """Generate `n` uniformly random tickets -- the matched control for any weighted generator.
+
+    Same output shape as :func:`generate_candidates` so the two can be scored side by side. On a fair
+    draw this is not a worse strategy than any other; it is the yardstick that says so.
+    """
+    if ball_cols is None or star_cols is None:
+        default_ball, default_star = default_columns(ball_k, star_k)
+        ball_cols = default_ball if ball_cols is None else ball_cols
+        star_cols = default_star if star_cols is None else star_cols
+
+    uniform_balls = np.ones(max_ball, dtype=float)
+    uniform_stars = np.ones(max_star, dtype=float) if max_star > 0 else np.array([])
+    rng = np.random.default_rng(seed)
+    rows = []
+    balls_pop = range(1, max_ball + 1)
+    stars_pop = range(1, max_star + 1) if max_star > 0 else []
+
+    for _ in range(n):
+        balls = _sample_numbers(balls_pop, uniform_balls, k=ball_k, rng=rng)
+        stars = _sample_numbers(stars_pop, uniform_stars, k=star_k, rng=rng)
+        row = {}
+        for i, col in enumerate(ball_cols):
+            if i < len(balls):
+                row[col] = int(balls[i])
+        for i, col in enumerate(star_cols):
+            if i < len(stars):
+                row[col] = int(stars[i])
+        rows.append(row)
+
     return pd.DataFrame(rows)
 
 
@@ -143,11 +216,21 @@ def main() -> None:
     
     if args.num_stars > 0:
         if star_cols[0] not in history.columns:
-             # Try other common names
-             if "lucky_star_1" in history.columns:
-                 star_cols = [f"lucky_star_{i}" for i in range(1, args.num_stars + 1)]
-             elif "dream" in history.columns and args.num_stars == 1:
-                  star_cols = ["dream"]
+             # Try other common names. Without this, a history using an unrecognised star column
+             # silently produced uniform star probabilities instead of failing.
+             for prefix in ("lucky_star_", "star", "n_star_"):
+                 candidate = [f"{prefix}{i}" for i in range(1, args.num_stars + 1)]
+                 if candidate[0] in history.columns:
+                     star_cols = candidate
+                     break
+             else:
+                 if "dream" in history.columns and args.num_stars == 1:
+                     star_cols = ["dream"]
+                 else:
+                     raise SystemExit(
+                         f"Could not find star columns in history; tried {star_cols} and common "
+                         f"alternatives. Available columns: {list(history.columns)}"
+                     )
 
     candidates = generate_candidates(
         history, 

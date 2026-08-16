@@ -16,16 +16,15 @@ repository is actually in.
 | [Getting Started](docs/wiki/Getting-Started.md) | Install plus commands verified to run today |
 | [Repository Map](docs/wiki/Repository-Map.md) | Maintained core vs labs vs legacy |
 | [Methods and Findings](docs/wiki/Methods-and-Findings.md) | Every method and how it has scored |
-| [Outcome Tracking](docs/wiki/Outcome-Tracking.md) | The prospective ledger — the real experiment |
-| [Current State](docs/wiki/Current-State.md) | Known issues, staleness, and the path to green |
+| [Outcome Tracking](docs/wiki/Outcome-Tracking.md) | The prospective ledger and the live competition |
+| [Contributing a Provider](docs/wiki/Contributing-a-Provider.md) | Enter a new strategy — one file plus two registry lines |
+| [Current State](docs/wiki/Current-State.md) | Honest status: what works, what is open, what was fixed |
 | [Documentation Standard](docs/wiki/Documentation-Standard.md) | The bar this repo is held to |
 
-> **Status, verified 2026-08-16.** The maintained core (`lotteries_core/`) is green and gated in CI.
-> The wider repository is not: a bare `pytest` fails at collection on two modules, repository-wide
-> `ruff` reports 61 errors, and the bundled draw history ends 2025-08-12. Run
-> `pytest -q tests/test_core_inference.py tests/test_outcome_tracking.py tests/test_benchmark_regression.py tests/test_causal_poi.py`
-> (24 passed) rather than `make test`. Details and fixes in
-> [Current State](docs/wiki/Current-State.md).
+> **Status, verified 2026-08-16.** `make test` passes — `ruff check .` clean and 54 tests passing,
+> repository-wide, and CI blocks on both. Draw history is current through 2026-08-14. Six methods are
+> entered in the live prospective competition for the next draw. Details, and a record of what was
+> broken before, in [Current State](docs/wiki/Current-State.md).
 
 > **Scope & honesty (please read).** This project is a **research framework**, not a betting system.
 > The lottery is a **negative-sum** game and fair draws are **unpredictable** — nothing here predicts
@@ -97,11 +96,7 @@ python -m venv .venv
 python -m pip install -U pip
 pip install -e ".[dev]"
 
-# Quality gate for the maintained core -- this is the one that passes today
-pytest -q tests/test_core_inference.py tests/test_outcome_tracking.py \
-         tests/test_benchmark_regression.py tests/test_causal_poi.py
-
-# Full gate -- currently RED; see docs/wiki/Current-State.md
+# Quality gate (lint + tests, repository-wide -- the same gate CI blocks on)
 make test     # or: ruff check . && pytest -q
 
 # 1) Fetch EuroMillions history (cached and normalized)

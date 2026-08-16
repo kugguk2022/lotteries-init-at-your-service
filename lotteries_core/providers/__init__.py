@@ -8,16 +8,19 @@ from __future__ import annotations
 
 from ..likely_set_generator import CooccurrenceLevelSetProvider
 from .frequency import FrequencyProvider
+from .parallax import ParallaxGuardProvider, replicated_evidence
 from .spectral import PerronFrobeniusProvider, null_tv_band, stationary_distribution
 from .unpopularity import UnpopularityProvider
 
 __all__ = [
     "CooccurrenceLevelSetProvider",
     "FrequencyProvider",
+    "ParallaxGuardProvider",
     "PerronFrobeniusProvider",
     "UnpopularityProvider",
     "load_ml_ensemble",
     "null_tv_band",
+    "replicated_evidence",
     "stationary_distribution",
 ]
 

@@ -10,9 +10,9 @@ import pandas as pd
 from euromillions.arithmetic_branch import (
     DEFAULT_BATCH_SIZE,
     DEFAULT_HISTORY,
-    RESIDUAL_MODEL_CHOICES,
     DEFAULT_START_DATE,
     DEFAULT_THRESHOLD,
+    RESIDUAL_MODEL_CHOICES,
     build_branch_frame,
     evaluate_branch_mode,
     search_branch_candidates,

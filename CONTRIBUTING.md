@@ -7,17 +7,12 @@ Thanks for helping! This project is research-focused; please keep experiments is
 - Read [`docs/wiki/Home.md`](docs/wiki/Home.md) first — especially
   [Scope and Honesty](docs/wiki/Scope-and-Honesty.md) and [Current State](docs/wiki/Current-State.md).
 - Fork + clone, create a virtualenv, then `pip install -e ".[dev]"`.
-- Before sending a PR, run the maintained-core gate (this is what CI blocks on, and it passes):
-
-  ```bash
-  pytest -q tests/test_core_inference.py tests/test_outcome_tracking.py \
-           tests/test_benchmark_regression.py tests/test_causal_poi.py
-  ruff check <the files you changed>
-  ```
-
-  `make test` runs the full gate and currently **fails** for pre-existing reasons unrelated to your
-  change — two uncollectable test modules and 61 repository-wide lint errors. Fixing either is a
-  welcome PR; see [Current State](docs/wiki/Current-State.md).
+- Before sending a PR, run `make test` (`ruff check .` + `pytest -q`). Both are repository-wide and
+  both must pass; CI blocks on exactly this.
+- Adding a new strategy? Follow [Contributing a Provider](docs/wiki/Contributing-a-Provider.md) — it
+  is one file plus two registry lines, and it explains the two things a contribution needs to be
+  taken seriously here: an **ablation** that turns your signal off, and a **null calibration** that
+  shows what you found is not noise.
 
 ## Good first experiments
 

@@ -260,7 +260,9 @@ def _append_results(path: Path, row: dict) -> None:
 def _load_payout_table(path: str | None) -> dict[str, float]:
     if not path:
         return {}
-    raw = json.loads(Path(path).read_text(encoding="utf-8"))
+    # utf-8-sig so payout tables authored on Windows (Notepad, PowerShell Out-File) are accepted;
+    # it strips a leading BOM if present and is a no-op otherwise.
+    raw = json.loads(Path(path).read_text(encoding="utf-8-sig"))
     tiers = raw.get("tiers", raw)
     return {str(k): float(v) for k, v in tiers.items()}
 

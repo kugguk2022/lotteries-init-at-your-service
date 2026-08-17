@@ -35,6 +35,13 @@ def test_named_versions_are_available_to_three_year_tracker():
     assert {"gingerm", "claude_inference", "parallax"} <= set(METHOD_CHOICES)
 
 
+def test_named_versions_keep_their_public_identity():
+    from lotteries_core import registry
+
+    for name in ("gingerm", "claude_inference", "parallax"):
+        assert registry.create(name).name == name
+
+
 def test_provider_integrates_with_common_protocol():
     history = _history()
     spec = GameSpec("small", main_n=8, main_k=3, star_n=4, star_k=1)

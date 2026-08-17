@@ -1,7 +1,6 @@
 # Scope and Honesty
 
-Read this before using or extending anything here. The full argument lives in
-[`docs/SCOPE_AND_ETHICS.md`](../SCOPE_AND_ETHICS.md); this page is the orientation.
+Read this before using or extending anything here. This page is the orientation.
 
 ## What this project is
 
@@ -54,8 +53,6 @@ where the signal is real.
 
 ## Related reading in this repository
 
-- [`docs/SCOPE_AND_ETHICS.md`](../SCOPE_AND_ETHICS.md) — the complete argument, including what each ML
-  technique can and cannot do here.
 - [`docs/GEOGRAPHY.md`](../GEOGRAPHY.md) — why winner-location data is a population map with noise, and
   the data contract that keeps it from becoming a correlation-fishing trap.
 - [`docs/OUTCOME_TRACKING.md`](../OUTCOME_TRACKING.md) — the non-negotiable rules of the ledger.

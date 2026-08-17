@@ -50,6 +50,24 @@ def _cooccurrence() -> InferenceProvider:
     return CooccurrenceLevelSetProvider()
 
 
+def _named(provider: InferenceProvider, name: str) -> InferenceProvider:
+    """Give a public entrant name to an existing implementation."""
+    provider.name = name
+    return provider
+
+
+def _gingerm() -> InferenceProvider:
+    return _named(_cooccurrence(), "gingerm")
+
+
+def _claude_inference() -> InferenceProvider:
+    return _named(_perron("contrarian")(), "claude_inference")
+
+
+def _public_parallax() -> InferenceProvider:
+    return _named(_parallax("guarded")(), "parallax")
+
+
 def _perron(orientation: str) -> Callable[[], InferenceProvider]:
     def make() -> InferenceProvider:
         from .providers import PerronFrobeniusProvider
@@ -75,6 +93,9 @@ def _ml_ensemble() -> InferenceProvider:
 
 
 _FACTORIES: dict[str, Callable[[], InferenceProvider]] = {
+    "gingerm": _gingerm,
+    "claude_inference": _claude_inference,
+    "parallax": _public_parallax,
     "frequency": _frequency,
     "unpopularity": _unpopularity,
     "cooccurrence_level_set": _cooccurrence,
@@ -87,6 +108,18 @@ _FACTORIES: dict[str, Callable[[], InferenceProvider]] = {
 }
 
 PROVIDERS: dict[str, ProviderSpec] = {
+    "gingerm": ProviderSpec(
+        "gingerm",
+        "GINGERM: the owner's forward-only pair-co-occurrence level-set strategy.",
+    ),
+    "claude_inference": ProviderSpec(
+        "claude_inference",
+        "Claude inference: contrarian Perron-Frobenius ranking of the co-occurrence graph.",
+    ),
+    "parallax": ProviderSpec(
+        "parallax",
+        "Parallax: replication-guarded residual inference with coverage-first portfolio selection.",
+    ),
     "frequency": ProviderSpec(
         "frequency",
         "Smoothed historical-frequency weighted sampling. No predictive edge on a fair draw; the "

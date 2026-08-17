@@ -7,6 +7,7 @@ import pytest
 
 from lotteries_core.likely_set_generator import CooccurrenceLevelSetProvider
 from lotteries_core.outcome_tracker import PENDING, RESULTS
+from lotteries_core.outcome_tracker import METHOD_CHOICES
 from lotteries_core.outcome_tracker import main as tracker_main
 from lotteries_core.protocol import GameSpec
 
@@ -28,6 +29,10 @@ def _history() -> pd.DataFrame:
             }
         )
     return pd.DataFrame(rows)
+
+
+def test_named_versions_are_available_to_three_year_tracker():
+    assert {"gingerm", "claude_inference", "parallax"} <= set(METHOD_CHOICES)
 
 
 def test_provider_integrates_with_common_protocol():

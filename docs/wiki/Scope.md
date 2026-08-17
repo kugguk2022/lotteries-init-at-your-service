@@ -3,6 +3,9 @@
 This project provides a research framework for studying lottery data and fixed-budget candidate
 portfolios in simulation.
 
+> **Note:** We do not play. We supply strategies that may improve outcomes for some people,
+> somewhere, in the future.
+
 ## Included
 
 - Historical draw collection, normalization, and validation.

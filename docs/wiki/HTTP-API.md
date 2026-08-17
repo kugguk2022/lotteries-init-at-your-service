@@ -82,8 +82,18 @@ Three things ride along with every portfolio deliberately:
   response can be traced back to its input.
 - **`disclaimer`** — in the response body, not the fine print.
 
-`cooccurrence_level_set` works but is slow (it enumerates every main combination against every star
-combination); expect a long request. Everything else responds quickly.
+The three named research versions can be selected directly in `POST /portfolio`:
+
+| `provider` value | Version |
+|---|---|
+| `gingerm` | The owner's pair-co-occurrence level-set strategy |
+| `claude_inference` | Claude's contrarian Perron-Frobenius inference strategy |
+| `parallax` | Replication-guarded residual inference and coverage-first selection |
+
+For example: `{"provider":"gingerm","game":"euromillions","budget":20,"seed":7}`.
+`gingerm` (and its legacy name `cooccurrence_level_set`) enumerates every main combination against
+every star combination, so expect a long request. The legacy technical provider names remain
+available for compatibility.
 
 ## Errors
 

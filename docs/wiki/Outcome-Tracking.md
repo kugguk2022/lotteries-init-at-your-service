@@ -46,6 +46,17 @@ zero, so an early lead is luck until the window is long.
 
 ### Live entrants
 
+The named versions used for the planned three-year comparison are:
+
+| Entrant | Implementation |
+|---|---|
+| `gingerm` | The owner's pair-co-occurrence level-set strategy (not `unpopularity`) |
+| `claude_inference` | Contrarian Perron-Frobenius inference |
+| `parallax` | Replication-guarded residual inference with coverage-first selection |
+
+They can be recorded together with `--methods gingerm,claude_inference,parallax`, or included through
+`--methods all`. Each is sealed before the draw and scored against the same matched random control.
+
 Recorded for the **2026-08-18** EuroMillions draw, 20 sets each, against 1,972 draws of history
 through 2026-08-14 (`history_sha256` `966ccd78…`):
 

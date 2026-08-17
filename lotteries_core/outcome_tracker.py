@@ -49,6 +49,9 @@ RESULTS = "results.csv"
 #: are :class:`~lotteries_core.protocol.InferenceProvider` implementations, recorded through the
 #: same protocol so any future contribution joins by adding one registry entry.
 PROVIDER_METHODS = (
+    "gingerm",
+    "claude_inference",
+    "parallax",
     "frequency",
     "unpopularity",
     "perron_frobenius",

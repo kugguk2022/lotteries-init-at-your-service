@@ -70,7 +70,15 @@ def test_health_reports_history_presence(client):
 def test_providers_are_listed_with_their_ablations(client):
     body = client.get("/providers").json()
     names = {p["name"] for p in body}
-    assert {"frequency", "unpopularity", "parallax_guard", "perron_frobenius_contrarian"} <= names
+    assert {
+        "gingerm",
+        "claude_inference",
+        "parallax",
+        "frequency",
+        "unpopularity",
+        "parallax_guard",
+        "perron_frobenius_contrarian",
+    } <= names
 
     by_name = {p["name"]: p for p in body}
     # Every ablation points at the provider it controls for, and that target exists.
@@ -92,7 +100,14 @@ def test_games_report_the_universe_size(client):
 
 @pytest.mark.parametrize(
     "provider",
-    ["frequency", "unpopularity", "perron_frobenius_contrarian", "parallax_guard"],
+    [
+        "frequency",
+        "unpopularity",
+        "claude_inference",
+        "parallax",
+        "perron_frobenius_contrarian",
+        "parallax_guard",
+    ],
 )
 def test_portfolio_returns_exactly_budget_legal_tickets(client, provider):
     response = client.post("/portfolio", json={"provider": provider, "budget": 7, "seed": 5})
@@ -124,6 +139,13 @@ def test_portfolio_is_reproducible_for_a_fixed_seed(client):
     first = client.post("/portfolio", json=payload).json()["tickets"]
     second = client.post("/portfolio", json=payload).json()["tickets"]
     assert first == second
+
+
+def test_named_versions_keep_the_requested_rest_identity(client):
+    for provider in ("claude_inference", "parallax"):
+        response = client.post("/portfolio", json={"provider": provider, "budget": 3, "seed": 9})
+        assert response.status_code == 200, response.text
+        assert response.json()["provider"] == provider
 
 
 def test_unknown_provider_and_game_are_404(client):

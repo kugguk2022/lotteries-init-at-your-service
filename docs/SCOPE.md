@@ -2,6 +2,9 @@
 
 This repository is a research and simulation framework for EuroMillions, Totoloto, and EuroDreams.
 
+> **Note:** We do not play. We supply strategies that may improve outcomes for some people,
+> somewhere, in the future.
+
 ## Included
 
 - Fetching, normalizing, and validating historical draw data.

@@ -2,7 +2,7 @@
 
 [![CI status](https://github.com/kugguk2022/lotteries/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/kugguk2022/lotteries/actions/workflows/ci.yml)
 
-Lottery data playground for EuroMillions, Totoloto, and EuroDreams. The repo ships a small typed public API plus labs for modelling, bankroll experiments, and scraping. Everything is research-focused; use it responsibly.
+Lottery data playground for EuroMillions, Totoloto, and EuroDreams. The repo ships a small typed public API plus labs for modelling, bankroll experiments, and scraping. Everything is research-focused and cannot predict lottery draws. See scope below.
 
 ## 📖 Start with the wiki
 
@@ -12,7 +12,6 @@ repository is actually in.
 
 | | |
 |---|---|
-| [Scope and Honesty](docs/wiki/Scope-and-Honesty.md) | What is claimed, what is refused, and why |
 | [Getting Started](docs/wiki/Getting-Started.md) | Install plus commands verified to run today |
 | [Repository Map](docs/wiki/Repository-Map.md) | Maintained core vs labs vs legacy |
 | [Methods and Findings](docs/wiki/Methods-and-Findings.md) | Every method and how it has scored |
@@ -76,7 +75,7 @@ The best validated forecasting mode in this repo is currently the `classic` arit
 
 - Best holdout result so far: one-step walk-forward RMSE `26.915` over the last `52` draws for `classic`.
 - Comparison result: `prime-pruned` looked slightly better on internal composite-only fit, but lost on true holdout (`26.972` RMSE), so it remains a diagnostic view rather than the default forecasting mode.
-- Same-budget shortlist benchmark result: `branch_classic` was tied with `diagnostics3_super_likely` on main-ball recall over the last `3` draws, while `diagnostics3_super_likely` did better on stars.
+- Same-budget shortlist benchmark result: `branch_classic` was tied with `diagnostics3_super_likely` on main-ball recall over the last `3` draws, while `diagnostics3_super_likely` did better on star matching.
 
 Run the current best-validated branch check:
 
@@ -121,14 +120,14 @@ python run_all.py --n-candidates 200
 ## Use Cases
 
 - Keep a validated EuroMillions history CSV up to date with retry/caching.
-- Inspect number/“lucky star” distributions for quick EDA.
+- Inspect number/"lucky star" distributions for quick EDA.
 - Generate baseline candidate tickets using smoothed frequency sampling.
 - Extend the labs (`grok.py`, `roi.py`) for custom modelling experiments.
 - Fetch and benchmark Totoloto and EuroDreams datasets alongside EuroMillions.
 
 ## EuroMillions `get_draws`
 
-Fetches historical EuroMillions draws from the MerseyWorld CSV endpoint, caches responses locally, retries transient failures, and normalizes the output. The script deduplicates on `draw_date` and validates before writing a CSV.
+Fetches historical EuroMillions draws from the MerseyWorld CSV endpoint, caches responses locally, retries transient failures, and normalizes the output. The script deduplicates on `draw_date` and validates ranges.
 
 ```bash
 python -m euromillions.get_draws --out data/euromillions.csv --append
@@ -154,16 +153,16 @@ draw_date,ball_1,ball_2,ball_3,ball_4,ball_5,star_1,star_2
 
 ### Validation
 
-`euromillions/schema.py` enforces the canonical column set, coerces `draw_date` to timezone-naive timestamps, and checks ranges (1-50 for balls, 1-12 for stars). Tests cover both the schema and CSV normalization pipeline.
+`euromillions/schema.py` enforces the canonical column set, coerces `draw_date` to timezone-naive timestamps, and checks ranges (1-50 for balls, 1-12 for stars). Tests cover both the schema and CSV normalization.
 
 Resilience notes:
 
 - Fetcher accepts header-less CSV payloads and trims malformed source headers.
-- `--allow-stale` reuses (in order) an existing `--out` file, the bundled `euromillions/euromillions_2016_2025.csv`, or the tiny sample `data/examples/euromillions_sample.csv` when all network sources fail.
+- `--allow-stale` reuses (in order) an existing `--out` file, the bundled `euromillions/euromillions_2016_2025.csv`, or the tiny sample `data/examples/euromillions_sample.csv` when all network sources fail, falling back to bundled data before erroring.
 
 ## EuroMillions Inference (Baseline)
 
-`euromillions/infer.py` provides a light, frequency-weighted baseline generator inspired by the original `grok.py` experiment. It reads historical draws, builds smoothed number frequencies, and samples tickets without replacement.
+`euromillions/infer.py` provides a light, frequency-weighted baseline generator inspired by the original `grok.py` experiment. It reads historical draws, builds smoothed number frequencies, and samples from them.
 
 ```bash
 python -m euromillions.infer --history data/euromillions.csv --n 10 --out runs/euromillions_candidates.csv
@@ -206,7 +205,7 @@ Current fair benchmark snapshot on the last 3 draws:
 - Main-ball recall was tied: recall@5 `0.1333` for `branch_classic` and `0.1333` for `diagnostics3_super_likely`.
 - Exact `5+2` accuracy was `0.0000` for both methods in this small window.
 - `diagnostics3_super_likely` captured more stars in the same-sample comparison: star recall `0.6667` vs `0.0000` for `branch_classic`.
-- Current interpretation: the branch shortlist is not yet materially better than the standard diagnostics shortlist on a fair, tiny holdout; it appears roughly tied on main-ball recovery and worse on stars in this small sample.
+- Current interpretation: the branch shortlist is not yet materially better than the standard diagnostics shortlist on a fair, tiny holdout; it appears roughly tied on main-ball recovery and worse on star matching.
 
 Shortlist benchmark artifacts:
 
@@ -247,7 +246,7 @@ python eurodreams/eurodreams_get_draws.py --out data/eurodreams_2023_2025.csv --
 
 ## Run-All Orchestrator
 
-`run_all.py` pulls history for EuroMillions, Totoloto, and EuroDreams (via the existing fetchers), generates frequency-weighted candidates for each, and evaluates the baseline in a forward-only walk-forward setup. At each holdout draw `t`, it fits frequencies on draws `< t`, samples candidates from that training-only distribution, and compares their realized hit rate on draw `t` against a uniform-random baseline.
+`run_all.py` pulls history for EuroMillions, Totoloto, and EuroDreams (via the existing fetchers), generates frequency-weighted candidates for each, and evaluates the baseline in a forward-only window.
 
 ```bash
 python run_all.py --n-candidates 200 --permutation-iters 500 --smoothing 1.0 --test-frac 0.2
@@ -265,11 +264,11 @@ The repository implements a multi-stage pipeline for lottery analysis, capable o
 
 ### The Pipeline Steps
 
-1.  **Fetch (`get_draws`)**: Downloads historical draw data from various online sources, normalizes it, and saves it to a CSV file. It supports caching and fallbacks to local data if the network or source is unavailable.
-2.  **Lotto Lab (`lottolab.py`)** _(EuroMillions only)_: A comprehensive research lab that runs an "Agent" (forecaster), a "Discriminator" (pair co-occurrence), a "Grok" model (tiny transformer), and an RL Mixer. It produces detailed analysis and plots.
-3.  **Features (`phase2_sobol.py`)**: Extracts advanced features from the draw history, specifically calculating "Point of Interest" (POI) metrics based on pair co-occurrences and time-based features (Euler phi).
+1.  **Fetch (`get_draws`)**: Downloads historical draw data from various online sources, normalizes it, and saves it to a CSV file. It supports caching and fallbacks to local data if the network is unavailable.
+2.  **Lotto Lab (`lottolab.py`)** _(EuroMillions only)_: A comprehensive research lab that runs an "Agent" (forecaster), a "Discriminator" (pair co-occurrence), a "Grok" model (tiny transformer), and a "Mixer" (portfolio aggregator).
+3.  **Features (`phase2_sobol.py`)**: Extracts advanced features from the draw history, specifically calculating "Point of Interest" (POI) metrics based on pair co-occurrences and time-based features.
 4.  **Grok (`grok.py`)**: Trains a dual-input Transformer model on the extracted features (`g` sequence vs `poi` sequence) to learn patterns and predict future "interest" scores.
-5.  **Tickets (`phase2_sobol.py`)**: Generates candidate tickets using Sobol low-discrepancy sequences combined with combinadic unranking. This ensures tickets cover the combinations space more evenly than random sampling.
+5.  **Tickets (`phase2_sobol.py`)**: Generates candidate tickets using Sobol low-discrepancy sequences combined with combinadic unranking. This ensures tickets cover the combinations space more evenly.
 6.  **Infer (`infer.py`)**: A baseline generator that creates tickets based on simple frequency-weighted sampling of historical draws.
 
 ### Quickstart Batch Scripts

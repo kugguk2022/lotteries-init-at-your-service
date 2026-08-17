@@ -116,7 +116,7 @@ coverage.
 
 ## What will get a contribution rejected
 
-- It claims to predict the draw. See [Scope and Honesty](Scope-and-Honesty.md).
+- It claims to predict the draw. See [Project Scope](Scope.md).
 - It has no ablation and no null calibration, so its gain cannot be attributed.
 - It peeks at data after the evaluated draw, in any form.
 - It returns fewer than `budget` tickets, making its numbers incomparable.

@@ -11,7 +11,7 @@ the diff showing up.
 
 | Page | What it answers |
 |---|---|
-| [Scope and Honesty](Scope-and-Honesty.md) | What this project claims, what it refuses to claim, and why. **Read this first.** |
+| [Project Scope](Scope.md) | What this project includes and excludes. **Read this first.** |
 | [Getting Started](Getting-Started.md) | Install, then a set of commands verified to actually run today. |
 | [Repository Map](Repository-Map.md) | Which directories are maintained, which are labs, which are legacy. |
 | [Methods and Findings](Methods-and-Findings.md) | Every method in the repo, what it does, and how it has scored so far. |
@@ -32,7 +32,7 @@ is **jackpot sharing** — picking combinations the crowd avoids does not improv
 improve the payout *conditional* on winning. It never pools funds, buys tickets, or moves money.
 
 The full argument, including which techniques are mathematically incapable of helping and why, is in
-[`docs/SCOPE_AND_ETHICS.md`](../SCOPE_AND_ETHICS.md).
+[`docs/SCOPE.md`](../SCOPE.md).
 
 ## Current state in one line
 

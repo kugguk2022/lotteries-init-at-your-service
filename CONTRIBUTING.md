@@ -5,7 +5,7 @@ Thanks for helping! This project is research-focused; please keep experiments is
 ## Getting started
 
 - Read [`docs/wiki/Home.md`](docs/wiki/Home.md) first — especially
-  [Scope and Honesty](docs/wiki/Scope-and-Honesty.md) and [Current State](docs/wiki/Current-State.md).
+  [Project Scope](docs/wiki/Scope.md) and [Current State](docs/wiki/Current-State.md).
 - Fork + clone, create a virtualenv, then `pip install -e ".[dev]"`.
 - Before sending a PR, run `make test` (`ruff check .` + `pytest -q`). Both are repository-wide and
   both must pass; CI blocks on exactly this.

@@ -26,14 +26,14 @@ repository is actually in.
 > entered in the live prospective competition for the next draw. Details, and a record of what was
 > broken before, in [Current State](docs/wiki/Current-State.md).
 
-> **Scope & honesty (please read).** This project is a **research framework**, not a betting system.
+> **Scope (please read).** This project is a **research framework**, not a betting system.
 > The lottery is a **negative-sum** game and fair draws are **unpredictable** — nothing here predicts
 > which numbers will be drawn, and nothing here claims a guaranteed or positive expected ROI. What it
 > studies is whether **coordinating many independent inference strategies** can improve
 > **combinatorial coverage** and **expected return-per-ticket** (via the pari-mutuel *unpopularity*
 > lever and instant-game *remaining-prize EV*) under a **fixed ticket budget** — in **simulation
 > only**. It never pools funds, buys tickets, or executes wagers. See
-> [`repurpose.md`](repurpose.md), [`docs/SCOPE_AND_ETHICS.md`](docs/SCOPE_AND_ETHICS.md), and
+> [`repurpose.md`](repurpose.md), [`docs/SCOPE.md`](docs/SCOPE.md), and
 > [`docs/GEOGRAPHY.md`](docs/GEOGRAPHY.md).
 
 ## Distributed-inference framework (`lotteries_core/`)
@@ -67,7 +67,7 @@ The reported metrics are `pair_coverage` / `number_coverage` / `mean_jaccard_div
 spread), `unpopularity_lift` and `expected_roi_per_ticket` (the shared-jackpot lever; ROI stays
 negative — the goal is *less* negative), and a high-variance `hit_recall`. The "Joan Ginther"-style
 advantage-play kernel lives honestly in `lotteries_core.roi.InstantGamePool` (finite-deck remaining
-EV) — see [`docs/SCOPE_AND_ETHICS.md`](docs/SCOPE_AND_ETHICS.md).
+EV) — see [`docs/SCOPE.md`](docs/SCOPE.md).
 
 ## Best Current EuroMillions Result
 

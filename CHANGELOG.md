@@ -18,7 +18,7 @@ research framework**.
   can be replayed deterministically.
 - Diversity-aware, equal-budget aggregation for combining candidate sets while
   maximizing combinatorial coverage under a fixed budget.
-- Scope and ethics documentation clarifying that the project is simulation-only:
+- Scope documentation clarifying that the project is simulation-only:
   it handles no money, no ticket purchasing, no pooling of funds, and makes no
   claim of guaranteed winnings.
 

@@ -100,7 +100,7 @@ there should never be one. `tests/test_api.py::test_no_endpoint_offers_wagering_
 that no route path contains `bet`, `wager`, `stake`, `payment`, `purchase`, `checkout`, or `deposit`
 — a guard on scope rather than on code, so the boundary is enforced by CI rather than by memory.
 
-See [Scope and Honesty](Scope-and-Honesty.md) for why.
+See [Project Scope](Scope.md) for the project boundary.
 
 ## Testing
 

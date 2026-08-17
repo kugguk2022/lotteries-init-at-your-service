@@ -6,7 +6,7 @@ experiment: record fixed-budget portfolios before each draw, settle them against
 and test whether the owner's co-occurrence method or coordinated providers outperform a matched
 random control over a long horizon.
 
-Read ``docs/SCOPE_AND_ETHICS.md`` before using anything here. The short version:
+Read ``docs/SCOPE.md`` before using anything here. The short version:
 
 * Licensed number draws are designed to be independent and fixed-odds; that is the null hypothesis.
   The package nevertheless tests draw-prediction methods prospectively rather than declaring an

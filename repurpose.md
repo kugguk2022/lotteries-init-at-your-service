@@ -15,7 +15,7 @@ null hypothesis is that a fair draw is independent of history and the method has
 repository therefore records portfolios before draws, settles them after official results, and
 keeps negative or inconclusive evidence. See
 [`docs/OUTCOME_TRACKING.md`](docs/OUTCOME_TRACKING.md) and
-[`docs/SCOPE_AND_ETHICS.md`](docs/SCOPE_AND_ETHICS.md).
+[`docs/SCOPE.md`](docs/SCOPE.md).
 
 ## What is preserved
 
@@ -76,7 +76,7 @@ A small, dependency-light package that is the common substrate:
 
 ## Implementation passes
 
-- [x] **Pass 0 — contract & scope.** This document, `docs/SCOPE_AND_ETHICS.md`, `docs/GEOGRAPHY.md`,
+- [x] **Pass 0 — contract & scope.** This document, `docs/SCOPE.md`, `docs/GEOGRAPHY.md`,
       README scope banner.
 - [x] **Pass 1 — protocol & envelopes.** `GameSpec`, `InferenceProvider`, `InferenceEnvelope`.
 - [x] **Pass 2 — the honest ROI lever.** Popularity model, expected-conditional-ROI, coverage,

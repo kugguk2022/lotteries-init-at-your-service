@@ -181,4 +181,4 @@ GLM, gradient boosting, deep learning, HMMs, and GARCH cannot extract a signal f
 draw, because there is none to extract. Where this repository uses them, they are pointed at **player
 behaviour** (crowd popularity, for the jackpot-sharing lever) or at **diagnostics** — never at the
 draw. The `ml_ensemble` provider is explicit about this in its own docstring. Full argument in
-[`docs/SCOPE_AND_ETHICS.md`](../SCOPE_AND_ETHICS.md).
+[`docs/SCOPE.md`](../SCOPE.md).

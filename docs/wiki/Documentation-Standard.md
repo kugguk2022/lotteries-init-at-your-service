@@ -33,7 +33,7 @@ date. This costs credibility once and earns it permanently; the alternative cost
 ### 3. Scope: what it does and refuses to do
 
 Especially where a reader may arrive with the wrong expectation. State the refusal plainly and early,
-and give the reason rather than the rule. [Scope and Honesty](Scope-and-Honesty.md) is the example.
+and give the reason rather than the rule. [Project Scope](Scope.md) is the example.
 
 ### 4. A tiered repository map
 

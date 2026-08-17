@@ -31,7 +31,7 @@ TWO CORRECTNESS FIXES over the original
   W matrix; the star part is added per (small) star-combo without rescanning the mains.
 
 ------------------------------------------------------------------------------------------------
-HONESTY (read docs/SCOPE_AND_ETHICS.md in the repo)
+SCOPE (read docs/SCOPE.md in the repo)
 ------------------------------------------------------------------------------------------------
 Under the fair-draw null hypothesis, past co-occurrence should not change a ticket's mechanical odds.
 G is therefore an experimental ranking signal, not proof of a more probable winner. This tool exists

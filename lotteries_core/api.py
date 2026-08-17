@@ -6,7 +6,7 @@
 
 What it exposes
 ---------------
-``GET  /providers``  the selectable strategies, with their honest scope and their ablation controls
+``GET  /providers``  the selectable strategies, with their operating scope and ablation controls
 ``POST /portfolio``  generate a fixed-budget portfolio from a chosen provider
 ``GET  /games``      supported game shapes
 ``GET  /dataset``    the history's provenance and staleness

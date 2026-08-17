@@ -1,6 +1,6 @@
 # Project Wiki
 
-Start here. This wiki explains what the repository is, what it honestly does and does not do, how to
+Start here. This wiki explains what the repository is, what it does and does not do, how to
 run it, and what state it is currently in.
 
 It lives **inside the repository** (`docs/wiki/`) rather than in the GitHub Wiki tab on purpose: it is
@@ -18,7 +18,7 @@ the diff showing up.
 | [Outcome Tracking](Outcome-Tracking.md) | The prospective ledger and the live competition. |
 | [HTTP API](HTTP-API.md) | REST layer: pick a provider, get a portfolio, inspect provenance. |
 | [Contributing a Provider](Contributing-a-Provider.md) | How to enter a new strategy — one file plus two registry lines. |
-| [Current State](Current-State.md) | Honest status: what works, what is open, what was fixed. |
+| [Current State](Current-State.md) | Verified status: what works, what is open, what was fixed. |
 | [Documentation Standard](Documentation-Standard.md) | The bar this and sibling repositories are being held to. |
 
 ## The project in five sentences
@@ -27,7 +27,7 @@ This is a **research framework** for studying lottery ticket portfolios, not a b
 draw is unpredictable by construction, so nothing here predicts winning numbers and nothing here
 claims positive expected return. What it studies is narrower and real: whether coordinating many
 independent strategies ("providers") improves **combinatorial coverage** and **expected
-return-per-ticket** under a fixed ticket budget, evaluated forward-only. The honest lever it exploits
+return-per-ticket** under a fixed ticket budget, evaluated forward-only. The lever it exploits
 is **jackpot sharing** — picking combinations the crowd avoids does not improve your odds, but it does
 improve the payout *conditional* on winning. It never pools funds, buys tickets, or moves money.
 

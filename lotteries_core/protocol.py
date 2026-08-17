@@ -120,7 +120,7 @@ class InferenceProvider(abc.ABC):
     #: Stable, unique, human-readable provider name (used in envelope provenance).
     name: str = "base"
 
-    #: Short description of the mechanism and its honest scope.
+    #: Short description of the mechanism and its operating scope.
     description: str = ""
 
     def fit(self, history) -> "InferenceProvider":  # noqa: ANN001 - history is a DataFrame-like

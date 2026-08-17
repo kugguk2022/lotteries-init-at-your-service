@@ -18,7 +18,7 @@ from .protocol import InferenceProvider
 
 @dataclass(frozen=True)
 class ProviderSpec:
-    """A selectable strategy: how to build it, and what it honestly claims."""
+    """A selectable strategy: how to build it, and what it claims."""
 
     name: str
     summary: str

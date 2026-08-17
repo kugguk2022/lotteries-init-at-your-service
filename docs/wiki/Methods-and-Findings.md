@@ -33,7 +33,7 @@ Smoothed historical-frequency weighted sampling. Deliberately kept as the refere
 method must beat. On a fair draw it has **no** predictive edge over uniform sampling; the repository's
 own walk-forward test only shows it beating uniform on a deliberately *biased* synthetic dataset.
 
-### `unpopularity` — the honest lever
+### `unpopularity` — the conditional-payout lever
 
 Oversamples candidate tickets, scores each by expected jackpot payout under the crowd-popularity
 model, and keeps the least-crowded ones. It does **not** improve the odds of winning. It improves the
@@ -142,7 +142,7 @@ Reproduce with the command in [Getting Started](Getting-Started.md).
 2. **`unpopularity` wins the only lever that is real** — best `unpopularity_lift` (1.1890) and best
    expected ROI (−0.7141) — while being *worst* on coverage (0.0745 pair, 0.319 number). It buys
    conditional payout by concentrating on a narrow band of unpopular numbers. That trade is the
-   honest one, but it is a trade.
+   evidence-based one, but it is a trade.
 3. **`parallax_guard` wins coverage** by a clear margin (0.2039 vs 0.1850 for the next best) with
    perfect number coverage and balanced star usage.
 4. **Aggregation underperformed on coverage in this run, and has since been fixed.** The table above

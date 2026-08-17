@@ -2,7 +2,7 @@
 
 Purpose (stated plainly): this repo's hypothesis is that coordinated, coverage-and-co-occurrence-aware
 set selection produces *better tracked outcomes than random chance*. That is an empirical claim, and
-the only honest way to judge it is to record predictions BEFORE each draw and score them AFTER, over a
+the evaluation method is to record predictions BEFORE each draw and score them AFTER, over a
 long window (the owner's plan: ~3 years), then read off whether there is a consistent edge -- and PARK
 the project if there is not. This module is that ledger.
 

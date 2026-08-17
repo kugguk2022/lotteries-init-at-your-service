@@ -1,6 +1,6 @@
 # Winner / sales geography: what it can and cannot tell us
 
-You asked whether geographic data about winners can help. It can — but only for a specific, honest
+You asked whether geographic data about winners can help. It can — but only for a specific,
 purpose, and only after careful normalization. This document is the data contract for that feature so
 it is built correctly rather than as a correlation-fishing trap.
 

@@ -11,8 +11,8 @@ the ledger is built the way it is.
 > Coordinated, coverage-and-co-occurrence-aware set selection produces better tracked outcomes than an
 > equal-budget uniform random control.
 
-That is an empirical claim, and the only honest way to judge it is to **record predictions before each
-draw and score them after**, over a long window, then read off whether an edge exists — and **park the
+That is an empirical claim, evaluated by **recording predictions before each
+draw and scoring them after**, over a long window, then reading off whether an edge exists — and **parking the
 project if it does not**.
 
 Against a fair draw the expected edge is zero. The point is to measure, not to assume.

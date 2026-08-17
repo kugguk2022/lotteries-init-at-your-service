@@ -14,7 +14,7 @@ Implement [`InferenceProvider`](../../lotteries_core/protocol.py):
 ```python
 class MyProvider(InferenceProvider):
     name = "my_provider"          # stable, unique; used in envelope provenance and ledger labels
-    description = "..."           # mechanism plus its honest scope
+    description = "..."           # mechanism plus its operating scope
 
     def fit(self, history: pd.DataFrame, spec: GameSpec | None = None) -> "MyProvider":
         """Fit from training history only. Returns self."""
@@ -110,7 +110,7 @@ python -m lotteries_core.benchmark --history data/euromillions.csv \
     --out outputs/euromillions/competition_benchmark.json
 ```
 
-Read the results honestly against [Methods and Findings](Methods-and-Findings.md). `unpopularity` is
+Read the results against [Methods and Findings](Methods-and-Findings.md). `unpopularity` is
 the one to beat on `unpopularity_lift`, and the sampler-only ablations are the ones to beat on
 coverage.
 

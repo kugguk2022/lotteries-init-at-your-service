@@ -57,7 +57,7 @@ benchmark number without its command is folklore.
 
 Small repository: `README.md` alone, structured as above.
 
-Larger repository: keep the README short — what it is, honest status, install, first command, link to
+Larger repository: keep the README short — what it is, verified status, install, first command, link to
 the wiki — and move the depth into `docs/wiki/` with a `Home.md` index.
 
 Use an **in-repository** wiki (`docs/wiki/`), not the GitHub Wiki tab. In-repo means it is versioned
@@ -76,7 +76,7 @@ without anyone noticing.
 ## Checklist for a repository intended for readers
 
 - [ ] README opens with what it is, in one paragraph, without marketing.
-- [ ] Honest status near the top, with a "last verified" date.
+- [ ] Verified status near the top, with a "last verified" date.
 - [ ] Install instructions that were executed on a clean environment.
 - [ ] A first command that passes, or an explicit note that it does not and what to run instead.
 - [ ] Every top-level directory labelled maintained / lab / legacy.

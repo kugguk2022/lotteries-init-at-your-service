@@ -17,7 +17,7 @@ WHAT IT DOES
 * ``observed``  -- target = G of a specific drawn ticket (your original script's behavior). This
   *characterizes* the co-occurrence "siblings" of a draw you have already seen.
 * ``predicted`` -- target = a causal, trailing-mean forecast of the next draw's score, built ONLY
-  from draws before it (no look-ahead). This is the honest "n+1" generator.
+  from draws before it (no look-ahead). This is the forward-only "n+1" generator.
 
 ------------------------------------------------------------------------------------------------
 TWO CORRECTNESS FIXES over the original

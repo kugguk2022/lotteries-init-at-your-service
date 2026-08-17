@@ -18,7 +18,7 @@ repository is actually in.
 | [Outcome Tracking](docs/wiki/Outcome-Tracking.md) | The prospective ledger and the live competition |
 | [HTTP API](docs/wiki/HTTP-API.md) | REST layer: pick a provider, get a portfolio |
 | [Contributing a Provider](docs/wiki/Contributing-a-Provider.md) | Enter a new strategy — one file plus two registry lines |
-| [Current State](docs/wiki/Current-State.md) | Honest status: what works, what is open, what was fixed |
+| [Current State](docs/wiki/Current-State.md) | Verified status: what works, what is open, what was fixed |
 | [Documentation Standard](docs/wiki/Documentation-Standard.md) | The bar this repo is held to |
 
 > **Status, verified 2026-08-16.** `make test` passes — `ruff check .` clean and 54 tests passing,
@@ -66,7 +66,7 @@ operator and fails with "Missing expression after unary operator '--'".
 The reported metrics are `pair_coverage` / `number_coverage` / `mean_jaccard_diversity` (coverage &
 spread), `unpopularity_lift` and `expected_roi_per_ticket` (the shared-jackpot lever; ROI stays
 negative — the goal is *less* negative), and a high-variance `hit_recall`. The "Joan Ginther"-style
-advantage-play kernel lives honestly in `lotteries_core.roi.InstantGamePool` (finite-deck remaining
+advantage-play kernel lives in `lotteries_core.roi.InstantGamePool` (finite-deck remaining
 EV) — see [`docs/SCOPE.md`](docs/SCOPE.md).
 
 ## Best Current EuroMillions Result

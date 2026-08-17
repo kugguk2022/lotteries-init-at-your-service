@@ -4,7 +4,7 @@ This document is the **architectural contract** for the repository's pivot. It i
 conservative: it preserves the existing, already-validated experiments while introducing a common
 substrate for the new research question.
 
-## The research question (stated honestly)
+## The research question
 
 > Can the owner's co-occurrence level-set method, alone or coordinated with independent inference
 > strategies, produce **better preregistered draw outcomes and net user returns** than matched random
@@ -71,7 +71,7 @@ A small, dependency-light package that is the common substrate:
 - ❌ No ticket purchasing or wager execution.
 - ❌ No guaranteed-winnings claim and no presentation of an unvalidated edge as established.
 - ✅ Explicitly test draw-prediction performance and the possibility of positive net user outcomes.
-- ✅ Reproducible forward-only recording, official settlement, matched controls, and honest verdicts.
+- ✅ Reproducible forward-only recording, official settlement, matched controls, and evidence-based verdicts.
 - ✅ Report hit tiers, payout and net return before secondary coverage/popularity metrics.
 
 ## Implementation passes
@@ -79,7 +79,7 @@ A small, dependency-light package that is the common substrate:
 - [x] **Pass 0 — contract & scope.** This document, `docs/SCOPE.md`, `docs/GEOGRAPHY.md`,
       README scope banner.
 - [x] **Pass 1 — protocol & envelopes.** `GameSpec`, `InferenceProvider`, `InferenceEnvelope`.
-- [x] **Pass 2 — the honest ROI lever.** Popularity model, expected-conditional-ROI, coverage,
+- [x] **Pass 2 — the conditional ROI lever.** Popularity model, expected-conditional-ROI, coverage,
       diversity-aware equal-budget aggregation, instant-game remaining-prize EV.
 - [ ] **Pass 3 — wrap strategies as providers.** Co-occurrence, frequency, unpopularity and ML exist;
       branch-classic, Sobol and uniform adapters remain required.

@@ -1,6 +1,6 @@
 # Current State
 
-An honest status page. Everything below was verified by running it, not inferred from the code.
+A verified status page. Everything below was verified by running it, not inferred from the code.
 
 **Last verified:** 2026-08-16, on `agent/integrate-outcome-tracking`.
 
@@ -140,7 +140,7 @@ for other providers, which train on all 1,972 rows including pre-2016 draws unde
 pool. For frequency-style methods that is mostly harmless; for anything reading star structure it is
 not. Worth making a `GameSpec`-level property rather than one provider's private rule.
 
-## How to keep this page honest
+## How to keep this page current
 
 Re-verify on any change to the build, the entry points, or the data schema. If a command is listed as
 working, someone ran it. If it is broken, it stays listed as broken until it is fixed — deleting the

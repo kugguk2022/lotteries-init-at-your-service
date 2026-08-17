@@ -1,6 +1,6 @@
 """Frequency-weighted baseline provider (preserves the repo's original baseline behaviour).
 
-This is the honest baseline: it samples tickets with numbers weighted by their smoothed historical
+This baseline samples tickets with numbers weighted by their smoothed historical
 frequency. On a fair draw this has *no* predictive edge over uniform sampling (and the repo's own
 walk-forward test only claims it beats uniform on a deliberately *biased* synthetic dataset). It is
 retained as the reference every other provider and the aggregator must beat on coverage / expected

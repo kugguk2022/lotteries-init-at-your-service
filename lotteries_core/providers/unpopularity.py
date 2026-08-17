@@ -1,4 +1,4 @@
-"""Unpopularity provider -- the honest "best expected ROI per user" strategy.
+"""Unpopularity provider -- a "best expected ROI per user" strategy.
 
 This provider directly implements the only mathematically valid draw-game lever: it prefers legal
 tickets that the *crowd* is least likely to pick, so that -- conditional on the (unchanged, tiny)

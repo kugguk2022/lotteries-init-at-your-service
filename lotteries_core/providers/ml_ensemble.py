@@ -1,4 +1,4 @@
-"""GLM + gradient-boosting + (optional) deep-learning ensemble -- honestly scoped.
+"""GLM + gradient-boosting + (optional) deep-learning ensemble.
 
 The user asked for a "GLM + XGBoost + deep learning" stack. Here it is -- but pointed at a target
 where machine learning is *legitimately useful* rather than at the draw itself (which is random and
@@ -8,7 +8,7 @@ how over- or under-picked a number is relative to a uniform baseline, given engi
 popularity estimates then bias sampling toward *under-picked* numbers, feeding the same
 conditional-ROI lever as :class:`UnpopularityProvider`, but data-driven instead of prior-driven.
 
-Design choices that keep it robust and honest:
+Design choices that keep it robust and testable:
 
 * **GLM** (Poisson/logistic via scikit-learn) is always available.
 * **Gradient boosting** uses ``xgboost`` if installed, else scikit-learn's

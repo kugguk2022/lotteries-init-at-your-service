@@ -21,7 +21,7 @@ chain, and ``pi`` collapses to ``1/n``. Any structure you see in ``pi`` is there
 noise plus whatever real bias the machine has. The provider reports ``tv_from_uniform`` -- the total
 variation distance ``0.5 * sum |pi_i - 1/n|`` -- and :func:`null_tv_band` computes the distribution of
 that same statistic over simulated *fair* histories of identical length. If the observed value sits
-inside the null band, the ranking carries no information beyond sampling noise. That is the honest,
+inside the null band, the ranking carries no information beyond sampling noise. That is the tested,
 quantitative reason to promote or demote this method, and it is the reason it keeps losing: damping
 pulls ``pi`` toward uniform, and a fair generator supplies nothing for it to pull away from.
 

@@ -1,4 +1,4 @@
-"""Expected return-per-ticket -- computed honestly, simulation-only, never a guarantee.
+"""Expected return-per-ticket -- computed in simulation, never a guarantee.
 
 This module answers the user-facing question "which set of tickets has the best expected ROI?"
 in the *only* way that is mathematically defensible for a fair draw:
@@ -132,7 +132,7 @@ def portfolio_expected_roi(
 
 
 # --------------------------------------------------------------------------------------------
-# Instant / scratch games: the honest core of the "Joan Ginther" advantage-play story.
+# Instant / scratch games: the finite-deck core of the "Joan Ginther" advantage-play story.
 # --------------------------------------------------------------------------------------------
 @dataclass(frozen=True)
 class InstantGamePool:

@@ -2,7 +2,7 @@
 
     pip install -e ".[api]"
     lotto-serve                      # or: uvicorn lotteries_core.api:app --reload
-    open http://127.0.0.1:8000/docs  # interactive OpenAPI schema
+    open http://127.0.0.1:8007/docs  # interactive OpenAPI schema
 
 What it exposes
 ---------------
@@ -19,6 +19,11 @@ There is no endpoint that takes payment, places a wager, or reports a "predicted
 there never should be. A fair draw is unpredictable; every portfolio this returns carries the same
 disclaimer the rest of the repository does, in the response body rather than in the fine print. The
 API is a convenience over :mod:`lotteries_core`, not a product.
+
+The port is 8007 by default, overridable with ``LOTTERIES_PORT`` or ``--port``. It is deliberately
+not 8000: that is uvicorn's convention, so every other local API claims it too, and when a
+neighbouring service got there first this API's documented URL quietly served somebody else's
+application -- same host, same port, entirely different product, no error anywhere to notice.
 
 The history file is read from ``LOTTERIES_HISTORY`` (default ``data/euromillions.csv``). It is loaded
 once per process and cached, so a refresh needs a restart -- deliberate, since a portfolio's
@@ -60,6 +65,7 @@ GAMES: dict[str, GameSpec] = {
 }
 
 DEFAULT_HISTORY = os.environ.get("LOTTERIES_HISTORY", "data/euromillions.csv")
+DEFAULT_PORT = int(os.environ.get("LOTTERIES_PORT", "8007"))
 
 app = FastAPI(
     title="lotteries-core",
@@ -349,7 +355,9 @@ def main(argv: list[str] | None = None) -> None:
 
     ap = argparse.ArgumentParser(description="Serve the lotteries-core HTTP API.")
     ap.add_argument("--host", default="127.0.0.1", help="bind address (default: loopback only)")
-    ap.add_argument("--port", type=int, default=8000)
+    ap.add_argument(
+        "--port", type=int, default=DEFAULT_PORT, help="bind port (or set LOTTERIES_PORT)"
+    )
     ap.add_argument("--reload", action="store_true", help="auto-reload on source changes")
     args = ap.parse_args(argv)
 

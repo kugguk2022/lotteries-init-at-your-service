@@ -7,12 +7,12 @@ provenance behind it. It is a convenience over the library, not a product.
 
 ```bash
 pip install -e ".[api]"
-lotto-serve                                  # loopback:8000
+lotto-serve                                  # loopback:8007
 lotto-serve --host 0.0.0.0 --port 8080       # explicit bind
 uvicorn lotteries_core.api:app --reload      # equivalent, with auto-reload
 ```
 
-Interactive schema at **http://127.0.0.1:8000/docs**, machine-readable at `/openapi.json`.
+Interactive schema at **http://127.0.0.1:8007/docs**, machine-readable at `/openapi.json`.
 
 The history file comes from `LOTTERIES_HISTORY` (default `data/euromillions.csv`) and is cached for
 the process's lifetime — a refresh needs a restart. That is deliberate: a portfolio's provenance
@@ -53,7 +53,7 @@ when a provider needs an optional dependency that is not installed here; it is n
 Then post that name:
 
 ```bash
-curl -s http://127.0.0.1:8000/portfolio \
+curl -s http://127.0.0.1:8007/portfolio \
   -H 'content-type: application/json' \
   -d '{"provider": "parallax_guard", "game": "euromillions", "budget": 3, "seed": 7}'
 ```

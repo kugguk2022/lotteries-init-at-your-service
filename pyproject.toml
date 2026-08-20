@@ -57,7 +57,17 @@ include = ["euromillions", "totoloto", "eurodreams", "euromillions_agent"]
 
 [tool.ruff]
 line-length = 100
+
+[tool.ruff.lint]
 extend-select = ["I"]
+ignore = [
+    "BLE001",  # broad exception catches are intentional in CLI error handlers
+    "S110",    # try-except-pass patterns are intentional
+    "S112",    # try-except-continue patterns are intentional
+    "DTZ001",  # timezone-naive datetime is acceptable for historical lottery data
+    "DTZ007",  # timezone-naive strptime is acceptable here
+    "DTZ011",  # date.today() is acceptable here
+]
 
 [tool.mypy]
 python_version = "3.11"

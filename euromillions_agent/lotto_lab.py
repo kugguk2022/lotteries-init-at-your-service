@@ -847,6 +847,11 @@ def train_grok(
             )
     except Exception:
         pass  # optional output; ignore errors
+    return sig_full, best
+
+
+# --------------- RL Mixer ---------------
+def zscore(a, axis=1, eps=1e-12):
     m = a.mean(axis=axis, keepdims=True)
     s = a.std(axis=axis, keepdims=True)
     s = np.where(s < eps, 1.0, s)

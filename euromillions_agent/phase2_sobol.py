@@ -203,11 +203,8 @@ def load_int_draws(path: Path, main_k: int = 5, star_k: int = 2) -> tuple[np.nda
             df_stars = df[stars].loc[df_mains.index].apply(pd.to_numeric, errors='coerce').astype(int)
             stars_arr = df_stars.to_numpy()
         else:
-             # If we expected stars but didn't find them, return None or error?
-             # For robustness, if we can't find stars separate, we might return None or zeros?
-             # phase2_sobol expects stars if star_k > 0.
-             # Let's try to be lenient: if missing, maybe return empty if allowed, but strict here:
-             # No additional numeric columns available; stars_arr will remain None.
+             # stars_arr will remain None — not enough star columns found
+             stars_arr = None
     
     return mains_arr, stars_arr
 

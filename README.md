@@ -116,6 +116,13 @@ python -m euromillions.infer --history data/euromillions.csv --n 10 --out runs/e
 # 3) (Optional) Run all lotteries end-to-end
 python run_all.py --n-candidates 200
 ```
+# Windows PowerShell
+py -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install --upgrade pip
+python -m pip install -e ".[dev,api,ml]"
+
+python -m pip install -e ".[dev]"
 
 ## Use Cases
 

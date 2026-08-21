@@ -118,9 +118,12 @@ def read(csv_path: str | Path) -> DatasetMetadata | None:
 
 def verify(csv_path: str | Path) -> tuple[bool, str]:
     """Check the CSV still matches its recorded digest. Returns ``(ok, human-readable reason)``."""
+    csv_path = Path(csv_path)
     recorded = read(csv_path)
     if recorded is None:
         return False, f"no metadata recorded for {csv_path}"
+    if not csv_path.exists():
+        return False, f"dataset file missing: {csv_path}"
     actual = content_digest(pd.read_csv(csv_path))
     if actual != recorded.content_sha256:
         return False, (

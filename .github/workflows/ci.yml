@@ -30,9 +30,14 @@ jobs:
       # Also repository-wide. Previously only four files blocked and the full suite ran with
       # continue-on-error; both uncollectable modules are fixed, so the real suite is the gate.
       - name: Pytest (whole suite, with core coverage)
+        # Keep functional and dataset failures visible even when inherited lint debt is red.
+        # This does not weaken the job: an earlier Ruff failure still makes the job fail.
+        if: ${{ !cancelled() }}
         run: pytest -q --maxfail=1 --disable-warnings --cov=lotteries_core
 
       - name: Fail on placeholders in changed Python files
+        # Run the structural guard after either Ruff or pytest fails so no failure masks it.
+        if: ${{ !cancelled() }}
         shell: bash
         env:
           PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
@@ -50,3 +55,4 @@ jobs:
             echo "Found placeholder 'pass' or '...' in changed code. Refuse to merge."
             exit 1
           fi
+

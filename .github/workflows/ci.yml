@@ -55,4 +55,3 @@ jobs:
             echo "Found placeholder 'pass' or '...' in changed code. Refuse to merge."
             exit 1
           fi
-

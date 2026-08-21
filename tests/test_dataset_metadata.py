@@ -6,6 +6,8 @@ documented results and sealed ledger entries keep being computed against it.
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import numpy as np
 import pandas as pd
 import pytest
@@ -91,6 +93,17 @@ def test_verify_detects_drift(tmp_path):
     assert "content changed" in reason
 
 
+def test_verify_reports_missing_dataset_when_sidecar_exists(tmp_path):
+    csv = tmp_path / "euromillions.csv"
+    _history(csv)
+    dataset.write(csv, game="euromillions")
+    csv.unlink()
+
+    ok, reason = dataset.verify(csv)
+    assert not ok
+    assert reason == f"dataset file missing: {csv}"
+
+
 def test_staleness_is_measured_from_the_newest_draw(tmp_path):
     csv = tmp_path / "euromillions.csv"
     _history(csv, last="2026-08-14")
@@ -124,7 +137,9 @@ def test_empty_or_dateless_history_is_rejected(tmp_path):
 
 def test_the_committed_history_is_described_and_current():
     """The real dataset the ledger and documented results depend on."""
-    csv = "data/euromillions.csv"
+    csv = Path("data/euromillions.csv")
+    if not csv.exists():
+        pytest.skip("canonical history is not committed yet; run the refresh-history workflow")
     meta = dataset.read(csv)
     if meta is None:
         pytest.skip("data/euromillions.csv has no sidecar yet; run scripts/refresh_history.py")

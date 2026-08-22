@@ -46,6 +46,14 @@ dev = [
   "pytest-cov>=5.0",
   "mypy>=1.8",
 ]
+repo-test = [
+  "beautifulsoup4>=4.12",
+  "matplotlib>=3.7",
+  "pandera>=0.20",
+  "requests>=2.31",
+  "scipy>=1.10",
+  "statsmodels>=0.14",
+]
 release = [
   "build>=1.2",
   "twine>=6.0",

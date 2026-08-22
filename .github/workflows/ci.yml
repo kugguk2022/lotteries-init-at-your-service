@@ -19,7 +19,7 @@ jobs:
       - name: Install project
         run: |
           python -m pip install -U pip
-          pip install -e ".[dev,api,ml]"
+          pip install -e ".[dev,api,ml,repo-test]"
 
       # Repository-wide. The former changed-files-only gate existed because `ruff check .` was red;
       # the legacy debt is now either fixed or scoped to explicit per-file-ignores in pyproject.toml,

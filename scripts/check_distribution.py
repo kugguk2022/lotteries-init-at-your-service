@@ -20,6 +20,7 @@ FORBIDDEN_ROOTS = {
     "totoloto",
 }
 FORBIDDEN_SUFFIXES = {".csv", ".jsonl", ".parquet", ".png", ".xlsx"}
+ALLOWED_ASSETS = {"assets/online-logo.png"}
 REQUIRED = {"lotteries_core/registry.py", "lotteries_core/roi.py"}
 
 
@@ -45,7 +46,8 @@ def check(path: Path) -> None:
         parts = PurePosixPath(name).parts
         if not parts:
             continue
-        if parts[0] in FORBIDDEN_ROOTS or PurePosixPath(name).suffix.lower() in FORBIDDEN_SUFFIXES:
+        forbidden_suffix = PurePosixPath(name).suffix.lower() in FORBIDDEN_SUFFIXES
+        if parts[0] in FORBIDDEN_ROOTS or (forbidden_suffix and name not in ALLOWED_ASSETS):
             leaked.append(name)
     if leaked:
         raise SystemExit(f"{path}: repository artifacts leaked into distribution: {sorted(leaked)}")

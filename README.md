@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="assets/online-logo.png" alt="Online project logo" width="222">
+</p>
+
 # Lotteries
 
 [![CI status](https://github.com/kugguk2022/lotteries/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/kugguk2022/lotteries/actions/workflows/ci.yml)
@@ -321,4 +325,5 @@ _Outputs:_ `outputs/eurodreams/`
 
 ## License
 
-[MIT](LICENSE)
+The code and Online logo artwork are distributed under the [MIT License](LICENSE).
+See [NOTICE](NOTICE) for attribution details.

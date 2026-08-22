@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="https://raw.githubusercontent.com/kugguk2022/lotteries-init-at-your-service/main/assets/online-logo.png" alt="Online project logo" width="222">
+</p>
+
 # lotteries-core
 
 `lotteries-core` is an Alpha research package for comparing 12 registered lottery inference
@@ -68,3 +72,9 @@ not betting advice.
 
 Source, documentation, and issue tracker:
 https://github.com/kugguk2022/lotteries-init-at-your-service
+
+## License
+
+The code and Online logo artwork are distributed under the MIT License. See the repository's
+[LICENSE](https://github.com/kugguk2022/lotteries-init-at-your-service/blob/main/LICENSE) and
+[NOTICE](https://github.com/kugguk2022/lotteries-init-at-your-service/blob/main/NOTICE).

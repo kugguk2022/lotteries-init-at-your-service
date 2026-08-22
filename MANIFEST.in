@@ -1,5 +1,7 @@
 include LICENSE
+include NOTICE
 include README.pypi.md
+include assets/online-logo.png
 recursive-include lotteries_core *.py
 recursive-exclude lotteries_core __pycache__ *.py[cod]
 prune data
@@ -8,4 +10,4 @@ prune lotto_lab_out
 prune outputs
 prune runs
 prune tests
-global-exclude *.csv *.jsonl *.parquet *.png *.xlsx
+global-exclude *.csv *.jsonl *.parquet *.xlsx

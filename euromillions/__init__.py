@@ -33,10 +33,13 @@ _EXPORTS = {
 __all__ = sorted(_EXPORTS)
 
 if TYPE_CHECKING:  # import-time types for editors and mypy only
-    from .get_draws import normalize
-    from .guess import EuroMillionsGuess, evaluate_guess
-    from .infer import generate_candidates, probability_tables, random_candidates
-    from .schema import validate_df
+    from .get_draws import normalize as normalize
+    from .guess import EuroMillionsGuess as EuroMillionsGuess
+    from .guess import evaluate_guess as evaluate_guess
+    from .infer import generate_candidates as generate_candidates
+    from .infer import probability_tables as probability_tables
+    from .infer import random_candidates as random_candidates
+    from .schema import validate_df as validate_df
 
 
 def __getattr__(name: str):

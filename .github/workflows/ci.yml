@@ -8,18 +8,18 @@ jobs:
   build-test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           fetch-depth: 0
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.11"
 
       - name: Install project
         run: |
           python -m pip install -U pip
-          pip install -e ".[dev]"
+          pip install -e ".[dev,api,ml]"
 
       # Repository-wide. The former changed-files-only gate existed because `ruff check .` was red;
       # the legacy debt is now either fixed or scoped to explicit per-file-ignores in pyproject.toml,
@@ -50,3 +50,36 @@ jobs:
             echo "Found placeholder 'pass' or '...' in changed code. Refuse to merge."
             exit 1
           fi
+
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+
+      - name: Build source and wheel distributions
+        run: |
+          python -m pip install -U pip build twine
+          python -m build
+
+      - name: Validate metadata and archive contents
+        run: |
+          python -m twine check dist/*
+          python scripts/check_distribution.py dist/*
+
+      - name: Install base wheel in a fresh environment
+        shell: bash
+        run: |
+          python -m venv "$RUNNER_TEMP/lotteries-wheel"
+          "$RUNNER_TEMP/lotteries-wheel/bin/python" -m pip install -U pip
+          "$RUNNER_TEMP/lotteries-wheel/bin/python" -m pip install "$GITHUB_WORKSPACE"/dist/*.whl
+          cd "$RUNNER_TEMP"
+          "$RUNNER_TEMP/lotteries-wheel/bin/python" "$GITHUB_WORKSPACE/scripts/wheel_smoke.py"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: python-package-distributions
+          path: dist/

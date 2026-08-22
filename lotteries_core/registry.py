@@ -10,6 +10,7 @@ Adding a strategy means one entry here plus the provider module itself. See
 
 from __future__ import annotations
 
+import importlib.util
 from dataclasses import dataclass
 from typing import Callable
 
@@ -87,6 +88,8 @@ def _parallax(mode: str) -> Callable[[], InferenceProvider]:
 
 
 def _ml_ensemble() -> InferenceProvider:
+    if importlib.util.find_spec("sklearn") is None:
+        raise ImportError("ml_ensemble requires the 'ml' extra: pip install 'lotteries-core[ml]'")
     from .providers import load_ml_ensemble
 
     return load_ml_ensemble()()

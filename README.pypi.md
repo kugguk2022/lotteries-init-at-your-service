@@ -18,6 +18,7 @@ Optional HTTP API and ML ensemble dependencies are deliberately separate:
 ```bash
 python -m pip install "lotteries-core[api]"
 python -m pip install "lotteries-core[ml]"
+python -m pip install "lotteries-core[ml-full]"  # optional XGBoost + Torch members
 ```
 
 The base installation requires only NumPy and pandas. PyArrow, statsmodels, matplotlib, seaborn,
@@ -58,6 +59,7 @@ framework version, Git commit, and SHA-256 of the training data.
 ## Competing inference
 
 ```bash
+python -m pip install "lotteries-core[ml]"
 lotto-benchmark --history history.csv --all-providers --budget 25 --holdout 40
 ```
 

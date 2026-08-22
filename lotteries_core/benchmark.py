@@ -63,6 +63,24 @@ def build_providers(
     return providers
 
 
+def build_registered_providers():
+    """Instantiate the complete public competition in stable registry order.
+
+    ``--all-providers`` is an exact contract: it runs all 12 identities or stops with a useful
+    installation message. Silently dropping the optional ML entrant would make comparisons between
+    machines non-equivalent.
+    """
+    from . import registry
+
+    missing = [name for name in registry.names() if name not in registry.available()]
+    if missing:
+        raise SystemExit(
+            f"all-provider competition needs optional providers {missing}; "
+            "install with: pip install 'lotteries-core[ml]'"
+        )
+    return [registry.create(name) for name in registry.names()]
+
+
 def main(argv: list[str] | None = None) -> None:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--history", required=True, help="Normalised draw-history CSV")
@@ -89,7 +107,7 @@ def main(argv: list[str] | None = None) -> None:
     ap.add_argument(
         "--all-providers",
         action="store_true",
-        help="Enable every optional provider (equivalent to all --with-* flags)",
+        help="Run the complete 12-entry public registry (requires the 'ml' extra)",
     )
     ap.add_argument("--out", default=None, help="Optional path to write the JSON summary")
     args = ap.parse_args(argv)
@@ -97,11 +115,15 @@ def main(argv: list[str] | None = None) -> None:
     history = pd.read_csv(args.history)
     spec = _GAMES[args.game]()
     every = args.all_providers
-    providers = build_providers(
-        args.with_ml or every,
-        args.with_cooccurrence or every,
-        args.with_spectral or every,
-        args.with_parallax or every,
+    providers = (
+        build_registered_providers()
+        if every
+        else build_providers(
+            args.with_ml,
+            args.with_cooccurrence,
+            args.with_spectral,
+            args.with_parallax,
+        )
     )
     summary = evaluate_forward(
         history, spec, providers, budget=args.budget, holdout=args.holdout, seed=args.seed

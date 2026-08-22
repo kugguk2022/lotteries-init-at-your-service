@@ -1,0 +1,11 @@
+include LICENSE
+include README.pypi.md
+recursive-include lotteries_core *.py
+recursive-exclude lotteries_core __pycache__ *.py[cod]
+prune data
+prune ledger
+prune lotto_lab_out
+prune outputs
+prune runs
+prune tests
+global-exclude *.csv *.jsonl *.parquet *.png *.xlsx

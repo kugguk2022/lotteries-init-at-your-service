@@ -33,13 +33,16 @@ from __future__ import annotations
 
 from .envelope import InferenceEnvelope
 from .protocol import GameSpec, InferenceProvider, Ticket
+from .roi import JackpotModel, portfolio_roi_trace
 
 __all__ = [
     "GameSpec",
     "InferenceEnvelope",
     "InferenceProvider",
+    "JackpotModel",
     "Ticket",
     "__version__",
+    "portfolio_roi_trace",
 ]
 
-__version__ = "0.2.0.dev0"
+__version__ = "0.1.0a1"

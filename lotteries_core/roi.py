@@ -19,6 +19,8 @@ framework never buys tickets or moves money.
 
 from __future__ import annotations
 
+import hashlib
+import json
 from dataclasses import dataclass
 from math import comb
 
@@ -26,6 +28,8 @@ import numpy as np
 
 from .popularity import PopularityModel
 from .protocol import GameSpec, Ticket
+
+ROI_TRACE_SCHEMA_VERSION = 1
 
 
 @dataclass(frozen=True)
@@ -110,10 +114,52 @@ def portfolio_expected_roi(
     *uniformly popular* portfolio of the same size -- i.e. how much of the shared-jackpot lever the
     portfolio actually captured. > 1 means the portfolio leans unpopular (good for conditional ROI).
     """
-    if not tickets:
-        return {"expected_roi_per_ticket": float("nan"), "unpopularity_lift": float("nan")}
+    return portfolio_roi_trace(spec, tickets, jackpot, popularity)["summary"]
+
+
+def portfolio_roi_trace(
+    spec: GameSpec,
+    tickets: list[Ticket],
+    jackpot: JackpotModel | None = None,
+    popularity: PopularityModel | None = None,
+) -> dict:
+    """Return an integrity-stamped audit trail for every input and per-ticket ROI calculation.
+
+    The older :func:`portfolio_expected_roi` API intentionally remains a compact summary. This
+    function is the publication/audit surface: it exposes the assumptions and intermediate values
+    needed to reproduce that summary, then stamps the canonical JSON payload with SHA-256.
+    """
     jackpot = jackpot or JackpotModel()
     popularity = popularity or PopularityModel()
+
+    if not tickets:
+        trace = {
+            "schema_version": ROI_TRACE_SCHEMA_VERSION,
+            "game": {
+                "name": spec.name,
+                "main_n": spec.main_n,
+                "main_k": spec.main_k,
+                "star_n": spec.star_n,
+                "star_k": spec.star_k,
+                "combination_count": spec.n_tickets(),
+            },
+            "assumptions": {
+                "jackpot": jackpot.jackpot,
+                "ticket_price": jackpot.ticket_price,
+                "n_other_tickets": jackpot.n_other_tickets,
+                "scope": "jackpot-tier-only",
+                "cowinner_model": "poisson",
+            },
+            "tickets": [],
+            "summary": {
+                "expected_roi_per_ticket": float("nan"),
+                "best_ticket_roi": float("nan"),
+                "mean_popularity_share": float("nan"),
+                "unpopularity_lift": float("nan"),
+            },
+        }
+        trace["trace_sha256"] = _trace_digest(trace)
+        return trace
 
     shares = popularity.absolute_shares(spec, tickets)  # 1.0 == average crowding
     rois = np.array(
@@ -123,12 +169,58 @@ def portfolio_expected_roi(
         [expected_jackpot_payout(spec, jackpot, float(s)) for s in shares], dtype=float
     )
     baseline_payout = expected_jackpot_payout(spec, jackpot, 1.0)
-    return {
-        "expected_roi_per_ticket": float(rois.mean()),
-        "best_ticket_roi": float(rois.max()),
-        "mean_popularity_share": float(shares.mean()),
-        "unpopularity_lift": float(payouts.mean() / baseline_payout) if baseline_payout else float("nan"),
+    ticket_traces = []
+    p_win = jackpot.jackpot_match_probability(spec)
+    for ticket, share, payout, roi in zip(tickets, shares, payouts, rois, strict=True):
+        main, stars = ticket
+        ticket_traces.append(
+            {
+                "main": list(main),
+                "stars": list(stars),
+                "popularity_share": float(share),
+                "expected_cowinners": expected_cowinners(
+                    spec, float(share), jackpot.n_other_tickets
+                ),
+                "jackpot_match_probability": p_win,
+                "expected_payout_if_jackpot": float(payout),
+                "expected_roi": float(roi),
+            }
+        )
+
+    trace = {
+        "schema_version": ROI_TRACE_SCHEMA_VERSION,
+        "game": {
+            "name": spec.name,
+            "main_n": spec.main_n,
+            "main_k": spec.main_k,
+            "star_n": spec.star_n,
+            "star_k": spec.star_k,
+            "combination_count": spec.n_tickets(),
+        },
+        "assumptions": {
+            "jackpot": jackpot.jackpot,
+            "ticket_price": jackpot.ticket_price,
+            "n_other_tickets": jackpot.n_other_tickets,
+            "scope": "jackpot-tier-only",
+            "cowinner_model": "poisson",
+        },
+        "tickets": ticket_traces,
+        "summary": {
+            "expected_roi_per_ticket": float(rois.mean()),
+            "best_ticket_roi": float(rois.max()),
+            "mean_popularity_share": float(shares.mean()),
+            "unpopularity_lift": (
+                float(payouts.mean() / baseline_payout) if baseline_payout else float("nan")
+            ),
+        },
     }
+    trace["trace_sha256"] = _trace_digest(trace)
+    return trace
+
+
+def _trace_digest(trace: dict) -> str:
+    payload = json.dumps(trace, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    return hashlib.sha256(payload).hexdigest()
 
 
 # --------------------------------------------------------------------------------------------

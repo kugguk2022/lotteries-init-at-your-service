@@ -31,7 +31,8 @@ PRIMARY_URL = "https://www.national-lottery.co.uk/results/euromillions/draw-hist
 SECONDARY_URL = "https://www.merseyworld.com/euromillions/resultsArchive.php?format=csv"
 CSV_URLS = (PRIMARY_URL, SECONDARY_URL)
 
-#: ``auto`` tries the CSV archives in order. The HTML choices require the ``scrape`` extra.
+#: ``auto`` tries the CSV archives in order, then falls back to the HTML archive. Every
+#: choice runs on the base install: ``requests`` and ``beautifulsoup4`` are base dependencies.
 SOURCE_CHOICES = ("auto", "merseyworld", "national-lottery", "archive", "lottology")
 
 CACHE_DIR = Path(".cache/euromillions")
@@ -227,8 +228,8 @@ def fetch_euromillions(
 ) -> pd.DataFrame:
     """Retrieve and normalize EuroMillions history.
 
-    ``source`` selects an archive. ``archive`` and ``lottology`` are HTML and need the ``scrape``
-    extra; every other choice runs on the base install.
+    ``source`` selects an archive. ``archive`` and ``lottology`` are HTML-parsed rather than CSV;
+    every choice, including those, runs on a plain ``pip install lottobench``.
     """
     if source not in SOURCE_CHOICES:
         raise ValueError(f"unknown source {source!r}; choose from {list(SOURCE_CHOICES)}")

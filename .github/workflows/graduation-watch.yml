@@ -89,8 +89,16 @@ jobs:
       - name: Merge the install matrix into one report
         shell: bash
         run: |
+          shopt -s nullglob
           mkdir -p outputs/graduation
-          jq -s 'add // {} | {results: .}' pypi-probes/*.json > outputs/graduation/pypi-report.json
+          probes=(pypi-probes/*.json)
+          if ((${#probes[@]} == 0)); then
+            # No probe ran at all. An empty result set leaves the gate `unknown`, which is the
+            # honest reading; writing `{}` here must never be mistaken for a passing matrix.
+            echo '{"results": {}}' > outputs/graduation/pypi-report.json
+          else
+            jq -s 'add | {results: .}' "${probes[@]}" > outputs/graduation/pypi-report.json
+          fi
           cat outputs/graduation/pypi-report.json
 
       - name: Count open critical issues
@@ -137,19 +145,26 @@ jobs:
             --color 0E8A16 \
             --description "Automated milestone notice from graduation-watch" 2>/dev/null || true
 
+          # Fetch every issue this workflow has ever filed, open and closed, and match markers
+          # locally. GitHub's code search tokenizes punctuation, so asking it about a marker full of
+          # angle brackets is not dependable -- and a missed match means a duplicate issue, which is
+          # exactly the noise this workflow exists to avoid.
+          reported="$(gh issue list --repo "$GITHUB_REPOSITORY" --state all --limit 200 \
+            --label graduation-watch --json body --jq '.[].body' || true)"
+
           for body in "${notifications[@]}"; do
             key="$(basename "$body" .md)"
             title="$(jq -r .title "outputs/graduation/notify/${key}.json")"
             marker="<!-- lottobench-watch: ${key} -->"
 
-            # Search every state, open and closed. A milestone that was reported and dismissed must
-            # stay dismissed; reopening it every month is the failure mode this guard exists for.
-            existing="$(gh issue list --repo "$GITHUB_REPOSITORY" --state all --limit 200 \
-              --search "\"${marker}\" in:body" --json number --jq '.[0].number // empty')"
-            if [ -n "$existing" ]; then
-              echo "Already reported as #${existing}: ${key}"
-              continue
-            fi
+            # A milestone that was reported and then dismissed stays dismissed; reopening it every
+            # month is the failure mode this guard exists for.
+            case "$reported" in
+              *"$marker"*)
+                echo "Already reported: ${key}"
+                continue
+                ;;
+            esac
 
             gh issue create --repo "$GITHUB_REPOSITORY" \
               --title "$title" \

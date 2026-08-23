@@ -421,10 +421,12 @@ def gate_benchmark_reproducible(
 ) -> Gate:
     """Run the shipped benchmark CLI twice and require byte-identical output.
 
-    Only the most recent ``rows`` draws are replayed. Determinism is a property of the pipeline
-    rather than of history length, and replaying the full canonical history through every provider
-    twice costs more than ten minutes -- long enough that the check would be skipped in practice,
-    which is worse than a shorter one that actually runs.
+    Deliberately a small replay: the most recent ``rows`` draws over a short holdout. Determinism
+    is a property of the pipeline rather than of history length, and the full canonical history
+    costs over ten minutes per run once the ``ml`` and ``transformer`` extras are installed -- long
+    enough that the check would be skipped in practice, which is worse than a smaller one that
+    actually runs. ``--all-providers`` is kept, because the optional heavy providers are exactly
+    the ones carrying enough internal randomness to be worth pinning down.
     """
     import pandas as pd
 
@@ -593,8 +595,8 @@ def build_report(
     history: Path | None,
     game: str,
     budget: int,
-    holdout: int,
     repro_rows: int,
+    repro_holdout: int,
     thresholds: Thresholds,
     pythons: Sequence[str],
     skip_benchmark: bool,
@@ -617,7 +619,7 @@ def build_report(
         detail = "Reproducibility check was skipped by request."
         gates.append(Gate("benchmark_reproducible", UNKNOWN, detail))
     else:
-        gates.append(gate_benchmark_reproducible(history, game, budget, holdout, repro_rows))
+        gates.append(gate_benchmark_reproducible(history, game, budget, repro_holdout, repro_rows))
     gates.sort(key=lambda gate: gate.name)
 
     report: dict[str, Any] = {
@@ -673,7 +675,6 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--history", type=Path, default=Path("data/euromillions.csv"))
     parser.add_argument("--game", default="euromillions")
     parser.add_argument("--budget", type=int, default=25)
-    parser.add_argument("--holdout", type=int, default=20)
     parser.add_argument(
         "--pypi-report",
         type=Path,
@@ -696,6 +697,12 @@ def main(argv: list[str] | None = None) -> int:
         type=int,
         default=120,
         help="Most recent draws replayed by the reproducibility gate",
+    )
+    parser.add_argument(
+        "--repro-holdout",
+        type=int,
+        default=3,
+        help="Holdout draws used by the reproducibility gate; small on purpose, see its docstring",
     )
     parser.add_argument(
         "--skip-benchmark", action="store_true", help="Skip the repeated benchmark run"
@@ -723,8 +730,8 @@ def main(argv: list[str] | None = None) -> int:
         history=args.history,
         game=args.game,
         budget=args.budget,
-        holdout=args.holdout,
         repro_rows=args.repro_rows,
+        repro_holdout=args.repro_holdout,
         thresholds=thresholds,
         pythons=SUPPORTED_PYTHONS,
         skip_benchmark=args.skip_benchmark,

@@ -1,12 +1,13 @@
 .DEFAULT_GOAL := help
 
-.PHONY: help venv install setup setup-experiments doctor lint test test-experiments providers benchmark roi-report roi-export e2e package check serve
+.PHONY: help venv install setup setup-experiments doctor lint test test-experiments providers benchmark roi-report roi-export graduation e2e package check serve
 
 PYTHON ?= python3
 GAME ?= euromillions
 HISTORY ?= data/euromillions.csv
 LEDGER ?= ledger/euromillions
 ROI_OUT ?= outputs/euromillions/roi-benchmark-v1.json
+GRADUATION_OUT ?= outputs/graduation/status.json
 OUT ?= outputs/euromillions/competition_benchmark.json
 BUDGET ?= 25
 HOLDOUT ?= 20
@@ -50,6 +51,10 @@ roi-report: ## Retrieve cumulative realized user ROI from the prospective ledger
 
 roi-export: ## Export deterministic version-aware ROI evidence for aggregation
 	$(PYTHON) -m lotteries_core.realized_roi export --ledger $(LEDGER) --out $(ROI_OUT)
+
+graduation: ## Report which alpha-to-stable gates and provider-evidence thresholds are met
+	$(PYTHON) scripts/check_graduation.py --ledger $(LEDGER) --history $(HISTORY) \
+	  --game $(GAME) --out $(GRADUATION_OUT)
 
 e2e: ## Validate provider registry, benchmark/ROI metrics, storage, and provenance offline
 	$(PYTHON) -m scripts.validate_user_journey

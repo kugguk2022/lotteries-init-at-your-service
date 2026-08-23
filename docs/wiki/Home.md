@@ -19,6 +19,7 @@ the diff showing up.
 | [Outcome Tracking](Outcome-Tracking.md) | The prospective ledger and the live competition. |
 | [HTTP API](HTTP-API.md) | REST layer: pick a provider, get a portfolio, inspect provenance. |
 | [Contributing a Provider](Contributing-a-Provider.md) | How to enter a new strategy — one file plus two registry lines. |
+| [Graduation Criteria](Graduation-Criteria.md) | The machine-checked gates for a stable release, and for claiming a provider beat random. |
 | [Current State](Current-State.md) | Verified status: what works, what is open, what was fixed. |
 | [Documentation Standard](Documentation-Standard.md) | The bar this and sibling repositories are being held to. |
 

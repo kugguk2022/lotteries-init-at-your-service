@@ -19,6 +19,7 @@ from pathlib import Path
 
 import pandas as pd
 
+from . import registry
 from .evaluation import evaluate_forward
 from .protocol import GameSpec
 from .providers import (
@@ -89,7 +90,7 @@ def main(argv: list[str] | None = None) -> None:
     ap.add_argument(
         "--all-providers",
         action="store_true",
-        help="Enable every optional provider (equivalent to all --with-* flags)",
+        help="Run every provider currently available in the canonical registry",
     )
     ap.add_argument("--out", default=None, help="Optional path to write the JSON summary")
     args = ap.parse_args(argv)
@@ -97,11 +98,15 @@ def main(argv: list[str] | None = None) -> None:
     history = pd.read_csv(args.history)
     spec = _GAMES[args.game]()
     every = args.all_providers
-    providers = build_providers(
-        args.with_ml or every,
-        args.with_cooccurrence or every,
-        args.with_spectral or every,
-        args.with_parallax or every,
+    providers = (
+        [registry.create(name) for name in registry.available()]
+        if every
+        else build_providers(
+            args.with_ml,
+            args.with_cooccurrence,
+            args.with_spectral,
+            args.with_parallax,
+        )
     )
     summary = evaluate_forward(
         history, spec, providers, budget=args.budget, holdout=args.holdout, seed=args.seed

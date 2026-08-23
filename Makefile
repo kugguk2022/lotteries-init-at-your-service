@@ -1,30 +1,59 @@
-.PHONY: venv install lint test draws quality branch-hmm-v3 branch-hmm-v4 lawyer
+.DEFAULT_GOAL := help
+
+.PHONY: help venv install install-dev lint test providers benchmark roi-report e2e package check db-refresh db-check serve
 
 PYTHON ?= python3
+DB ?= data/lotteries.db
+GAME ?= euromillions
+HISTORY ?= data/euromillions.csv
+LEDGER ?= ledger/euromillions
+OUT ?= outputs/euromillions/competition_benchmark.json
+BUDGET ?= 25
+HOLDOUT ?= 20
 
-venv:
+help: ## Show supported developer and user commands
+	@awk 'BEGIN {FS = ":.*## "} /^[a-zA-Z0-9_-]+:.*## / {printf "  %-14s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
+
+venv: ## Create a local virtual environment
 	$(PYTHON) -m venv .venv
+	@echo "Activate .venv, then run: make install-dev"
 
-install:
-	$(PYTHON) -m pip install -e ".[dev]"
+install: ## Install the lightweight LottoBench library locally
+	$(PYTHON) -m pip install -e .
 
-lint:
-	ruff check .
+install-dev: ## Install repository test, API, ML, and release tooling
+	$(PYTHON) -m pip install -e ".[dev,api,ml,repo-test,release]"
 
-test:
-	ruff check .
-	pytest -q
+lint: ## Run repository-wide static checks
+	$(PYTHON) -m ruff check .
 
-quality: test
+test: ## Run the repository test suite
+	$(PYTHON) -m pytest -q --maxfail=1 --disable-warnings
 
-draws:
-	$(PYTHON) -m euromillions.get_draws --out data/euromillions.csv --append
+providers: ## List the 12 registered inference providers and availability
+	$(PYTHON) -c "from lotteries_core.registry import PROVIDERS, available; ready=set(available()); [print(f'{name:32} {\"available\" if name in ready else \"optional dependency missing\"}') for name in PROVIDERS]"
 
-branch-hmm-v3:
-	$(PYTHON) -m euromillions.branch_hmm_v3 --source real --history data/euromillions.csv --out-dir outputs/euromillions/branch_hmm_v3
+benchmark: ## Run all registered providers forward-only at equal budget
+	$(PYTHON) -m lotteries_core.benchmark --history $(HISTORY) --game $(GAME) --budget $(BUDGET) --holdout $(HOLDOUT) --all-providers --out $(OUT)
 
-branch-hmm-v4:
-	$(PYTHON) -m euromillions.branch_hmm_v4 --source real --history data/euromillions.csv --out-dir outputs/euromillions/branch_hmm_v4
+roi-report: ## Retrieve cumulative realized user ROI from the prospective ledger
+	$(PYTHON) -m lotteries_core.outcome_tracker report --ledger $(LEDGER)
 
-lawyer:
-	$(PYTHON) -c "import importlib, pathlib, sys; print('python_executable=', sys.executable); print('python_version=', sys.version.replace(chr(10), ' ')); mod = importlib.import_module('euromillions.branch_hmm_v4'); print('branch_hmm_v4_import=', getattr(mod, '__file__', '<unknown>')); history = pathlib.Path('data/euromillions.csv'); print('history_exists=', history.exists(), history.resolve() if history.exists() else history); out_dir = pathlib.Path('outputs/euromillions'); out_dir.mkdir(parents=True, exist_ok=True); print('output_dir_ready=', out_dir.resolve())"
+e2e: ## Validate provider registry, benchmark/ROI metrics, storage, and provenance offline
+	$(PYTHON) -m scripts.validate_user_journey
+
+package: ## Build and validate wheel and source distributions
+	$(PYTHON) -m build
+	$(PYTHON) -m twine check dist/*
+	$(PYTHON) scripts/check_distribution.py dist/*
+
+check: lint test e2e package ## Run the complete pull-request/release gate
+
+db-refresh: ## Refresh one game in the ignored local SQLite database (network)
+	$(PYTHON) scripts/refresh_history.py --out $(DB) --game $(GAME)
+
+db-check: ## Check local database provenance and staleness
+	$(PYTHON) scripts/refresh_history.py --check --out $(DB) --game $(GAME)
+
+serve: ## Start the optional local API on 127.0.0.1:8007
+	$(PYTHON) -m lotteries_core.api

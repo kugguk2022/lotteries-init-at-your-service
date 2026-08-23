@@ -7,7 +7,7 @@ import tarfile
 import zipfile
 from pathlib import Path, PurePosixPath
 
-FORBIDDEN_ROOTS = {"data", "ledger", "outputs", "runs", "tests"}
+FORBIDDEN_ROOTS = {"data", "experiments", "ledger", "outputs", "runs", "tests"}
 FORBIDDEN_SUFFIXES = {".csv", ".db", ".jsonl", ".parquet", ".pt", ".xlsx"}
 REQUIRED = {
     "lottobench/__init__.py",

@@ -36,7 +36,7 @@ provider = lottobench.create("frequency")
 provider.fit(pd.DataFrame({
     "ball_1": [1, 2], "ball_2": [8, 9], "ball_3": [19, 20],
     "ball_4": [34, 35], "ball_5": [47, 48], "ball_6": [52, 53],
-}))
+}), definition.spec)
 result = provider.propose(definition.spec, budget=5, rng=np.random.default_rng(7))
 print(result.tickets)
 ```

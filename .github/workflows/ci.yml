@@ -5,34 +5,30 @@ on:
   pull_request:
 
 jobs:
-  build-test:
+  core-test:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.11", "3.12", "3.13", "3.14"]
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
-
-      - name: Install project
+          python-version: ${{ matrix.python-version }}
+      - name: Install LottoBench core
         run: |
           python -m pip install -U pip
-          pip install -e ".[dev,api,ml,repo-test]"
-
-      # Repository-wide. The former changed-files-only gate existed because `ruff check .` was red;
-      # the legacy debt is now either fixed or scoped to explicit per-file-ignores in pyproject.toml,
-      # so the whole tree is gated and cannot silently regress.
-      - name: Ruff (whole repository)
+          pip install -e ".[dev,api]"
+      - name: Ruff
         run: ruff check .
-
-      # Also repository-wide. Previously only four files blocked and the full suite ran with
-      # continue-on-error; both uncollectable modules are fixed, so the real suite is the gate.
-      - name: Pytest (whole suite, with core coverage)
+      - name: Core tests
         run: pytest -q --maxfail=1 --disable-warnings --cov=lotteries_core
-
-      - name: Fail on placeholders in changed Python files
+      - name: Offline core journey
+        run: python -m scripts.validate_user_journey
+      - name: Reject placeholders in changed Python
         shell: bash
         env:
           PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
@@ -51,25 +47,35 @@ jobs:
             exit 1
           fi
 
+  experiments-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install experiment dependencies
+        run: |
+          python -m pip install -U pip
+          pip install -e ".[dev,api,ml,repo-test]"
+      - name: Test preserved experiments separately
+        run: pytest -q experiments/tests --maxfail=1 --disable-warnings
+
   package:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-
       - name: Build source and wheel distributions
         run: |
           python -m pip install -U pip build twine
           python -m build
-
       - name: Validate metadata and archive contents
         run: |
           python -m twine check dist/*
           python scripts/check_distribution.py dist/*
-
       - name: Install and smoke-test the base wheel
         shell: bash
         run: |
@@ -78,7 +84,6 @@ jobs:
           "$RUNNER_TEMP/lottobench-wheel/bin/python" -m pip install "$GITHUB_WORKSPACE"/dist/*.whl
           cd "$RUNNER_TEMP"
           "$RUNNER_TEMP/lottobench-wheel/bin/python" "$GITHUB_WORKSPACE/scripts/wheel_smoke.py"
-
       - uses: actions/upload-artifact@v4
         with:
           name: lottobench-python-distributions

@@ -17,6 +17,8 @@ classifiers = [
   "Programming Language :: Python :: 3.10",
   "Programming Language :: Python :: 3.11",
   "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python :: 3.14",
   "Intended Audience :: Science/Research",
   "Topic :: Scientific/Engineering :: Information Analysis",
 ]
@@ -32,6 +34,7 @@ ml = [
   "xgboost>=2.0.0",
 ]
 api = [
+  "anyio>=4.4",
   "fastapi>=0.110",
   "uvicorn>=0.27",
   "httpx>=0.27",   # also the FastAPI TestClient transport
@@ -76,6 +79,7 @@ include = ["lottobench", "lottobench.*", "lotteries_core", "lotteries_core.*"]
 
 [tool.ruff]
 line-length = 100
+extend-exclude = ["experiments"]
 
 [tool.ruff.lint]
 extend-select = ["I"]
@@ -89,15 +93,15 @@ extend-select = ["I"]
 #       whoever next works in that script with the context to judge.
 # E402: single-file scripts that interleave module-level analysis code with imports.
 [tool.ruff.lint.per-file-ignores]
-"euromillions/arithmetic_branch.py" = ["F841"]
-"euromillions/branch_hmm_v3.py" = ["F841"]
-"euromillions/garch_glm_diagnostics.py" = ["F841"]
-"euromillions/garchx_glm.py" = ["F841"]
-"euromillions/roi.py" = ["F841"]
-"euromillions_agent/lotto_lab.py" = ["F841"]
-"eurodreams/eurodreams_get_draws.py" = ["E402"]
-"grok.py" = ["E402"]
-"totoloto/grok.py" = ["E402"]
+"experiments/euromillions/arithmetic_branch.py" = ["F841"]
+"experiments/euromillions/branch_hmm_v3.py" = ["F841"]
+"experiments/euromillions/garch_glm_diagnostics.py" = ["F841"]
+"experiments/euromillions/garchx_glm.py" = ["F841"]
+"experiments/euromillions/roi.py" = ["F841"]
+"experiments/euromillions_agent/lotto_lab.py" = ["F841"]
+"experiments/eurodreams/eurodreams_get_draws.py" = ["E402"]
+"experiments/grok.py" = ["E402"]
+"experiments/totoloto/grok.py" = ["E402"]
 
 [tool.mypy]
 python_version = "3.11"

@@ -9,6 +9,7 @@ prune ledger
 prune outputs
 prune runs
 prune tests
+prune experiments
 prune eurodreams
 prune euromillions
 prune euromillions_agent

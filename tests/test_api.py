@@ -49,8 +49,9 @@ def history_csv(tmp_path):
 def client(history_csv, monkeypatch):
     monkeypatch.setattr(api, "DEFAULT_HISTORY", str(history_csv))
     api.load_history.cache_clear()
-    with TestClient(api.app) as c:
-        yield c
+    c = TestClient(api.app)
+    yield c
+    c.close()
     api.load_history.cache_clear()
 
 

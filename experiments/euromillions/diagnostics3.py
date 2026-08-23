@@ -7,11 +7,6 @@ from dataclasses import asdict, dataclass
 from itertools import combinations, islice
 from pathlib import Path
 
-import matplotlib
-
-matplotlib.use("Agg")
-
-import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import statsmodels.api as sm
@@ -38,6 +33,20 @@ DEFAULT_MODE = "full7"
 DEFAULT_ROLLING_WINDOW = 100
 EXCEL_MAX_ROWS = 1_048_576
 FULL7_DEFAULT_START_DATE = "2016-09-27"
+
+
+def _get_matplotlib_pyplot():
+    try:
+        import matplotlib
+
+        matplotlib.use("Agg")
+        import matplotlib.pyplot as plt
+
+        return plt
+    except ModuleNotFoundError as exc:
+        raise ModuleNotFoundError(
+            "matplotlib is required to generate diagnostics plots. Install it to save plot outputs."
+        ) from exc
 
 
 @dataclass
@@ -870,6 +879,7 @@ def save_plot(
     inlier_mask: np.ndarray,
     out_path: Path,
 ) -> None:
+    plt = _get_matplotlib_pyplot()
     fig, axes = plt.subplots(3, 1, figsize=(14, 14), constrained_layout=True)
 
     axes[0].plot(frame["draw_date"], frame["poi"], color="steelblue", lw=0.8, label="poi")
@@ -943,6 +953,7 @@ def save_orderstat_pair_plot(
     rolling_window: int,
     out_path: Path,
 ) -> None:
+    plt = _get_matplotlib_pyplot()
     ordered_mains = np.sort(
         history[[f"ball_{idx}" for idx in range(1, 6)]].to_numpy(dtype=float),
         axis=1,

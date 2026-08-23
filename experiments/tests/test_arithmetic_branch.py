@@ -1,7 +1,11 @@
 from __future__ import annotations
 
-import numpy as np
+import builtins
 
+import numpy as np
+import pytest
+
+from euromillions import arithmetic_branch, diagnostics3
 from euromillions.arithmetic_branch import (
     ResidualMixtureComponent,
     fit_residual_distribution,
@@ -41,3 +45,23 @@ def test_student_t_mixture_quantiles_round_trip_through_cdf() -> None:
         point = residual_ppf(dist, quantile)
         recovered = residual_cdf(dist, point)
         assert np.isclose(recovered, quantile, atol=1e-5)
+
+
+@pytest.mark.parametrize(
+    "plot_loader",
+    [arithmetic_branch._get_matplotlib_pyplot, diagnostics3._get_matplotlib_pyplot],
+)
+def test_plot_helpers_raise_clear_error_when_matplotlib_missing(plot_loader) -> None:
+    original_import = builtins.__import__
+
+    def blocked_import(name, globals=None, locals=None, fromlist=(), level=0):
+        if name == "matplotlib" or name.startswith("matplotlib."):
+            raise ModuleNotFoundError("No module named 'matplotlib'")
+        return original_import(name, globals, locals, fromlist, level)
+
+    builtins.__import__ = blocked_import
+    try:
+        with pytest.raises(ModuleNotFoundError, match="matplotlib is required"):
+            plot_loader()
+    finally:
+        builtins.__import__ = original_import

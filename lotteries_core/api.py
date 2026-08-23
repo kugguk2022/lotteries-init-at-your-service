@@ -198,7 +198,7 @@ def _history_provenance(path: str, frame: pd.DataFrame) -> dict:
 
 
 @app.get("/", response_model=ServiceInfo, tags=["meta"])
-def root() -> ServiceInfo:
+async def root() -> ServiceInfo:
     """Service identity, the standing disclaimer, and where to go next."""
     return ServiceInfo(
         service="lottobench",
@@ -210,14 +210,14 @@ def root() -> ServiceInfo:
 
 
 @app.get("/health", tags=["meta"])
-def health() -> dict:
+async def health() -> dict:
     """Liveness probe. Reports whether the configured history is actually readable."""
     ok = Path(DEFAULT_HISTORY).exists()
     return {"status": "ok" if ok else "degraded", "history_present": ok}
 
 
 @app.get("/providers", response_model=list[ProviderInfo], tags=["providers"])
-def list_providers() -> list[ProviderInfo]:
+async def list_providers() -> list[ProviderInfo]:
     """The selectable strategies. Pass one of these names to POST /portfolio."""
     usable = set(registry.available())
     return [
@@ -233,7 +233,7 @@ def list_providers() -> list[ProviderInfo]:
 
 
 @app.get("/games", response_model=list[GameInfo], tags=["providers"])
-def list_games() -> list[GameInfo]:
+async def list_games() -> list[GameInfo]:
     """Supported game shapes and the size of each combinatorial universe."""
     return [
         GameInfo(
@@ -249,7 +249,7 @@ def list_games() -> list[GameInfo]:
 
 
 @app.post("/portfolio", response_model=PortfolioResponse, tags=["providers"])
-def build_portfolio(request: PortfolioRequest) -> PortfolioResponse:
+async def build_portfolio(request: PortfolioRequest) -> PortfolioResponse:
     """Generate a fixed-budget portfolio from the chosen provider.
 
     The provider is fit on the configured history and asked for exactly ``budget`` distinct legal
@@ -297,7 +297,9 @@ def build_portfolio(request: PortfolioRequest) -> PortfolioResponse:
 
 
 @app.get("/dataset", response_model=DatasetInfo, tags=["provenance"])
-def dataset_info(path: str = Query(DEFAULT_HISTORY, description="History CSV to describe")) -> DatasetInfo:
+async def dataset_info(
+    path: str = Query(DEFAULT_HISTORY, description="History CSV to describe"),
+) -> DatasetInfo:
     """Provenance and staleness for a history file, from its metadata sidecar."""
     meta = dataset.read(path)
     if meta is None:
@@ -318,7 +320,7 @@ def dataset_info(path: str = Query(DEFAULT_HISTORY, description="History CSV to 
 
 
 @app.get("/ledger/{name}", response_model=LedgerInfo, tags=["provenance"])
-def ledger_info(name: str) -> LedgerInfo:
+async def ledger_info(name: str) -> LedgerInfo:
     """Prospective-ledger contents and per-method standings, if any draws have settled."""
     from .outcome_tracker import PENDING, RESULTS, SETTLED, _read_jsonl
 

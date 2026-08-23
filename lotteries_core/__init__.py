@@ -33,16 +33,12 @@ from __future__ import annotations
 
 from .envelope import InferenceEnvelope
 from .protocol import GameSpec, InferenceProvider, Ticket
-from .realized_roi import comparison as compare_realized_roi
-from .realized_roi import export_bundle as export_roi_bundle
 
 __all__ = [
     "GameSpec",
     "InferenceEnvelope",
     "InferenceProvider",
     "Ticket",
-    "compare_realized_roi",
-    "export_roi_bundle",
     "__version__",
 ]
 

@@ -1,0 +1,158 @@
+name: graduation-watch
+
+# Opens exactly one issue when a milestone is genuinely reached, and stays silent otherwise.
+#
+# Two milestones are watched, and each is deduplicated by a marker embedded in the issue body, so a
+# monthly schedule cannot turn into monthly noise:
+#
+#   * the stable-release gates are all satisfied, or
+#   * a provider has beaten the uniform_random control by enough prospective evidence that a single
+#     lucky payout cannot explain it.
+#
+# The gate logic lives in scripts/check_graduation.py, where it is unit-tested. This file only
+# supplies the two facts the script cannot observe from a checkout -- a real PyPI install matrix and
+# the open critical-issue count -- and turns the resulting notifications into issues.
+
+on:
+  schedule:
+    # Monthly. The milestones move on a scale of releases and settled draws, not of days.
+    - cron: "17 6 1 * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  pypi-install:
+    name: install from PyPI (${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.11", "3.12", "3.13", "3.14"]
+    steps:
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Try a plain install of the published package
+        id: probe
+        shell: bash
+        # Deliberately no --pre. A prerelease-only project does not install this way, so a green
+        # result here is itself evidence that a stable release exists on PyPI.
+        run: |
+          ok=false
+          if python -m pip install --disable-pip-version-check lottobench; then
+            if python -c "import lottobench, lotteries_core; print(lotteries_core.__version__)"; then
+              ok=true
+            fi
+          fi
+          echo "installed=$ok" >> "$GITHUB_OUTPUT"
+          printf '{"%s": %s}\n' "${{ matrix.python-version }}" "$ok" > "pypi-${{ matrix.python-version }}.json"
+          cat "pypi-${{ matrix.python-version }}.json"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pypi-probe-${{ matrix.python-version }}
+          path: pypi-${{ matrix.python-version }}.json
+          retention-days: 7
+
+  gates:
+    name: evaluate gates
+    needs: pypi-install
+    if: always()
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Tag history is how the release-count, public-API and ledger-schema gates are measured.
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install LottoBench core
+        run: |
+          python -m pip install -U pip
+          pip install -e ".[dev,api]"
+
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: pypi-probe-*
+          path: pypi-probes
+          merge-multiple: true
+
+      - name: Merge the install matrix into one report
+        shell: bash
+        run: |
+          mkdir -p outputs/graduation
+          jq -s 'add // {} | {results: .}' pypi-probes/*.json > outputs/graduation/pypi-report.json
+          cat outputs/graduation/pypi-report.json
+
+      - name: Count open critical issues
+        id: critical
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        # Maintainers label packaging and data-integrity blockers `critical`. A search (rather than
+        # --label) returns an empty list instead of erroring when the label does not exist yet.
+        run: |
+          count=$(gh issue list --repo "$GITHUB_REPOSITORY" --state open \
+            --search "label:critical" --limit 200 --json number --jq 'length')
+          echo "count=${count:-0}" >> "$GITHUB_OUTPUT"
+          echo "open critical issues: ${count:-0}"
+
+      - name: Evaluate the graduation and provider-evidence gates
+        run: |
+          python scripts/check_graduation.py \
+            --pypi-report outputs/graduation/pypi-report.json \
+            --open-critical-issues "${{ steps.critical.outputs.count }}" \
+            --out outputs/graduation/status.json \
+            --notify-dir outputs/graduation/notify
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: graduation-status
+          path: outputs/graduation/
+          retention-days: 30
+
+      - name: Open one issue per milestone reached
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          shopt -s nullglob
+          notifications=(outputs/graduation/notify/*.md)
+          if ((${#notifications[@]} == 0)); then
+            echo "No milestone reached. Nothing to open."
+            exit 0
+          fi
+
+          gh label create graduation-watch \
+            --repo "$GITHUB_REPOSITORY" \
+            --color 0E8A16 \
+            --description "Automated milestone notice from graduation-watch" 2>/dev/null || true
+
+          for body in "${notifications[@]}"; do
+            key="$(basename "$body" .md)"
+            title="$(jq -r .title "outputs/graduation/notify/${key}.json")"
+            marker="<!-- lottobench-watch: ${key} -->"
+
+            # Search every state, open and closed. A milestone that was reported and dismissed must
+            # stay dismissed; reopening it every month is the failure mode this guard exists for.
+            existing="$(gh issue list --repo "$GITHUB_REPOSITORY" --state all --limit 200 \
+              --search "\"${marker}\" in:body" --json number --jq '.[0].number // empty')"
+            if [ -n "$existing" ]; then
+              echo "Already reported as #${existing}: ${key}"
+              continue
+            fi
+
+            gh issue create --repo "$GITHUB_REPOSITORY" \
+              --title "$title" \
+              --body-file "$body" \
+              --label graduation-watch
+          done

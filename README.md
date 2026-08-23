@@ -11,6 +11,53 @@ checks, a prospective outcome ledger, and an optional local HTTP API.
 > gambling advice. Lottery participation is ordinarily negative-sum. See [NOTICE.md](NOTICE.md),
 > [LICENSE](LICENSE), and [Experimental Use and Liability](docs/wiki/Experimental-Use-and-Liability.md).
 
+## Best options today — ranked by objective
+
+There is **no realized-ROI winner yet**: the public ledger has no settled records containing both
+actual cost and payout. LottoBench therefore does not turn backtests or modeled ROI into a claimed
+user-return ranking. This table is the current evidence-based decision guide:
+
+| Rank | User objective | Current option | Evidence and limitation |
+|---:|---|---|---|
+| 1 | Preserve money | **Do not play** | The only option that avoids the expected loss of a negative-sum lottery. It is a financial baseline, not a provider. |
+| 2 | Contribute trustworthy realized ROI | **`frequency`** | Fast, simple reference control. It has no claimed predictive edge and gives future provider versions a stable baseline. |
+| 3 | Optimize modeled payout conditional on winning | **`unpopularity`** | Best stored modeled ROI/ticket, **−0.7141**, and unpopularity lift, **1.1890**. This does not improve win probability and is not realized user ROI. |
+| 4 | Maximize portfolio coverage | **`parallax_guard_ablation`** | Best stored pair coverage, **0.2039**, and number coverage, **1.000**. It matched `parallax_guard` exactly, so the measured value came from portfolio construction rather than its experimental signal. |
+| Unranked | Test the owner's GINGERM hypothesis | **`gingerm`** | Retained as an experimental entrant. Its stored short holdout is not comparable with the 40-draw table, and it has no settled user-ROI evidence yet. |
+
+Snapshot: EuroMillions, equal budget of 25 tickets, 40-draw forward holdout, seed 1234, except
+GINGERM's separately reported five-draw run. See the exact artifact and caveats in
+[Methods and Findings](docs/wiki/Methods-and-Findings.md). All stored modeled ROI values remain
+negative. Rankings should move only when versioned prospective evidence justifies it.
+
+### Fastest useful workflow for ROI contributors
+
+```bash
+# Install the repository package and inspect the available providers
+make setup PYTHON=python
+make providers
+
+# Before the draw: record a fixed-budget portfolio and its model/data provenance
+lotto-track record \
+  --history data/euromillions.csv --preset euromillions \
+  --draw-key YYYY-MM-DD --methods frequency \
+  --n-sets 10 --ticket-price YOUR_ACTUAL_PRICE --ledger ledger/euromillions
+
+# After the draw: settle against official numbers and an official payout table
+lotto-track settle \
+  --ledger ledger/euromillions --draw-key YYYY-MM-DD \
+  --actual-main 1,2,3,4,5 --actual-stars 1,2 \
+  --payout-table payouts.json --outcome-source operator_verified
+
+# Read and export provider/model-version ROI evidence
+lotto-roi report --ledger ledger/euromillions
+lotto-roi export --ledger ledger/euromillions --out roi-benchmark.json
+lotto-roi validate roi-benchmark.json
+```
+
+Use the actual ticket price and official results/payouts for the relevant draw. Export is explicit,
+offline by default, and contains no tickets, receipt contents, user identity, or device identifier.
+
 ## Quick start
 
 Python 3.10–3.14 is supported by the core package.

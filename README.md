@@ -28,7 +28,9 @@ user-return ranking. This table is the current evidence-based decision guide:
 Snapshot: EuroMillions, equal budget of 25 tickets, 40-draw forward holdout, seed 1234, except
 GINGERM's separately reported five-draw run. See the exact artifact and caveats in
 [Methods and Findings](docs/wiki/Methods-and-Findings.md). All stored modeled ROI values remain
-negative. Rankings should move only when versioned prospective evidence justifies it.
+negative. `uniform_random`, `garch_markov_branch`, and `sequence_transformer` were added after this
+snapshot and remain unranked until they complete the same evaluation. Rankings should move only
+when comparable versioned evidence justifies it.
 
 ### Fastest useful workflow for ROI contributors
 

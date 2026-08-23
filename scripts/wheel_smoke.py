@@ -29,6 +29,11 @@ providers = subprocess.run(
     text=True,
 )
 assert "frequency" in providers.stdout
+assert "uniform_random" in providers.stdout
+assert "garch_markov_branch" in providers.stdout
+assert "sequence_transformer" in providers.stdout
+assert "12 selectable entrants backed by 9 implementation families" in providers.stdout
+assert "install [transformer] extra" in providers.stdout
 assert "1.0.0" in providers.stdout
 subprocess.run(
     [sys.executable, "-m", "lotteries_core.realized_roi", "--help"],

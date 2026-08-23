@@ -5,7 +5,7 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-from lotteries_core import storage
+from lotteries_core import registry, storage
 
 from .games import GAMES
 
@@ -16,6 +16,7 @@ def main(argv: list[str] | None = None) -> int:
     )
     commands = parser.add_subparsers(dest="command", required=True)
     commands.add_parser("games", help="list supported national game definitions")
+    commands.add_parser("providers", help="list registered strategies and local availability")
 
     importer = commands.add_parser("import-csv", help="import a legacy history CSV")
     importer.add_argument("csv", type=Path)
@@ -31,6 +32,12 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "games":
         for key, definition in GAMES.items():
             print(f"{key:20} {definition.country_code:2}  {definition.display_name}")
+        return 0
+    if args.command == "providers":
+        ready = set(registry.available())
+        for name, spec in registry.PROVIDERS.items():
+            status = "available" if name in ready else "optional dependency missing"
+            print(f"{name:32} {spec.version:10} {status}")
         return 0
     if args.game not in GAMES:
         parser.error(f"unknown game {args.game!r}; choose from {sorted(GAMES)}")

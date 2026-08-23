@@ -33,9 +33,9 @@ negative. Rankings should move only when versioned prospective evidence justifie
 ### Fastest useful workflow for ROI contributors
 
 ```bash
-# Install the repository package and inspect the available providers
-make setup PYTHON=python
-make providers
+# Install from PyPI (or use `make setup PYTHON=python` in a source checkout)
+python -m pip install lottobench
+lottobench providers
 
 # Before the draw: record a fixed-budget portfolio and its model/data provenance
 lotto-track record \

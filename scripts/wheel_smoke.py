@@ -22,6 +22,14 @@ result = subprocess.run(
 )
 assert "uk-lotto" in result.stdout
 assert "se-lotto" in result.stdout
+providers = subprocess.run(
+    [sys.executable, "-m", "lottobench.cli", "providers"],
+    check=True,
+    capture_output=True,
+    text=True,
+)
+assert "frequency" in providers.stdout
+assert "1.0.0" in providers.stdout
 subprocess.run(
     [sys.executable, "-m", "lotteries_core.realized_roi", "--help"],
     check=True,

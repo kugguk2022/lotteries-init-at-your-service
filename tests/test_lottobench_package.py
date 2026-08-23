@@ -25,3 +25,12 @@ def test_country_game_catalogue(key, main_n, main_k):
 def test_public_strategy_api_is_functional():
     assert "frequency" in lottobench.names()
     assert lottobench.create("frequency").name == "frequency"
+
+
+def test_cli_lists_versioned_providers(capsys):
+    from lottobench.cli import main
+
+    assert main(["providers"]) == 0
+    output = capsys.readouterr().out
+    assert "frequency" in output
+    assert "1.0.0" in output

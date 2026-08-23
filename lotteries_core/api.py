@@ -47,12 +47,13 @@ except ImportError as exc:  # pragma: no cover - exercised by the extras-not-ins
         "The HTTP API needs the 'api' extra. Install it with: pip install -e \".[api]\""
     ) from exc
 
+from mslt.games import GAMES as GAME_DEFINITIONS
+
 from . import dataset, registry, storage
 from .coverage import coverage_report
 from .popularity import PopularityModel
 from .protocol import GameSpec
 from .roi import JackpotModel, portfolio_expected_roi
-from mslt.games import GAMES as GAME_DEFINITIONS
 
 DISCLAIMER = (
     "Research output only. A fair draw is unpredictable, the game is negative-sum, and these "

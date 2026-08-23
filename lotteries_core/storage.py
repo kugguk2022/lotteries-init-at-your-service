@@ -6,8 +6,8 @@ research scripts do not have to migrate all at once.
 
 from __future__ import annotations
 
-import sqlite3
 import json
+import sqlite3
 from pathlib import Path
 
 import pandas as pd

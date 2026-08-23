@@ -1,32 +1,16 @@
-name: refresh-history
+name: verify-history-refresh
 
-# Keeps data/euromillions.csv and its metadata sidecar current.
-#
-# The failure this prevents: the repository's documented benchmark results were once computed on a
-# history that had silently been a year stale, and a prospective ledger entry recorded against stale
-# history is invalid -- the method never sees the draws immediately before the one it predicts.
-#
-# It opens a pull request rather than pushing. Draw data is an input to published results and to a
-# sealed ledger, so a human should see the diff before it lands.
+# A diagnostic only. Runtime draw data belongs in the user's ignored SQLite database; this workflow
+# deliberately never commits generated data, opens a PR, or triggers the repository CI workflow.
 
 on:
-  schedule:
-    # EuroMillions draws Tuesday and Friday evenings; check the mornings after (UTC).
-    - cron: "0 6 * * 3,6"
   workflow_dispatch:
-  # Also bootstrap after this workflow itself is repaired/changed. This is deliberately narrow:
-  # normal source pushes do not refresh draw data.
-  push:
-    branches: [main]
-    paths:
-      - ".github/workflows/refresh-history.yml"
 
 permissions:
-  contents: write
-  pull-requests: write
+  contents: read
 
 jobs:
-  refresh:
+  verify:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -36,54 +20,10 @@ jobs:
           python-version: "3.11"
 
       - name: Install project
-        run: |
-          python -m pip install -U pip
-          pip install -e ".[dev]"
+        run: pip install -e ".[dev]"
 
-      - name: Refresh history and metadata
-        run: python scripts/refresh_history.py --out data/euromillions.csv --game euromillions
+      - name: Exercise a fresh local SQLite refresh
+        run: python scripts/refresh_history.py --out /tmp/lotteries.db --game euromillions
 
-      - name: Detect change
-        id: diff
-        shell: bash
-        run: |
-          # `git diff --quiet` ignores untracked files. That was the regression: a freshly generated
-          # data/euromillions.csv could be invisible here, leaving only its metadata sidecar tracked.
-          if [[ -z "$(git status --porcelain -- data/euromillions.csv data/euromillions.meta.json)" ]]; then
-            echo "changed=false" >> "$GITHUB_OUTPUT"
-            echo "History already current; nothing to do."
-          else
-            echo "changed=true" >> "$GITHUB_OUTPUT"
-            python - <<'PY' >> "$GITHUB_STEP_SUMMARY"
-          from lotteries_core import dataset
-          meta = dataset.read("data/euromillions.csv")
-          print(f"- **{meta.rows}** draws, `{meta.first_draw}` .. `{meta.last_draw}`")
-          print(f"- sha256 `{meta.content_sha256[:16]}`")
-          PY
-          fi
-
-      # The refreshed data must not break the suite before a PR is opened.
-      - name: Gate
-        if: steps.diff.outputs.changed == 'true'
-        run: |
-          ruff check .
-          pytest -q --disable-warnings
-
-      - name: Open pull request
-        if: steps.diff.outputs.changed == 'true'
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          set -euo pipefail
-          branch="chore/refresh-history-$(date -u +%Y%m%d)"
-          last=$(python -c "from lotteries_core import dataset; print(dataset.read('data/euromillions.csv').last_draw)")
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git checkout -b "$branch"
-          git add data/euromillions.csv data/euromillions.meta.json
-          git commit -m "Refresh EuroMillions history through ${last}"
-          git push -u origin "$branch"
-          gh pr create \
-            --title "Refresh EuroMillions history through ${last}" \
-            --body "Automated refresh by \`scripts/refresh_history.py\`. Lint and the full test suite passed against the new data. Metadata sidecar regenerated." \
-            --base "${GITHUB_REF_NAME}" || echo "PR already open for ${branch}"
+      - name: Verify database provenance
+        run: python scripts/refresh_history.py --check --out /tmp/lotteries.db --game euromillions

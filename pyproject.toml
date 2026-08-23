@@ -57,6 +57,7 @@ Issues = "https://github.com/kugguk2022/lotteries-init-at-your-service/issues"
 Discussions = "https://github.com/kugguk2022/lotteries-init-at-your-service/discussions"
 
 [project.scripts]
+mslt = "mslt.cli:main"
 lotto-get-draws = "euromillions.get_draws:main"
 lotto-likely-sets = "lotteries_core.likely_set_generator:main"
 lotto-track = "lotteries_core.outcome_tracker:main"

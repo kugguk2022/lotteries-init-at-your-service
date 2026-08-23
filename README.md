@@ -95,6 +95,33 @@ That benchmark writes the comparison summary and per-step results under `outputs
 
 ## Quickstart
 
+### MSLT local library and database
+
+MSLT (Multi-Strategy Lottery Tests) runs locally: no hosted database or cloud service is required.
+Draw histories live in the ignored SQLite file `data/lotteries.db`, so refreshes do not create Git
+diffs or trigger CI. Existing research scripts can still import or export CSV during migration.
+
+```bash
+pip install -e ".[api]"
+python scripts/refresh_history.py
+mslt games
+mslt import-csv old-euromillions.csv --game euromillions
+lotto-serve
+```
+
+The library namespace is also usable directly:
+
+```python
+import mslt
+
+spec = mslt.game("uk-lotto").spec
+provider = mslt.create("frequency")
+```
+
+The initial country catalogue covers Denmark, Germany, the UK, the Netherlands, and Sweden. It
+defines each ticket shape independently of its draw-source adapter; source adapters can therefore be
+added and tested one national lottery at a time without coupling the strategy engine to websites.
+
 ```bash
 git clone https://github.com/kugguk2022/lotteries
 cd lotteries

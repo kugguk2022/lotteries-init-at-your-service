@@ -287,14 +287,14 @@ def test_netherlands_cli_fetch_store_and_benchmark(monkeypatch, tmp_path):
     ) == 0
 
 
-def test_html_sources_are_shipped_but_do_not_burden_csv_users(monkeypatch):
-    """The `scrape` extra is optional; asking for an HTML source without it must be actionable."""
+def test_html_source_dependency_failure_is_actionable(monkeypatch):
+    """A damaged base installation should produce a useful repair command."""
     import sys
 
     from lotteries_core.sources import html_archive
 
     monkeypatch.setitem(sys.modules, "bs4", None)
-    with pytest.raises(ImportError, match=r"lottobench\[scrape\]"):
+    with pytest.raises(ImportError, match=r"force-reinstall lottobench"):
         html_archive._require_scrape_dependencies()
 
 

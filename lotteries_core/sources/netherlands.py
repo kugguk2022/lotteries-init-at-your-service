@@ -97,9 +97,14 @@ def fetch_netherlands(
             rows.extend(normalize_result(json.loads(raw)))
         except (FetchError, json.JSONDecodeError, NormalizationError) as exc:
             errors.append(f"{draw_date}: {exc}")
+    if errors:
+        detail = "; ".join(errors[-3:])
+        raise FetchError(
+            f"Netherlands Lotto retrieval was incomplete ({len(errors)}/{len(dates)} dates failed); "
+            f"refusing a history with silent gaps: {detail}"
+        )
     if not rows:
-        raise FetchError("No Netherlands Lotto draws retrieved; " + "; ".join(errors[-3:]))
+        raise FetchError("No Netherlands Lotto draws retrieved")
 
     frame = pd.DataFrame(rows)
     return finalize(frame, GameSpec("nl-lotto", main_n=45, main_k=6))
-

@@ -1,10 +1,8 @@
-"""HTML archive fallbacks, shipped but not required.
+"""HTML archive fallbacks used when the official EuroMillions CSV is unavailable.
 
-These two sources parse rendered pages, so they need ``requests`` and ``beautifulsoup4``. Those
-are the ``scrape`` extra, not base dependencies: a user who fetches CSV -- the default path --
-should not carry a scraping stack. The import is checked up front so ``available()``-style callers
-and the CLI get an actionable message instead of a stack trace mid-fetch, the same pattern
-``sequence_transformer`` uses.
+``requests`` and ``beautifulsoup4`` are base dependencies because automatic retrieval must also
+work in a clean installation. Imports are still checked up front to give a useful repair message
+if an installation is incomplete.
 """
 
 from __future__ import annotations
@@ -41,13 +39,14 @@ class DrawRow:
 
 
 def _require_scrape_dependencies():
-    """Return ``(requests, BeautifulSoup)`` or explain exactly what to install."""
+    """Return ``(requests, BeautifulSoup)`` or explain how to repair the installation."""
     try:
         import requests
         from bs4 import BeautifulSoup
     except ImportError as exc:
         raise ImportError(
-            "HTML archive sources require: pip install 'lottobench[scrape]'"
+            "LottoBench retrieval dependencies are missing; run: "
+            "pip install --force-reinstall lottobench"
         ) from exc
     return requests, BeautifulSoup
 

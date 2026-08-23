@@ -33,7 +33,7 @@ each passes the same contract. See `docs/wiki/Backlog.md`.
 pip install lottobench==0.1.0a2
 ```
 
-The base install carries only NumPy and pandas, and it is enough for everything below.
+The base install carries the small numerical and retrieval stack needed for everything below.
 
 ## The whole journey: two commands
 
@@ -50,7 +50,7 @@ shape, and writes it into the local SQLite database together with its provenance
 `benchmark` reads that database and runs every available provider forward-only at equal budget
 against the `uniform_random` control.
 
-Nothing else is required — no CSV to supply, no scraping stack, no manual data step.
+Nothing else is required — no CSV to supply, no separate scraper setup, no manual data step.
 
 ```bash
 lottobench games        # what is supported, and what is only defined

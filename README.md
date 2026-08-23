@@ -113,7 +113,8 @@ presented as the fair-draw null.
 
 ```bash
 make providers
-make benchmark HISTORY=data/euromillions.csv GAME=euromillions BUDGET=25 HOLDOUT=20
+make fetch GAME=euromillions DB=data/lotteries.db
+make benchmark GAME=euromillions DB=data/lotteries.db BUDGET=25 HOLDOUT=20
 ```
 
 The benchmark is forward-only and gives every provider the same ticket budget. Reported expected

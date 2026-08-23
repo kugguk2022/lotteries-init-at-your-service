@@ -38,10 +38,6 @@ ml = [
 transformer = [
   "torch>=2.10.0",
 ]
-scrape = [
-  "beautifulsoup4>=4.12",
-  "requests>=2.31",
-]
 api = [
   "anyio>=4.4",
   "fastapi>=0.110",

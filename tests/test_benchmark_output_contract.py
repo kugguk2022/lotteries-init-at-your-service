@@ -8,6 +8,7 @@ import pandas as pd
 from lotteries_core import registry
 from lotteries_core.evaluation import evaluate_forward
 from lotteries_core.protocol import GameSpec
+from lotteries_core.roi import JackpotModel
 
 
 def test_base_provider_benchmark_emits_complete_strict_json():
@@ -33,6 +34,7 @@ def test_base_provider_benchmark_emits_complete_strict_json():
         budget=3,
         holdout=1,
         seed=731,
+        jackpot=JackpotModel(jackpot=100.0, ticket_price=2.0, n_other_tickets=100.0),
     )
 
     assert set(summary["providers"]) == set(names)

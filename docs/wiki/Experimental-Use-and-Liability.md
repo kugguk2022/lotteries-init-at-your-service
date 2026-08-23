@@ -27,13 +27,13 @@ evidence that future draws can be predicted.
 - Expected return for ordinary lottery participation is negative. This project does not establish a
   positive-return strategy.
 
-Do not describe MSLT output as “winning numbers”, “safe”, “guaranteed”, “profitable”, “approved”, or
-“financial advice”. Applications built on MSLT should display the standing disclaimer next to any
-generated output rather than hiding it in terms or documentation.
+Do not describe LottoBench output as “winning numbers”, “safe”, “guaranteed”, “profitable”,
+“approved”, or “financial advice”. Applications built on LottoBench should display the standing
+disclaimer next to any generated output rather than hiding it in terms or documentation.
 
 ## Product boundary
 
-MSLT does not accept money, sell or buy tickets, execute wagers, pool stakes, hold balances, verify
+LottoBench does not accept money, sell or buy tickets, execute wagers, pool stakes, hold balances, verify
 identity or age, or determine official results. Adding those capabilities would materially change
 the legal, security, and regulatory character of the project and is outside its scope.
 
@@ -57,4 +57,4 @@ The software is supplied under the MIT License, which provides it “as is”, w
 limits author and copyright-holder liability. The project notice explains additional risks in plain
 language. Neither document can exclude rights or liabilities that applicable law does not allow to
 be excluded. Obtain qualified legal review before distributing a public-facing product based on
-MSLT.
+LottoBench.

@@ -47,7 +47,7 @@ except ImportError as exc:  # pragma: no cover - exercised by the extras-not-ins
         "The HTTP API needs the 'api' extra. Install it with: pip install -e \".[api]\""
     ) from exc
 
-from mslt.games import GAMES as GAME_DEFINITIONS
+from lottobench.games import GAMES as GAME_DEFINITIONS
 
 from . import dataset, registry, storage
 from .coverage import coverage_report
@@ -73,7 +73,7 @@ DEFAULT_HISTORY = os.environ.get("LOTTERIES_HISTORY", "data/lotteries.db")
 DEFAULT_PORT = int(os.environ.get("LOTTERIES_PORT", "8007"))
 
 app = FastAPI(
-    title="lotteries-core",
+    title="LottoBench Experimental API",
     version="0.1.0",
     summary="Experimental lottery portfolio research framework; not advice or a betting service.",
     description=__doc__,
@@ -201,7 +201,7 @@ def _history_provenance(path: str, frame: pd.DataFrame) -> dict:
 def root() -> ServiceInfo:
     """Service identity, the standing disclaimer, and where to go next."""
     return ServiceInfo(
-        service="lotteries-core",
+        service="lottobench",
         version=app.version,
         disclaimer=DISCLAIMER,
         history=DEFAULT_HISTORY,
@@ -358,7 +358,7 @@ def main(argv: list[str] | None = None) -> None:
 
     import uvicorn
 
-    ap = argparse.ArgumentParser(description="Serve the lotteries-core HTTP API.")
+    ap = argparse.ArgumentParser(description="Serve the LottoBench experimental HTTP API.")
     ap.add_argument("--host", default="127.0.0.1", help="bind address (default: loopback only)")
     ap.add_argument(
         "--port", type=int, default=DEFAULT_PORT, help="bind port (or set LOTTERIES_PORT)"

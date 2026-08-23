@@ -1,7 +1,7 @@
-"""MSLT — Multi-Strategy Lottery Tests.
+"""LottoBench — auditable benchmarking for lottery strategies.
 
-The public package is intentionally small.  Existing ``lotteries_core`` imports remain supported
-while applications can adopt the stable MSLT name.
+The public package is intentionally small. Existing ``lotteries_core`` imports remain supported
+for compatibility with the research code.
 """
 
 from lotteries_core import GameSpec, InferenceProvider, Ticket

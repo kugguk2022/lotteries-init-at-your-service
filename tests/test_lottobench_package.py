@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-import mslt
+import lottobench
 
 
 @pytest.mark.parametrize(
@@ -16,12 +16,12 @@ import mslt
     ],
 )
 def test_country_game_catalogue(key, main_n, main_k):
-    definition = mslt.game(key)
+    definition = lottobench.game(key)
     assert definition.spec.main_n == main_n
     assert definition.spec.main_k == main_k
     assert definition.source_url.startswith("https://")
 
 
 def test_public_strategy_api_is_functional():
-    assert "frequency" in mslt.names()
-    assert mslt.create("frequency").name == "frequency"
+    assert "frequency" in lottobench.names()
+    assert lottobench.create("frequency").name == "frequency"

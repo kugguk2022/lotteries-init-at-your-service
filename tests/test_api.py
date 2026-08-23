@@ -56,7 +56,7 @@ def client(history_csv, monkeypatch):
 
 def test_root_carries_the_disclaimer(client):
     body = client.get("/").json()
-    assert body["service"] == "lotteries-core"
+    assert body["service"] == "lottobench"
     assert "unpredictable" in body["disclaimer"]
     assert "/providers" in body["endpoints"]
 
@@ -166,7 +166,7 @@ def test_ledger_404s_when_absent(client):
 def test_openapi_schema_is_served_and_well_formed(client):
     schema = client.get("/openapi.json").json()
     assert schema["openapi"].startswith("3.")
-    assert schema["info"]["title"] == "lotteries-core"
+    assert schema["info"]["title"] == "LottoBench Experimental API"
     for path in ("/providers", "/games", "/portfolio", "/dataset"):
         assert path in schema["paths"]
     assert "PortfolioRequest" in schema["components"]["schemas"]

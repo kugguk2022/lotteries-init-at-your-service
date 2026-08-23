@@ -1,4 +1,4 @@
-"""Command-line utilities for the local MSLT data store."""
+"""Command-line utilities for the local LottoBench data store."""
 
 from __future__ import annotations
 
@@ -11,7 +11,9 @@ from .games import GAMES
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(prog="mslt", description="Multi-Strategy Lottery Tests")
+    parser = argparse.ArgumentParser(
+        prog="lottobench", description="Auditable benchmarking for lottery strategies"
+    )
     commands = parser.add_subparsers(dest="command", required=True)
     commands.add_parser("games", help="list supported national game definitions")
 

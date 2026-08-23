@@ -65,7 +65,7 @@ def main(argv: list[str] | None = None) -> int:
     fetch_path = out
     temporary = None
     if storage.is_database(out):
-        temporary = tempfile.TemporaryDirectory(prefix="mslt-refresh-")
+        temporary = tempfile.TemporaryDirectory(prefix="lottobench-refresh-")
         fetch_path = Path(temporary.name) / f"{args.game}.csv"
     try:
         result = fetch_and_normalize(out_path=fetch_path, allow_stale=args.allow_stale)

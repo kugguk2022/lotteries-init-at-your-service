@@ -6,7 +6,7 @@ from a qualified lawyer; the maintainers cannot provide legal advice.
 
 ## Experimental status
 
-MSLT, including this repository, Python package, command-line tools, HTTP API, local application,
+LottoBench, including this repository, Python package, command-line tools, HTTP API, local application,
 models, strategies, datasets, examples, reports, and generated outputs, is experimental research
 software. It may be incomplete, inaccurate, outdated, unavailable, insecure, or changed or withdrawn
 without notice. Interfaces, game rules, upstream data sources, statistical methods, and results may

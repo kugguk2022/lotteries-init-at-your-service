@@ -102,27 +102,27 @@ That benchmark writes the comparison summary and per-step results under `outputs
 
 ## Quickstart
 
-### MSLT local library and database
+### LottoBench local library and database
 
-MSLT (Multi-Strategy Lottery Tests) runs locally: no hosted database or cloud service is required.
+LottoBench runs locally: no hosted database or cloud service is required.
 Draw histories live in the ignored SQLite file `data/lotteries.db`, so refreshes do not create Git
 diffs or trigger CI. Existing research scripts can still import or export CSV during migration.
 
 ```bash
 pip install -e ".[api]"
 python scripts/refresh_history.py
-mslt games
-mslt import-csv old-euromillions.csv --game euromillions
+lottobench games
+lottobench import-csv old-euromillions.csv --game euromillions
 lotto-serve
 ```
 
 The library namespace is also usable directly:
 
 ```python
-import mslt
+import lottobench
 
-spec = mslt.game("uk-lotto").spec
-provider = mslt.create("frequency")
+spec = lottobench.game("uk-lotto").spec
+provider = lottobench.create("frequency")
 ```
 
 The initial country catalogue covers Denmark, Germany, the UK, the Netherlands, and Sweden. It

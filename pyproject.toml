@@ -3,14 +3,15 @@ requires = ["setuptools>=68", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "mslt-lottery"
-version = "0.1.0"
-description = "Experimental local multi-strategy lottery testing toolkit; not betting advice"
+name = "lottobench"
+version = "0.1.0a1"
+description = "Experimental, auditable benchmarking for lottery strategies; not betting advice"
 readme = { file = "README.md", content-type = "text/markdown" }
 requires-python = ">=3.10"
 authors = [{ name = "kugguk2022" }]
 license = { file = "LICENSE" }
 classifiers = [
+  "Development Status :: 3 - Alpha",
   "License :: OSI Approved :: MIT License",
   "Programming Language :: Python :: 3",
   "Programming Language :: Python :: 3.10",
@@ -57,7 +58,7 @@ Issues = "https://github.com/kugguk2022/lotteries-init-at-your-service/issues"
 Discussions = "https://github.com/kugguk2022/lotteries-init-at-your-service/discussions"
 
 [project.scripts]
-mslt = "mslt.cli:main"
+lottobench = "lottobench.cli:main"
 lotto-get-draws = "euromillions.get_draws:main"
 lotto-likely-sets = "lotteries_core.likely_set_generator:main"
 lotto-track = "lotteries_core.outcome_tracker:main"
@@ -66,7 +67,7 @@ lotto-serve = "lotteries_core.api:main"          # needs the [api] extra
 # lotto-roi = "euromillions.roi:main"
 
 [tool.setuptools.packages.find]
-include = ["mslt", "mslt.*", "euromillions", "totoloto", "eurodreams", "euromillions_agent", "lotteries_core", "lotteries_core.*"]
+include = ["lottobench", "lottobench.*", "euromillions", "totoloto", "eurodreams", "euromillions_agent", "lotteries_core", "lotteries_core.*"]
 
 [tool.ruff]
 line-length = 100

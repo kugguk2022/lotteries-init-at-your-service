@@ -1,0 +1,24 @@
+"""Smoke test executed from outside the repository against an installed wheel."""
+
+from __future__ import annotations
+
+import subprocess
+import sys
+
+import lotteries_core
+import lottobench
+
+assert lotteries_core.__version__ == "0.1.0a1"
+assert lottobench.game("uk-lotto").spec.main_n == 59
+assert "frequency" in lottobench.names()
+assert lottobench.create("frequency").name == "frequency"
+
+result = subprocess.run(
+    [sys.executable, "-m", "lottobench.cli", "games"],
+    check=True,
+    capture_output=True,
+    text=True,
+)
+assert "uk-lotto" in result.stdout
+assert "se-lotto" in result.stdout
+print("installed LottoBench wheel smoke test passed")

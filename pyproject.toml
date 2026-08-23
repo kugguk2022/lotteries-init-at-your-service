@@ -1,18 +1,18 @@
 [build-system]
-requires = ["setuptools>=68", "wheel"]
+requires = ["setuptools>=77", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "lottobench"
 version = "0.1.0a1"
 description = "Experimental, auditable benchmarking for lottery strategies; not betting advice"
-readme = { file = "README.md", content-type = "text/markdown" }
+readme = { file = "README.pypi.md", content-type = "text/markdown" }
 requires-python = ">=3.10"
 authors = [{ name = "kugguk2022" }]
-license = { file = "LICENSE" }
+license = "MIT"
+license-files = ["LICENSE", "NOTICE.md"]
 classifiers = [
   "Development Status :: 3 - Alpha",
-  "License :: OSI Approved :: MIT License",
   "Programming Language :: Python :: 3",
   "Programming Language :: Python :: 3.10",
   "Programming Language :: Python :: 3.11",
@@ -21,22 +21,13 @@ classifiers = [
   "Topic :: Scientific/Engineering :: Information Analysis",
 ]
 dependencies = [
-  "requests>=2.31",
-  "pandas>=2.0",
   "numpy>=1.25",
-  "python-dateutil>=2.8.2",
-  "pandera>=0.20",
-  "pyarrow>=15.0",
-  "scikit-learn>=1.3.0",
-  "statsmodels>=0.14.0",
-  "beautifulsoup4>=4.12.0",
-  "scipy>=1.10.0",
-  "matplotlib>=3.7.0",
-  "seaborn>=0.13.0",
+  "pandas>=2.0",
 ]
 
 [project.optional-dependencies]
 ml = [
+  "scikit-learn>=1.3.0",
   "torch>=2.0.0",
   "xgboost>=2.0.0",
 ]
@@ -51,6 +42,21 @@ dev = [
   "pytest-cov>=5.0",
   "mypy>=1.8",
 ]
+repo-test = [
+  "beautifulsoup4>=4.12",
+  "matplotlib>=3.7",
+  "pandera>=0.20",
+  "pyarrow>=15.0",
+  "python-dateutil>=2.8.2",
+  "requests>=2.31",
+  "scipy>=1.10",
+  "seaborn>=0.13",
+  "statsmodels>=0.14",
+]
+release = [
+  "build>=1.2",
+  "twine>=6.0",
+]
 
 [project.urls]
 Homepage = "https://github.com/kugguk2022/lotteries-init-at-your-service"
@@ -59,7 +65,6 @@ Discussions = "https://github.com/kugguk2022/lotteries-init-at-your-service/disc
 
 [project.scripts]
 lottobench = "lottobench.cli:main"
-lotto-get-draws = "euromillions.get_draws:main"
 lotto-likely-sets = "lotteries_core.likely_set_generator:main"
 lotto-track = "lotteries_core.outcome_tracker:main"
 lotto-serve = "lotteries_core.api:main"          # needs the [api] extra
@@ -67,7 +72,7 @@ lotto-serve = "lotteries_core.api:main"          # needs the [api] extra
 # lotto-roi = "euromillions.roi:main"
 
 [tool.setuptools.packages.find]
-include = ["lottobench", "lottobench.*", "euromillions", "totoloto", "eurodreams", "euromillions_agent", "lotteries_core", "lotteries_core.*"]
+include = ["lottobench", "lottobench.*", "lotteries_core", "lotteries_core.*"]
 
 [tool.ruff]
 line-length = 100

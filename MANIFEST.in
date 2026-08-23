@@ -1,0 +1,16 @@
+include LICENSE
+include NOTICE.md
+include README.pypi.md
+include pyproject.toml
+recursive-include lottobench *.py
+recursive-include lotteries_core *.py
+prune data
+prune ledger
+prune outputs
+prune runs
+prune tests
+prune eurodreams
+prune euromillions
+prune euromillions_agent
+prune totoloto
+global-exclude *.csv *.db *.jsonl *.parquet *.pt *.py[cod] *.xlsx

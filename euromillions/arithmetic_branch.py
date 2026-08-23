@@ -7,11 +7,6 @@ from itertools import combinations, islice
 from math import gcd
 from pathlib import Path
 
-import matplotlib
-
-matplotlib.use("Agg")
-
-import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import statsmodels.api as sm
@@ -41,6 +36,20 @@ DEFAULT_THRESHOLD = 0.5
 RESIDUAL_MODEL_CHOICES = ("auto", "normal", "student_t", "student_t_mixture")
 MIN_RESID_SCALE = 1e-6
 MIN_T_DF = 2.1
+
+
+def _get_matplotlib_pyplot():
+    try:
+        import matplotlib
+
+        matplotlib.use("Agg")
+        import matplotlib.pyplot as plt
+
+        return plt
+    except ModuleNotFoundError as exc:
+        raise ModuleNotFoundError(
+            "matplotlib is required to generate branch plots. Install it to save plot outputs."
+        ) from exc
 
 
 def is_prime_scalar(value: int) -> bool:
@@ -934,6 +943,7 @@ def save_branch_plot(
     branch_mode: str,
     out_path: Path,
 ) -> None:
+    plt = _get_matplotlib_pyplot()
     fig, axes = plt.subplots(2, 2, figsize=(16, 10), constrained_layout=True)
 
     upper_mask = branch_frame["model_branch"] == "upper"
@@ -1059,6 +1069,7 @@ def save_pruned_branch_plot(
     threshold: float,
     out_path: Path,
 ) -> None:
+    plt = _get_matplotlib_pyplot()
     fig, axes = plt.subplots(2, 2, figsize=(16, 10), constrained_layout=True)
 
     prime_mask = branch_frame["prime_ceiling"].astype(bool)

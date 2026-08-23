@@ -54,6 +54,20 @@ lottobench export-csv exported.csv --game euromillions --db data/lotteries.db
 
 SQLite databases and exported CSV histories are runtime data and are not included in the package.
 
+## Versioned realized ROI
+
+Prospective ledgers can be compared by provider/model version using actual recorded stake and payout:
+
+```bash
+lotto-roi report --ledger ledger/euromillions
+lotto-roi export --ledger ledger/euromillions --out roi-benchmark.json
+lotto-roi validate roi-benchmark.json
+lotto-roi compare roi-benchmark.json another-benchmark.json
+```
+
+Exports are deterministic and integrity-hashed. They contain benchmark provenance and aggregate
+financial outcomes, but no tickets, receipt contents, machine identifiers, or user identity.
+
 ## Current game definitions
 
 - Denmark: Danske Lotto

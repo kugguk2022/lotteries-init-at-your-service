@@ -28,6 +28,7 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import importlib.metadata
 import json
 from dataclasses import asdict
 from datetime import datetime, timezone
@@ -39,10 +40,29 @@ import pandas as pd
 from .envelope import data_sha256
 from .likely_set_generator import PRESETS, GameConfig, build_portfolio, resolve_config
 from .protocol import GameSpec
+from .realized_roi import ROI_SCHEMA_VERSION, canonical_sha256, result_digest
 
 PENDING = "pending_predictions.jsonl"
 SETTLED = "settled_predictions.jsonl"
 RESULTS = "results.csv"
+
+
+def _package_version() -> str:
+    try:
+        return importlib.metadata.version("lottobench")
+    except importlib.metadata.PackageNotFoundError:
+        from . import __version__
+
+        return __version__
+
+
+def _provider_version(method: str, label: str) -> str:
+    from . import registry
+
+    if method == "cooccurrence":
+        return "1.0.0"
+    name = _REGISTRY_ALIASES.get(method, label)
+    return registry.version(name)
 
 #: Methods that can be entered into the tracked competition. ``cooccurrence`` is the owner's
 #: level-set generator and stays the default so existing ledgers keep their method label. The rest
@@ -232,10 +252,14 @@ def cmd_record(args) -> None:
             print(f"[skip] {label} already recorded for draw {args.draw_key}")
             continue
         record = {
+            "schema_version": ROI_SCHEMA_VERSION,
+            "lottobench_version": _package_version(),
             "draw_key": args.draw_key,
             "game": cfg.name,
             "config": asdict(cfg),
             "method": label,
+            "provider_name": label,
+            "provider_version": _provider_version(method, label),
             "target": target,
             "n_sets": len(tickets),
             "tickets": [[list(m), list(s)] for m, s in tickets],
@@ -246,6 +270,24 @@ def cmd_record(args) -> None:
             "ticket_proof_sha256": args.ticket_proof_sha256 or None,
             "ticket_price": args.ticket_price,
         }
+        provider_config = {
+            "provider_name": record["provider_name"],
+            "provider_version": record["provider_version"],
+            "game_config": record["config"],
+            "target_mode": args.target_mode,
+            "pairing": args.pairing,
+            "window": args.window,
+            "n_sets": record["n_sets"],
+        }
+        record["provider_config_sha256"] = canonical_sha256(provider_config)
+        record["benchmark_id"] = canonical_sha256(
+            {
+                "game": record["game"],
+                "draw_key": record["draw_key"],
+                "history_sha256": record["history_sha256"],
+                "n_sets": record["n_sets"],
+            }
+        )
         record["record_sha256"] = _record_digest(record)
         _append_jsonl(ledger / PENDING, record)
         already.add((args.draw_key, label))
@@ -291,9 +333,15 @@ def cmd_settle(args) -> None:
         method_net = method_prize - stake if not np.isnan(stake) else float("nan")
         control_net = control_prize - stake if not np.isnan(stake) else float("nan")
         row = {
+            "schema_version": rec.get("schema_version", 1),
+            "lottobench_version": rec.get("lottobench_version", "unknown"),
             "draw_key": rec["draw_key"],
             "game": rec["game"],
             "method": rec["method"],
+            "provider_name": rec.get("provider_name", rec["method"]),
+            "provider_version": rec.get("provider_version", "legacy-unversioned"),
+            "provider_config_sha256": rec.get("provider_config_sha256", ""),
+            "benchmark_id": rec.get("benchmark_id", ""),
             "n_sets": method["n_sets"],
             "m_best_main": method["best_main"],
             "m_best_star": method["best_star"],
@@ -303,19 +351,36 @@ def cmd_settle(args) -> None:
             "m_tier_counts": json.dumps(method["tier_counts"], sort_keys=True),
             "m_portfolio_prize": method_prize,
             "m_net_return": method_net,
+            "realized_roi": method_net / stake if not np.isnan(stake) and stake > 0 else float("nan"),
             "c_best_main": control["best_main"],
             "c_mean_main": round(control["mean_main"], 4),
             "c_jackpot": control["jackpot"],
             "c_tier_counts": json.dumps(control["tier_counts"], sort_keys=True),
             "c_portfolio_prize": control_prize,
             "c_net_return": control_net,
+            "control_realized_roi": (
+                control_net / stake if not np.isnan(stake) and stake > 0 else float("nan")
+            ),
+            "realized_roi_lift": (
+                (method_net - control_net) / stake
+                if not np.isnan(stake) and stake > 0
+                else float("nan")
+            ),
             "stake": stake,
             "lift_mean_main": round(method["mean_main"] - control["mean_main"], 4),
             "prize_lift": method_prize - control_prize,
             "currency": args.currency,
+            "outcome_source": args.outcome_source,
+            "payout_table_sha256": (
+                hashlib.sha256(Path(args.payout_table).read_bytes()).hexdigest()
+                if args.payout_table
+                else ""
+            ),
+            "settled_utc": datetime.now(timezone.utc).isoformat(),
             "purchase_proof_hash_present": int(bool(rec.get("ticket_proof_sha256"))),
             "record_sha256": rec["record_sha256"],
         }
+        row["result_sha256"] = result_digest(row) if not np.isnan(stake) and stake > 0 else ""
         _append_results(ledger / RESULTS, row)
         rec["actual_main"] = sorted(actual_main)
         rec["actual_stars"] = sorted(actual_stars)
@@ -497,6 +562,12 @@ def main(argv: list[str] | None = None) -> None:
         help='optional JSON file mapping tiers such as "5+2" to official per-ticket payouts',
     )
     st.add_argument("--currency", default="EUR")
+    st.add_argument(
+        "--outcome-source",
+        choices=["self_reported", "operator_verified"],
+        default="self_reported",
+        help="provenance label for the submitted draw result and payout table",
+    )
     st.set_defaults(func=cmd_settle)
 
     rep = sub.add_parser("report", help="Cumulative verdict across all settled draws.")

@@ -14,6 +14,7 @@ REQUIRED = {
     "lottobench/cli.py",
     "lottobench/games.py",
     "lotteries_core/registry.py",
+    "lotteries_core/realized_roi.py",
     "lotteries_core/storage.py",
 }
 

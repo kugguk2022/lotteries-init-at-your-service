@@ -71,11 +71,23 @@ lottobench games
 lottobench import-csv history.csv --game euromillions --db data/lotteries.db
 lottobench export-csv exported.csv --game euromillions --db data/lotteries.db
 make roi-report LEDGER=ledger/euromillions
+make roi-export LEDGER=ledger/euromillions ROI_OUT=roi-benchmark.json
 ```
 
 Runtime databases and exported histories are not distributed in the wheel. Realized user ROI is
 reported only from settled prospective ledger entries; absent settled draws, LottoBench says there
 is no result instead of substituting a backtest.
+
+ROI exports contain model/configuration versions, dataset and prediction provenance, actual stake,
+payout and realized ROI, plus integrity hashes. They exclude tickets, receipts and user/device
+identifiers. Compare bundles from multiple installations with:
+
+```bash
+lotto-roi validate roi-benchmark.json
+lotto-roi compare submission-a.json submission-b.json
+```
+
+See [Versioned ROI Benchmark](docs/VERSIONED_ROI_BENCHMARK.md) for the evolution contract.
 
 ## API
 

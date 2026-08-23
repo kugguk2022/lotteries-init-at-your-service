@@ -70,6 +70,7 @@ Discussions = "https://github.com/kugguk2022/lotteries-init-at-your-service/disc
 lottobench = "lottobench.cli:main"
 lotto-likely-sets = "lotteries_core.likely_set_generator:main"
 lotto-track = "lotteries_core.outcome_tracker:main"
+lotto-roi = "lotteries_core.realized_roi:main"
 lotto-serve = "lotteries_core.api:main"          # needs the [api] extra
 # Enable later when implemented:
 # lotto-roi = "euromillions.roi:main"

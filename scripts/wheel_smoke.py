@@ -12,6 +12,7 @@ assert lotteries_core.__version__ == "0.1.0a1"
 assert lottobench.game("uk-lotto").spec.main_n == 59
 assert "frequency" in lottobench.names()
 assert lottobench.create("frequency").name == "frequency"
+assert callable(lottobench.compare_realized_roi)
 
 result = subprocess.run(
     [sys.executable, "-m", "lottobench.cli", "games"],
@@ -21,4 +22,10 @@ result = subprocess.run(
 )
 assert "uk-lotto" in result.stdout
 assert "se-lotto" in result.stdout
+subprocess.run(
+    [sys.executable, "-m", "lotteries_core.realized_roi", "--help"],
+    check=True,
+    capture_output=True,
+    text=True,
+)
 print("installed LottoBench wheel smoke test passed")

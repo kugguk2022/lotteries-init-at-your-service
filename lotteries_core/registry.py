@@ -27,6 +27,8 @@ class ProviderSpec:
     ablation_of: str | None = None
     #: Optional third-party dependencies. Absent ones make the provider unavailable, never fatal.
     optional: bool = False
+    #: Bump whenever an algorithm or default affecting generated portfolios changes.
+    version: str = "1.0.0"
 
     def build(self) -> InferenceProvider:
         return _FACTORIES[self.name]()
@@ -171,6 +173,13 @@ PROVIDERS: dict[str, ProviderSpec] = {
 def names() -> list[str]:
     """Every registered provider name, in a stable order."""
     return list(PROVIDERS)
+
+
+def version(name: str) -> str:
+    """Stable algorithm version used to separate realized-ROI benchmark cohorts."""
+    if name not in PROVIDERS:
+        raise KeyError(f"unknown provider {name!r}; available: {names()}")
+    return PROVIDERS[name].version
 
 
 def available() -> list[str]:

@@ -20,7 +20,7 @@ user-return ranking. This table is the current evidence-based decision guide:
 | Rank | User objective | Current option | Evidence and limitation |
 |---:|---|---|---|
 | 1 | Preserve money | **Do not play** | The only option that avoids the expected loss of a negative-sum lottery. It is a financial baseline, not a provider. |
-| 2 | Contribute trustworthy realized ROI | **`frequency`** | Fast, simple reference control. It has no claimed predictive edge and gives future provider versions a stable baseline. |
+| 2 | Contribute trustworthy realized ROI | **`uniform_random`** | Canonical seeded fair-draw null. It uses no history and gives every legal combination equal probability, so every learned provider has a defensible baseline to beat. |
 | 3 | Optimize modeled payout conditional on winning | **`unpopularity`** | Best stored modeled ROI/ticket, **−0.7141**, and unpopularity lift, **1.1890**. This does not improve win probability and is not realized user ROI. |
 | 4 | Maximize portfolio coverage | **`parallax_guard_ablation`** | Best stored pair coverage, **0.2039**, and number coverage, **1.000**. It matched `parallax_guard` exactly, so the measured value came from portfolio construction rather than its experimental signal. |
 | Unranked | Test the owner's GINGERM hypothesis | **`gingerm`** | Retained as an experimental entrant. Its stored short holdout is not comparable with the 40-draw table, and it has no settled user-ROI evidence yet. |
@@ -81,7 +81,7 @@ an actionable message.
 
 ## Benchmark the providers
 
-The canonical registry exposes **11 distinct benchmark entrants backed by eight implementation
+The canonical registry exposes **12 distinct benchmark entrants backed by nine implementation
 families**. Named aliases are not duplicated as competitors; ablations remain because they are
 necessary signal-off controls.
 The identities include named strategies (`gingerm`, `spectral_contrarian`, and `parallax`), technical
@@ -93,7 +93,21 @@ The prospective ledger currently containing six entrants is a historical cohort,
 registry. Use `--methods all` for a new tracking cohort containing every locally available identity.
 
 The temporal-model candidates are named after their mechanisms: `garch_markov_branch` and
-`sequence_transformer`. The latter requires the `ml` extra; neither is part of GINGERM.
+`sequence_transformer`. The latter requires the dedicated `transformer` extra; neither is part of
+GINGERM.
+
+```bash
+python -m pip install "lottobench[transformer]"
+lottobench providers
+```
+
+A base installation remains intentionally lean. `lottobench providers` reports unavailable optional
+entrants and the exact extra needed; `--all-providers` runs every entrant available in that
+environment instead of silently substituting a different algorithm.
+
+`uniform_random` is the canonical external-theory baseline. It ignores history and samples legal
+tickets uniformly from a seed. `frequency` remains a historical-frequency heuristic and must not be
+presented as the fair-draw null.
 
 ```bash
 make providers

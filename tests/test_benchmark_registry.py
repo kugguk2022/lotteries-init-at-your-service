@@ -21,4 +21,4 @@ def test_all_providers_comes_from_the_distinct_entry_registry(monkeypatch, tmp_p
     benchmark.main(["--history", str(history), "--all-providers"])
 
     assert seen["providers"] == registry.names()
-    assert len(seen["providers"]) == 11
+    assert len(seen["providers"]) == 12

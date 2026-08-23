@@ -24,6 +24,16 @@ pip install "lottobench[api]==0.1.0a1"
 lotto-serve
 ```
 
+Optional sequence Transformer provider:
+
+```bash
+pip install "lottobench[transformer]==0.1.0a1"
+lottobench providers
+```
+
+The base package does not install PyTorch. Provider discovery reports whether the Transformer is
+available; no fallback model is substituted under the same provider name.
+
 ## Library
 
 ```python

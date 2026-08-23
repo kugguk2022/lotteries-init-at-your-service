@@ -76,6 +76,7 @@ PROVIDER_METHODS = (
     "sequence_transformer",
     "frequency",
     "unpopularity",
+    "uniform_random",
     "perron_frobenius",
     "parallax_guard",
     "parallax_ablation",

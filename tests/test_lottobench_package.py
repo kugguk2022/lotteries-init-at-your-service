@@ -34,8 +34,17 @@ def test_cli_lists_versioned_providers(capsys):
     output = capsys.readouterr().out
     assert "frequency" in output
     assert "1.0.0" in output
-    assert "11 selectable entrants backed by 8 implementation families" in output
+    assert "12 selectable entrants backed by 9 implementation families" in output
     assert "spectral_contrarian" in output
     assert "garch_markov_branch" in output
     assert "sequence_transformer" in output
+    assert "uniform_random" in output
     assert "gingerm" in output
+    assert lottobench.names().count("sequence_transformer") == 1
+
+
+def test_optional_providers_name_their_install_extras():
+    from lotteries_core import registry
+
+    assert registry.PROVIDERS["sequence_transformer"].install_extra == "transformer"
+    assert registry.PROVIDERS["ml_ensemble"].install_extra == "ml"

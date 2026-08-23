@@ -44,15 +44,16 @@ cannot drift apart:
 ```json
 [
   {"name": "frequency", "summary": "Smoothed historical-frequency weighted sampling...",
-   "ablation_of": null, "optional": false, "available": true},
+   "ablation_of": null, "optional": false, "install_extra": null, "available": true},
   {"name": "parallax_guard_ablation", "summary": "Ablation control: identical candidate pool...",
-   "ablation_of": "parallax", "optional": false, "available": true}
+   "ablation_of": "parallax", "optional": false, "install_extra": null, "available": true}
 ]
 ```
 
 `ablation_of` makes the signal-off control discoverable next to the strategy it controls for — the
 convention described in [Contributing a Provider](Contributing-a-Provider.md). `available` is `false`
 when a provider needs an optional dependency that is not installed here; it is never a hard error.
+`install_extra` names the supported installation extra, such as `transformer`.
 
 Then post that name:
 

@@ -34,6 +34,7 @@ def test_named_versions_are_available_to_three_year_tracker():
     assert {
         "gingerm", "spectral_contrarian", "parallax", "garch_markov_branch",
         "sequence_transformer",
+        "uniform_random",
     } <= set(METHOD_CHOICES)
 
 

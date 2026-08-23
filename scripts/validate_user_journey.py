@@ -59,6 +59,7 @@ def main() -> int:
             "perron_frobenius_affinity", "perron_frobenius_uniform",
             "parallax_guard_ablation", "ml_ensemble", "garch_markov_branch",
             "sequence_transformer",
+            "uniform_random",
         }
         assert set(registry.names()) == expected
         for name in registry.names():

@@ -10,6 +10,7 @@ from ..likely_set_generator import CooccurrenceLevelSetProvider
 from .frequency import FrequencyProvider
 from .parallax import ParallaxGuardProvider, replicated_evidence
 from .spectral import PerronFrobeniusProvider, null_tv_band, stationary_distribution
+from .uniform import UniformRandomProvider
 from .unpopularity import UnpopularityProvider
 
 __all__ = [
@@ -20,6 +21,7 @@ __all__ = [
     "GarchMarkovBranchProvider",
     "SequenceTransformerProvider",
     "UnpopularityProvider",
+    "UniformRandomProvider",
     "load_ml_ensemble",
     "null_tv_band",
     "replicated_evidence",

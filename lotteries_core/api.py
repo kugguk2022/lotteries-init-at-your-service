@@ -100,6 +100,9 @@ class ProviderInfo(BaseModel):
         None, description="If set, this provider is the signal-off control for the named provider."
     )
     optional: bool
+    install_extra: str | None = Field(
+        None, description="PyPI extra required to make this optional provider available."
+    )
     available: bool = Field(description="False when an optional dependency is missing here.")
 
 
@@ -226,6 +229,7 @@ async def list_providers() -> list[ProviderInfo]:
             summary=spec.summary,
             ablation_of=spec.ablation_of,
             optional=spec.optional,
+            install_extra=spec.install_extra,
             available=spec.name in usable,
         )
         for spec in registry.PROVIDERS.values()

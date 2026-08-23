@@ -26,6 +26,8 @@ class ProviderSpec:
     #: intentionally share an implementation; exposing that relationship avoids presenting them as
     #: independent models.
     implementation: str
+    #: PyPI extra that makes an optional provider runnable, shown by the CLI and API.
+    install_extra: str | None = None
     #: Providers that pair with an ablation naming it here makes the control discoverable, which is
     #: the whole point of shipping one (see the contributing guide).
     ablation_of: str | None = None
@@ -48,6 +50,12 @@ def _unpopularity() -> InferenceProvider:
     from .providers import UnpopularityProvider
 
     return UnpopularityProvider()
+
+
+def _uniform_random() -> InferenceProvider:
+    from .providers import UniformRandomProvider
+
+    return UniformRandomProvider()
 
 
 def _cooccurrence() -> InferenceProvider:
@@ -118,6 +126,7 @@ _FACTORIES: dict[str, Callable[[], InferenceProvider]] = {
     "parallax": _public_parallax,
     "frequency": _frequency,
     "unpopularity": _unpopularity,
+    "uniform_random": _uniform_random,
     "perron_frobenius_affinity": _perron("affinity"),
     "perron_frobenius_uniform": _perron("uniform"),
     "parallax_guard_ablation": _parallax("ablation"),
@@ -154,6 +163,11 @@ PROVIDERS: dict[str, ProviderSpec] = {
         "expected payout conditional on winning, because fewer people share the jackpot.",
         "unpopularity",
     ),
+    "uniform_random": ProviderSpec(
+        "uniform_random",
+        "Canonical seeded fair-draw null: every legal ticket has equal probability; no history.",
+        "uniform_random",
+    ),
     "perron_frobenius_affinity": ProviderSpec(
         "perron_frobenius_affinity",
         "PageRank stationary ranking of the co-occurrence graph, preferring high-rank numbers.",
@@ -177,6 +191,7 @@ PROVIDERS: dict[str, ProviderSpec] = {
         "GLM + gradient boosting (+ optional MLP) aimed at crowd popularity, never at the draw. "
         "Requires scikit-learn; xgboost and torch are used when present.",
         "ml_ensemble",
+        install_extra="ml",
         optional=True,
     ),
     "garch_markov_branch": ProviderSpec(
@@ -188,6 +203,7 @@ PROVIDERS: dict[str, ProviderSpec] = {
         "sequence_transformer",
         "Causal Transformer forecast of the co-occurrence-score sequence; requires PyTorch.",
         "sequence_transformer",
+        install_extra="transformer",
         optional=True,
     ),
 }

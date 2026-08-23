@@ -135,7 +135,9 @@ class SequenceTransformerProvider(InferenceProvider):
         try:
             import torch  # noqa: F401
         except ImportError as exc:
-            raise ImportError("sequence_transformer requires the 'ml' extra (PyTorch)") from exc
+            raise ImportError(
+                "sequence_transformer requires: pip install 'lottobench[transformer]'"
+            ) from exc
         self.sequence_length = int(sequence_length)
         self.epochs = int(epochs)
         self._history: pd.DataFrame | None = None

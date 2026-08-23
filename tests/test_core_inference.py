@@ -21,6 +21,7 @@ from lotteries_core.providers import (
     FrequencyProvider,
     ParallaxGuardProvider,
     PerronFrobeniusProvider,
+    UniformRandomProvider,
     UnpopularityProvider,
     null_tv_band,
     replicated_evidence,
@@ -70,6 +71,17 @@ def test_provider_tickets_are_legal_and_distinct():
     assert len(set(res.tickets)) == 30
     for t in res.tickets:
         spec.validate_ticket(t)
+
+
+def test_uniform_random_is_reproducible_and_ignores_history():
+    spec = GameSpec.euromillions()
+    provider = UniformRandomProvider()
+    first = provider.propose(spec, budget=20, rng=np.random.default_rng(17))
+    provider.fit(_synthetic_history(), spec)
+    second = provider.propose(spec, budget=20, rng=np.random.default_rng(17))
+    assert first.tickets == second.tickets
+    assert np.all(first.scores == 0.0)
+    assert first.diagnostics["uses_history"] is False
 
 
 def test_envelope_roundtrip_and_provenance():

@@ -37,7 +37,12 @@ def main(argv: list[str] | None = None) -> int:
         ready = set(registry.available())
         print(f"{'identity':32} {'version':10} {'status':28} implementation family")
         for name, spec in registry.PROVIDERS.items():
-            status = "available" if name in ready else "optional dependency missing"
+            if name in ready:
+                status = "available"
+            elif spec.install_extra:
+                status = f"install [{spec.install_extra}] extra"
+            else:
+                status = "optional dependency missing"
             print(f"{name:32} {spec.version:10} {status:28} {spec.implementation}")
         families = {spec.implementation for spec in registry.PROVIDERS.values()}
         print(

@@ -93,6 +93,7 @@ def test_providers_are_listed_with_their_ablations(client):
         "parallax",
         "frequency",
         "unpopularity",
+        "uniform_random",
         "garch_markov_branch",
         "sequence_transformer",
     } <= names
@@ -106,6 +107,7 @@ def test_providers_are_listed_with_their_ablations(client):
 
     for provider in body:
         assert provider["summary"]
+    assert by_name["sequence_transformer"]["install_extra"] == "transformer"
 
 
 def test_games_report_the_universe_size(client):

@@ -84,6 +84,17 @@ class MLEnsembleProvider(InferenceProvider):
                 "MLEnsembleProvider only models 'popularity'; predicting the draw is not supported "
                 "because a fair draw is unlearnable."
             )
+        # scikit-learn is the one hard requirement here: xgboost and torch above are genuinely
+        # soft (the ensemble falls back without them), but the Ridge GLM and the sklearn boosting
+        # fallback in fit() are not optional. Checking it at construction is what lets
+        # ``registry.available()`` report this provider honestly -- deferring the failure to fit()
+        # makes ``--all-providers`` crash mid-benchmark on a base install instead of skipping it.
+        try:
+            import sklearn  # noqa: F401
+        except ImportError as exc:
+            raise ImportError(
+                "ml_ensemble requires: pip install 'lottobench[ml]'"
+            ) from exc
         self.random_state = int(random_state)
         self._spec: GameSpec | None = None
         self._pick_weight: np.ndarray | None = None

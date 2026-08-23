@@ -1,6 +1,6 @@
 .DEFAULT_GOAL := help
 
-.PHONY: help venv install setup setup-experiments doctor lint test test-experiments providers benchmark roi-report roi-export graduation e2e package check serve
+.PHONY: help venv install setup setup-experiments doctor lint test test-experiments providers benchmark roi-report roi-export fetch graduation e2e package check serve
 
 PYTHON ?= python3
 GAME ?= euromillions
@@ -8,6 +8,7 @@ HISTORY ?= data/euromillions.csv
 LEDGER ?= ledger/euromillions
 ROI_OUT ?= outputs/euromillions/roi-benchmark-v1.json
 GRADUATION_OUT ?= outputs/graduation/status.json
+DB ?= data/lotteries.db
 OUT ?= outputs/euromillions/competition_benchmark.json
 BUDGET ?= 25
 HOLDOUT ?= 20
@@ -43,8 +44,11 @@ test-experiments: ## Run the separate legacy research suite
 providers: ## List distinct benchmark entrants, controls, and local availability
 	$(PYTHON) -c "from lotteries_core.registry import PROVIDERS, available; ready=set(available()); [print(f'{name:32} {\"available\" if name in ready else \"optional dependency missing\"}') for name in PROVIDERS]"
 
-benchmark: ## Run all registered providers forward-only at equal budget
-	$(PYTHON) -m lotteries_core.benchmark --history $(HISTORY) --game $(GAME) --budget $(BUDGET) --holdout $(HOLDOUT) --all-providers --out $(OUT)
+benchmark: ## Run available providers against the selected game's stored history
+	$(PYTHON) -m lottobench.cli benchmark --game $(GAME) --db $(DB) --budget $(BUDGET) --holdout $(HOLDOUT) --out $(OUT)
+
+fetch: ## Retrieve the selected game's published history into local SQLite (network)
+	$(PYTHON) -m lottobench.cli fetch --game $(GAME) --db $(DB)
 
 roi-report: ## Retrieve cumulative realized user ROI from the prospective ledger
 	$(PYTHON) -m lotteries_core.realized_roi report --ledger $(LEDGER)

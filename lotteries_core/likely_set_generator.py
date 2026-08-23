@@ -75,6 +75,7 @@ class GameConfig:
 
 PRESETS: dict[str, GameConfig] = {
     "euromillions": GameConfig("euromillions", 50, 5, 12, 2),  # 5 + 2
+    "nl-lotto": GameConfig("nl-lotto", 45, 6),                  # 6 from 45
     "eurodreams": GameConfig("eurodreams", 40, 6, 5, 1),       # 6 + 1
     "totoloto": GameConfig("totoloto", 49, 5, 13, 1),          # 5 + 1
     "5+2": GameConfig("5+2", 50, 5, 12, 2),

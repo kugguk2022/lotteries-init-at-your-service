@@ -51,6 +51,22 @@ class JackpotModel:
         return 1.0 / spec.n_tickets()
 
 
+def default_jackpot_model(spec: GameSpec) -> JackpotModel:
+    """Return conservative game-specific economics for modeled jackpot-only ROI.
+
+    These are comparison defaults, not live jackpot claims. Realized ROI always uses recorded
+    stake and payout. Reusing EuroMillions' jackpot for a smaller 6/45 universe can manufacture a
+    positive expected return, so an unknown game must not silently inherit EuroMillions economics.
+    """
+    if spec.name == "euromillions":
+        return JackpotModel(jackpot=100_000_000.0, ticket_price=2.5, n_other_tickets=50_000_000.0)
+    if spec.name == "nl-lotto":
+        return JackpotModel(jackpot=1_000_000.0, ticket_price=2.0, n_other_tickets=1_000_000.0)
+    raise ValueError(
+        f"no modeled jackpot economics for {spec.name!r}; pass JackpotModel explicitly"
+    )
+
+
 def expected_cowinners(spec: GameSpec, popularity_share: float, n_other_tickets: float) -> float:
     """Expected number of *other* tickets that also hit the jackpot combination you hold.
 
@@ -112,7 +128,7 @@ def portfolio_expected_roi(
     """
     if not tickets:
         return {"expected_roi_per_ticket": float("nan"), "unpopularity_lift": float("nan")}
-    jackpot = jackpot or JackpotModel()
+    jackpot = jackpot or default_jackpot_model(spec)
     popularity = popularity or PopularityModel()
 
     shares = popularity.absolute_shares(spec, tickets)  # 1.0 == average crowding

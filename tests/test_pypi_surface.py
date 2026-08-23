@@ -13,7 +13,7 @@ def test_alpha_version_and_public_identity():
     from lotteries_core import __version__
 
     assert re.fullmatch(r"0\.1\.0a\d+", __version__)
-    assert lottobench.game("uk-lotto").spec.name == "uk-lotto"
+    assert lottobench.game("euromillions").spec.name == "euromillions"
     assert "frequency" in lottobench.names()
     assert "gingerm" in lottobench.names()
 

@@ -11,42 +11,64 @@ It does not predict winning numbers, improve the mechanical odds of a fair draw,
 tickets, or provide financial or gambling advice. Lottery participation is ordinarily negative-sum.
 See the bundled `NOTICE.md` and `LICENSE` before relying on or redistributing the software.
 
+## Supported scope
+
+**EuroMillions and the primary Netherlands Lotto series are supported end to end.** Retrieval,
+normalization, game-separated storage, forward benchmarking, and realized-ROI settlement use the
+same public commands and are covered by tests.
+
+For Netherlands Lotto, a playable line is six numbers from 1–45. The reserve number and the
+jackpot-machine colour are stored as result metadata; they are not player-selected pools. Lotto XL
+and the additional Super Saturday draw are separate series and are not mixed into the primary
+`nl-lotto` training history.
+
+Other national games are defined but **not** supported: they have no retrieval adapter, so they
+cannot complete the journey below. `lottobench games` labels them explicitly and
+`lottobench.game(...)` refuses them with the reason. They move into the supported list only once
+each passes the same contract. See `docs/wiki/Backlog.md`.
+
 ## Install
 
 ```bash
-pip install lottobench==0.1.0a1
+pip install lottobench==0.1.0a2
 ```
 
-Optional local API:
+The base install carries only NumPy and pandas, and it is enough for everything below.
+
+## The whole journey: two commands
 
 ```bash
-pip install "lottobench[api]==0.1.0a1"
-lotto-serve
+lottobench fetch --game euromillions --db data/lotteries.db
+lottobench benchmark --game euromillions --db data/lotteries.db
+
+lottobench fetch --game nl-lotto --db data/lotteries.db
+lottobench benchmark --game nl-lotto --db data/lotteries.db
 ```
 
-Optional sequence Transformer provider:
+`fetch` retrieves published EuroMillions history, validates every draw against the game's declared
+shape, and writes it into the local SQLite database together with its provenance digest.
+`benchmark` reads that database and runs every available provider forward-only at equal budget
+against the `uniform_random` control.
+
+Nothing else is required — no CSV to supply, no scraping stack, no manual data step.
 
 ```bash
-pip install "lottobench[transformer]==0.1.0a1"
-lottobench providers
+lottobench games        # what is supported, and what is only defined
+lottobench providers    # registered strategies and local availability
 ```
-
-The base package does not install PyTorch. Provider discovery reports whether the Transformer is
-available; no fallback model is substituted under the same provider name.
 
 ## Library
 
 ```python
 import numpy as np
-import pandas as pd
 import lottobench
+from lotteries_core import storage
 
-definition = lottobench.game("uk-lotto")
+definition = lottobench.game("euromillions")
+history = storage.read_history("data/lotteries.db", game="euromillions")
+
 provider = lottobench.create("frequency")
-provider.fit(pd.DataFrame({
-    "ball_1": [1, 2], "ball_2": [8, 9], "ball_3": [19, 20],
-    "ball_4": [34, 35], "ball_5": [47, 48], "ball_6": [52, 53],
-}), definition.spec)
+provider.fit(history, definition.spec)
 result = provider.propose(definition.spec, budget=5, rng=np.random.default_rng(7))
 print(result.tickets)
 ```
@@ -54,10 +76,25 @@ print(result.tickets)
 The stable public identity is `lottobench`. The lower-level `lotteries_core` namespace remains
 available for compatibility and research extensions.
 
-## Local data
+## Optional extras
+
+| Extra | Adds | For |
+|---|---|---|
+| `api` | FastAPI + uvicorn | `lotto-serve`, the read-only local HTTP API |
+| `ml` | scikit-learn, xgboost | the `ml_ensemble` provider |
+| `transformer` | PyTorch | the `sequence_transformer` provider |
 
 ```bash
-lottobench games
+pip install "lottobench[api]==0.1.0a2"
+```
+
+Provider discovery reports honestly whether an optional provider is actually runnable; no fallback
+model is ever substituted under the same provider name, and a provider whose dependency is missing
+is reported as unavailable rather than failing mid-benchmark.
+
+## Legacy CSV import and export
+
+```bash
 lottobench import-csv history.csv --game euromillions --db data/lotteries.db
 lottobench export-csv exported.csv --game euromillions --db data/lotteries.db
 ```
@@ -78,21 +115,9 @@ lotto-roi compare roi-benchmark.json another-benchmark.json
 Exports are deterministic and integrity-hashed. They contain benchmark provenance and aggregate
 financial outcomes, but no tickets, receipt contents, machine identifiers, or user identity.
 
-## Current game definitions
-
-- Denmark: Danske Lotto
-- Germany: LOTTO 6aus49
-- United Kingdom: Lotto
-- Netherlands: Lotto
-- Sweden: Lotto
-- EuroMillions
-
-Game definitions do not imply that every country already has an automated results adapter. Always
-verify game rules and official results with the relevant operator.
-
 ## Experimental status
 
-Version `0.1.0a1` is an alpha. APIs, data schemas, strategies, and country support may change. A
+Version `0.1.0a2` is an alpha. APIs, data schemas, strategies, and game support may change. A
 passing benchmark or a high metric value is not evidence of future draw prediction unless the exact
 metric, holdout, data cutoff, ticket budget, baseline, and leakage controls are supplied and
-reproducible.
+reproducible. Always verify game rules and official results with the relevant operator.

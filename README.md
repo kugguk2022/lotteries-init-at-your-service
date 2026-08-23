@@ -127,11 +127,11 @@ import numpy as np
 import pandas as pd
 import lottobench
 
-game = lottobench.game("uk-lotto")
+game = lottobench.game("nl-lotto")
 provider = lottobench.create("frequency")
 history = pd.DataFrame({
     "ball_1": [1, 2], "ball_2": [8, 9], "ball_3": [19, 20],
-    "ball_4": [34, 35], "ball_5": [47, 48], "ball_6": [52, 53],
+    "ball_4": [24, 25], "ball_5": [34, 35], "ball_6": [42, 43],
 })
 provider.fit(history, game.spec)
 result = provider.propose(game.spec, budget=5, rng=np.random.default_rng(7))

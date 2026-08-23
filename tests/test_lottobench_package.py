@@ -6,20 +6,32 @@ import lottobench
 
 
 @pytest.mark.parametrize(
-    ("key", "main_n", "main_k"),
-    [
-        ("dk-lotto", 36, 7),
-        ("de-lotto-6aus49", 49, 6),
-        ("uk-lotto", 59, 6),
-        ("nl-lotto", 45, 6),
-        ("se-lotto", 35, 7),
-    ],
+    ("key", "main_n", "main_k"), [("euromillions", 50, 5), ("nl-lotto", 45, 6)]
 )
-def test_country_game_catalogue(key, main_n, main_k):
+def test_supported_game_catalogue(key, main_n, main_k):
+    """``GAMES`` lists only games supported end to end."""
     definition = lottobench.game(key)
     assert definition.spec.main_n == main_n
     assert definition.spec.main_k == main_k
     assert definition.source_url.startswith("https://")
+
+
+@pytest.mark.parametrize(
+    "key", ["dk-lotto", "de-lotto-6aus49", "uk-lotto", "se-lotto"]
+)
+def test_backlog_games_are_not_advertised_as_supported(key):
+    """Regression: the catalogue used to return these, implying a journey that does not exist.
+
+    They have no retrieval adapter, so ``lottobench fetch`` cannot serve them. Listing them as
+    supported is what made the published package journey misleading.
+    """
+    from lottobench.games import BACKLOG_GAMES
+
+    assert key not in lottobench.GAMES
+    assert key in BACKLOG_GAMES
+    assert BACKLOG_GAMES[key].blocked_on
+    with pytest.raises(KeyError, match="not supported end to end"):
+        lottobench.game(key)
 
 
 def test_public_strategy_api_is_functional():

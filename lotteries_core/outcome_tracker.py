@@ -37,6 +37,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
+from . import storage
 from .envelope import data_sha256
 from .likely_set_generator import PRESETS, GameConfig, build_portfolio, resolve_config
 from .protocol import GameSpec
@@ -238,7 +239,7 @@ def _resolve_methods(raw: str) -> list[str]:
 def cmd_record(args) -> None:
     cfg = resolve_config(args)
     ledger = Path(args.ledger)
-    df = pd.read_csv(args.history)
+    df = storage.read_history(args.history, game=cfg.name)
     methods = _resolve_methods(args.methods)
 
     # One control per draw key, shared by every entrant, so the competition is paired: all methods

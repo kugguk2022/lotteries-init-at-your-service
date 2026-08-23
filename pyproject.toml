@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "lottobench"
-version = "0.1.0a1"
+version = "0.1.0a2"
 description = "Experimental, auditable benchmarking for lottery strategies; not betting advice"
 readme = { file = "README.pypi.md", content-type = "text/markdown" }
 requires-python = ">=3.10"
@@ -25,6 +25,8 @@ classifiers = [
 dependencies = [
   "numpy>=1.25",
   "pandas>=2.0",
+  "beautifulsoup4>=4.12",
+  "requests>=2.31",
 ]
 
 [project.optional-dependencies]
@@ -35,6 +37,10 @@ ml = [
 ]
 transformer = [
   "torch>=2.10.0",
+]
+scrape = [
+  "beautifulsoup4>=4.12",
+  "requests>=2.31",
 ]
 api = [
   "anyio>=4.4",

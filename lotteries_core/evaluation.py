@@ -26,7 +26,7 @@ from .coverage import coverage_report
 from .envelope import InferenceEnvelope
 from .popularity import PopularityModel
 from .protocol import GameSpec, InferenceProvider, Ticket
-from .roi import JackpotModel, portfolio_expected_roi
+from .roi import JackpotModel, default_jackpot_model, portfolio_expected_roi
 
 
 @dataclass
@@ -62,7 +62,7 @@ def evaluate_forward(
     main_cols: list[str] | None = None,
 ) -> dict:
     """Run the forward-only, equal-budget benchmark and return a JSON-serialisable summary."""
-    jackpot = jackpot or JackpotModel()
+    jackpot = jackpot or default_jackpot_model(spec)
     popularity = popularity or PopularityModel()
 
     if main_cols is None:

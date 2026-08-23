@@ -26,13 +26,13 @@ python -m venv .venv-testpypi
 .venv-testpypi/bin/python -m pip install \
   --index-url https://test.pypi.org/simple/ \
   --extra-index-url https://pypi.org/simple/ \
-  lottobench==0.1.0a1
+  lottobench==0.1.0a2
 lottobench games
 ```
 
 ## Publish
 
-After CI and the TestPyPI rehearsal pass, create a GitHub release tagged `v0.1.0a1`. The production
+After CI and the TestPyPI rehearsal pass, create a GitHub release tagged `v0.1.0a2`. The production
 workflow rejects a tag that does not exactly match `project.version`, builds fresh artifacts, and
 waits for approval in the protected `pypi` environment.
 

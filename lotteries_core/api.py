@@ -53,7 +53,7 @@ from . import dataset, registry, storage
 from .coverage import coverage_report
 from .popularity import PopularityModel
 from .protocol import GameSpec
-from .roi import JackpotModel, portfolio_expected_roi
+from .roi import default_jackpot_model, portfolio_expected_roi
 
 DISCLAIMER = (
     "Experimental research output only; provided as-is without warranty. A fair draw is "
@@ -63,11 +63,8 @@ DISCLAIMER = (
 )
 
 GAMES: dict[str, GameSpec] = {
-    "euromillions": GameSpec.euromillions(),
-    "totoloto": GameSpec.totoloto(),
-    "eurodreams": GameSpec.eurodreams(),
+    key: definition.spec for key, definition in GAME_DEFINITIONS.items()
 }
-GAMES.update({key: definition.spec for key, definition in GAME_DEFINITIONS.items()})
 
 DEFAULT_HISTORY = os.environ.get("LOTTERIES_HISTORY", "data/lotteries.db")
 DEFAULT_PORT = int(os.environ.get("LOTTERIES_PORT", "8007"))
@@ -285,7 +282,7 @@ async def build_portfolio(request: PortfolioRequest) -> PortfolioResponse:
 
     metrics = {
         **coverage_report(spec, result.tickets),
-        **portfolio_expected_roi(spec, result.tickets, JackpotModel(), PopularityModel()),
+        **portfolio_expected_roi(spec, result.tickets, default_jackpot_model(spec), PopularityModel()),
     }
     return PortfolioResponse(
         provider=provider.name,

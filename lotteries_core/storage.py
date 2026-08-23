@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 import sqlite3
+from contextlib import closing
 from pathlib import Path
 
 import pandas as pd
@@ -27,7 +28,7 @@ def read_history(path: str | Path, *, game: str | None = None) -> pd.DataFrame:
         return pd.read_csv(path)
     if game is None:
         raise ValueError("game is required when reading a multi-game SQLite database")
-    with sqlite3.connect(path) as connection:
+    with closing(sqlite3.connect(path)) as connection, connection:
         frame = pd.read_sql_query(
             f'SELECT * FROM "{DRAW_TABLE}" WHERE game = ? ORDER BY draw_date',
             connection,
@@ -47,8 +48,12 @@ def write_history(path: str | Path, frame: pd.DataFrame, *, game: str) -> None:
     stored = frame.copy()
     if "draw_date" not in stored.columns:
         raise ValueError("history has no draw_date column")
+    # The column is declared TEXT and the reader orders by it as text, so normalize to ISO dates
+    # here rather than trusting the caller's dtype. A retrieval adapter hands us datetime64, which
+    # sqlite3 cannot bind at all, and mixed spellings like "2020-1-5" would sort wrongly.
+    stored["draw_date"] = pd.to_datetime(stored["draw_date"]).dt.strftime("%Y-%m-%d")
     stored.insert(0, "game", game)
-    with sqlite3.connect(path) as connection:
+    with closing(sqlite3.connect(path)) as connection, connection:
         connection.execute("BEGIN IMMEDIATE")
         connection.execute(
             f'CREATE TABLE IF NOT EXISTS "{DRAW_TABLE}" '
@@ -95,7 +100,7 @@ def export_csv(db_path: str | Path, csv_path: str | Path, *, game: str) -> int:
 
 def write_metadata(path: str | Path, *, game: str, metadata: dict) -> None:
     """Store provenance beside the draws, inside SQLite."""
-    with sqlite3.connect(path) as connection:
+    with closing(sqlite3.connect(path)) as connection, connection:
         connection.execute(
             f'CREATE TABLE IF NOT EXISTS "{METADATA_TABLE}" '
             "(game TEXT PRIMARY KEY, metadata_json TEXT NOT NULL)"
@@ -111,7 +116,7 @@ def read_metadata(path: str | Path, *, game: str) -> dict | None:
     """Read stored provenance, returning ``None`` for an uninitialised database."""
     if not Path(path).exists():
         return None
-    with sqlite3.connect(path) as connection:
+    with closing(sqlite3.connect(path)) as connection, connection:
         exists = connection.execute(
             "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?", (METADATA_TABLE,)
         ).fetchone()

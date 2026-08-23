@@ -1,5 +1,0 @@
-eurodreams
-euromillions
-euromillions_agent
-lotteries_core
-totoloto

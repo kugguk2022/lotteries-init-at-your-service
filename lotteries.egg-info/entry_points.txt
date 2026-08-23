@@ -1,5 +1,0 @@
-[console_scripts]
-lotto-get-draws = euromillions.get_draws:main
-lotto-likely-sets = lotteries_core.likely_set_generator:main
-lotto-serve = lotteries_core.api:main
-lotto-track = lotteries_core.outcome_tracker:main

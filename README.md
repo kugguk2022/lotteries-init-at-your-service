@@ -33,9 +33,13 @@ negative. Rankings should move only when versioned prospective evidence justifie
 ### Fastest useful workflow for ROI contributors
 
 ```bash
-# Install from PyPI (or use `make setup PYTHON=python` in a source checkout)
+# Published package (after the first PyPI release)
 python -m pip install lottobench
 lottobench providers
+
+# Current source checkout (works before the first PyPI release)
+python -m pip install -e .
+python -m lottobench.cli providers
 
 # Before the draw: record a fixed-budget portfolio and its model/data provenance
 lotto-track record \
@@ -77,9 +81,19 @@ an actionable message.
 
 ## Benchmark the providers
 
-The canonical registry exposes twelve provider identities, including named strategies, baselines,
-and ablation controls. Some identities intentionally share an implementation so their experimental
-claim can be compared with its signal-off control.
+The canonical registry exposes **11 distinct benchmark entrants backed by eight implementation
+families**. Named aliases are not duplicated as competitors; ablations remain because they are
+necessary signal-off controls.
+The identities include named strategies (`gingerm`, `spectral_contrarian`, and `parallax`), technical
+names, baselines, and ablation controls. For example, `gingerm` is backed by the co-occurrence
+implementation and `spectral_contrarian` by the contrarian Perron–Frobenius implementation; they are
+present even though there are no misleading duplicate source files bearing those names.
+
+The prospective ledger currently containing six entrants is a historical cohort, not the provider
+registry. Use `--methods all` for a new tracking cohort containing every locally available identity.
+
+The temporal-model candidates are named after their mechanisms: `garch_markov_branch` and
+`sequence_transformer`. The latter requires the `ml` extra; neither is part of GINGERM.
 
 ```bash
 make providers

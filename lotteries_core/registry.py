@@ -22,6 +22,10 @@ class ProviderSpec:
 
     name: str
     summary: str
+    #: Algorithm family backing this selectable identity. Several public names and ablation modes
+    #: intentionally share an implementation; exposing that relationship avoids presenting them as
+    #: independent models.
+    implementation: str
     #: Providers that pair with an ablation naming it here makes the control discoverable, which is
     #: the whole point of shipping one (see the contributing guide).
     ablation_of: str | None = None
@@ -62,8 +66,8 @@ def _gingerm() -> InferenceProvider:
     return _named(_cooccurrence(), "gingerm")
 
 
-def _claude_inference() -> InferenceProvider:
-    return _named(_perron("contrarian")(), "claude_inference")
+def _spectral_contrarian() -> InferenceProvider:
+    return _named(_perron("contrarian")(), "spectral_contrarian")
 
 
 def _public_parallax() -> InferenceProvider:
@@ -94,77 +98,96 @@ def _ml_ensemble() -> InferenceProvider:
     return load_ml_ensemble()()
 
 
+def _garch_markov_branch() -> InferenceProvider:
+    from .providers import load_temporal_providers
+
+    provider, _ = load_temporal_providers()
+    return provider()
+
+
+def _sequence_transformer() -> InferenceProvider:
+    from .providers import load_temporal_providers
+
+    _, provider = load_temporal_providers()
+    return provider()
+
+
 _FACTORIES: dict[str, Callable[[], InferenceProvider]] = {
     "gingerm": _gingerm,
-    "claude_inference": _claude_inference,
+    "spectral_contrarian": _spectral_contrarian,
     "parallax": _public_parallax,
     "frequency": _frequency,
     "unpopularity": _unpopularity,
-    "cooccurrence_level_set": _cooccurrence,
     "perron_frobenius_affinity": _perron("affinity"),
-    "perron_frobenius_contrarian": _perron("contrarian"),
     "perron_frobenius_uniform": _perron("uniform"),
-    "parallax_guard": _parallax("guarded"),
     "parallax_guard_ablation": _parallax("ablation"),
     "ml_ensemble": _ml_ensemble,
+    "garch_markov_branch": _garch_markov_branch,
+    "sequence_transformer": _sequence_transformer,
 }
 
 PROVIDERS: dict[str, ProviderSpec] = {
     "gingerm": ProviderSpec(
         "gingerm",
         "GINGERM: the owner's forward-only pair-co-occurrence level-set strategy.",
+        "cooccurrence_level_set",
     ),
-    "claude_inference": ProviderSpec(
-        "claude_inference",
-        "Claude inference: contrarian Perron-Frobenius ranking of the co-occurrence graph.",
+    "spectral_contrarian": ProviderSpec(
+        "spectral_contrarian",
+        "Vendor-neutral contrarian Perron-Frobenius ranking of the co-occurrence graph.",
+        "perron_frobenius",
     ),
     "parallax": ProviderSpec(
         "parallax",
         "Parallax: replication-guarded residual inference with coverage-first portfolio selection.",
+        "parallax_guard",
     ),
     "frequency": ProviderSpec(
         "frequency",
         "Smoothed historical-frequency weighted sampling. No predictive edge on a fair draw; the "
         "reference baseline every other strategy must beat.",
+        "frequency",
     ),
     "unpopularity": ProviderSpec(
         "unpopularity",
         "Prefers combinations the crowd avoids. Does not change the odds of winning; improves the "
         "expected payout conditional on winning, because fewer people share the jackpot.",
-    ),
-    "cooccurrence_level_set": ProviderSpec(
-        "cooccurrence_level_set",
-        "Forward-only pair-co-occurrence level-set generator. Slow: enumerates every main "
-        "combination against every star combination.",
+        "unpopularity",
     ),
     "perron_frobenius_affinity": ProviderSpec(
         "perron_frobenius_affinity",
         "PageRank stationary ranking of the co-occurrence graph, preferring high-rank numbers.",
-    ),
-    "perron_frobenius_contrarian": ProviderSpec(
-        "perron_frobenius_contrarian",
-        "The same stationary ranking, preferring low-rank numbers.",
+        "perron_frobenius",
     ),
     "perron_frobenius_uniform": ProviderSpec(
         "perron_frobenius_uniform",
         "Ablation control: the identical sampler with the stationary vector discarded.",
+        "perron_frobenius",
         ablation_of="perron_frobenius_affinity",
-    ),
-    "parallax_guard": ProviderSpec(
-        "parallax_guard",
-        "Residuals admitted only when they replicate across two disjoint history views and clear a "
-        "family-wise threshold, plus a coverage-first portfolio optimiser.",
     ),
     "parallax_guard_ablation": ProviderSpec(
         "parallax_guard_ablation",
         "Ablation control: identical candidate pool and portfolio objective with the residual "
         "forced to zero.",
-        ablation_of="parallax_guard",
+        "parallax_guard",
+        ablation_of="parallax",
     ),
     "ml_ensemble": ProviderSpec(
         "ml_ensemble",
         "GLM + gradient boosting (+ optional MLP) aimed at crowd popularity, never at the draw. "
         "Requires scikit-learn; xgboost and torch are used when present.",
+        "ml_ensemble",
+        optional=True,
+    ),
+    "garch_markov_branch": ProviderSpec(
+        "garch_markov_branch",
+        "GARCH(1,1) co-occurrence-score variance with a two-state empirical Markov branch model.",
+        "garch_markov_branch",
+    ),
+    "sequence_transformer": ProviderSpec(
+        "sequence_transformer",
+        "Causal Transformer forecast of the co-occurrence-score sequence; requires PyTorch.",
+        "sequence_transformer",
         optional=True,
     ),
 }

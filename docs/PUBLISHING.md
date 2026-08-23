@@ -18,7 +18,8 @@ Name availability is secured only by the first accepted upload.
 
 ## Rehearse on TestPyPI
 
-Run `publish-testpypi` manually, then install in a clean environment:
+Until this workflow completes successfully, `pip install lottobench` and the `lottobench` command
+cannot work. Run `publish-testpypi` manually, then install in a clean environment:
 
 ```bash
 python -m venv .venv-testpypi

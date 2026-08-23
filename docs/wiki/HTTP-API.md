@@ -46,7 +46,7 @@ cannot drift apart:
   {"name": "frequency", "summary": "Smoothed historical-frequency weighted sampling...",
    "ablation_of": null, "optional": false, "available": true},
   {"name": "parallax_guard_ablation", "summary": "Ablation control: identical candidate pool...",
-   "ablation_of": "parallax_guard", "optional": false, "available": true}
+   "ablation_of": "parallax", "optional": false, "available": true}
 ]
 ```
 
@@ -59,12 +59,12 @@ Then post that name:
 ```bash
 curl -s http://127.0.0.1:8007/portfolio \
   -H 'content-type: application/json' \
-  -d '{"provider": "parallax_guard", "game": "euromillions", "budget": 3, "seed": 7}'
+  -d '{"provider": "parallax", "game": "euromillions", "budget": 3, "seed": 7}'
 ```
 
 ```json
 {
-  "provider": "parallax_guard",
+  "provider": "parallax",
   "budget": 3,
   "tickets": [
     {"main": [40, 41, 46, 47, 50], "star": [11, 12]},
@@ -91,13 +91,13 @@ The three named research versions can be selected directly in `POST /portfolio`:
 | `provider` value | Version |
 |---|---|
 | `gingerm` | The owner's pair-co-occurrence level-set strategy |
-| `claude_inference` | Claude's contrarian Perron-Frobenius inference strategy |
+| `spectral_contrarian` | Vendor-neutral contrarian Perron-Frobenius inference strategy |
 | `parallax` | Replication-guarded residual inference and coverage-first selection |
 
 For example: `{"provider":"gingerm","game":"euromillions","budget":20,"seed":7}`.
-`gingerm` (and its legacy name `cooccurrence_level_set`) enumerates every main combination against
-every star combination, so expect a long request. The legacy technical provider names remain
-available for compatibility.
+`gingerm` enumerates every main combination against every star combination, so expect a long
+request. Historical artifacts can retain old technical labels, but duplicate aliases are not
+entered as separate competitors.
 
 ## Errors
 

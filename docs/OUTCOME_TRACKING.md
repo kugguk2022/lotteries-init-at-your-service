@@ -4,7 +4,7 @@ The repository's primary experiment is whether the owner's co-occurrence level-s
 coordinated with other providers, produces better tracked outcomes than an equal-budget uniform
 random control.
 
-The named entrants are `gingerm` (the owner's co-occurrence method), `claude_inference` (the
+The named entrants are `gingerm` (the owner's co-occurrence method), `spectral_contrarian` (the
 contrarian Perron-Frobenius method), and `parallax` (replication-guarded inference with coverage-first
 selection). They remain individually selectable through the REST API and outcome ledger. The
 `unpopularity` provider is a separate crowd-avoidance strategy; it is not GINGERM.
@@ -31,7 +31,7 @@ selection). They remain individually selectable through the REST API and outcome
 # Before the draw; history contains completed draws only.
 lotto-track record --history data/euromillions.csv --preset euromillions \
   --draw-key 2026-08-18 --ledger ledger/euromillions --n-sets 20 --ticket-price 2.50 \
-  --methods gingerm,claude_inference,parallax
+  --methods gingerm,spectral_contrarian,parallax
 
 # After the draw. The optional payout table maps tiers, for example {"5+2": 100000000}.
 lotto-track settle --ledger ledger/euromillions --draw-key 2026-08-18 \

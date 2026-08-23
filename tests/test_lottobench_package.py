@@ -34,3 +34,8 @@ def test_cli_lists_versioned_providers(capsys):
     output = capsys.readouterr().out
     assert "frequency" in output
     assert "1.0.0" in output
+    assert "11 selectable entrants backed by 8 implementation families" in output
+    assert "spectral_contrarian" in output
+    assert "garch_markov_branch" in output
+    assert "sequence_transformer" in output
+    assert "gingerm" in output

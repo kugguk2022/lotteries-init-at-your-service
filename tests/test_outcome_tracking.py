@@ -31,13 +31,16 @@ def _history() -> pd.DataFrame:
 
 
 def test_named_versions_are_available_to_three_year_tracker():
-    assert {"gingerm", "claude_inference", "parallax"} <= set(METHOD_CHOICES)
+    assert {
+        "gingerm", "spectral_contrarian", "parallax", "garch_markov_branch",
+        "sequence_transformer",
+    } <= set(METHOD_CHOICES)
 
 
 def test_named_versions_keep_their_public_identity():
     from lotteries_core import registry
 
-    for name in ("gingerm", "claude_inference", "parallax"):
+    for name in ("gingerm", "spectral_contrarian", "parallax"):
         assert registry.create(name).name == name
 
 

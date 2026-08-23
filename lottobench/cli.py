@@ -35,9 +35,15 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     if args.command == "providers":
         ready = set(registry.available())
+        print(f"{'identity':32} {'version':10} {'status':28} implementation family")
         for name, spec in registry.PROVIDERS.items():
             status = "available" if name in ready else "optional dependency missing"
-            print(f"{name:32} {spec.version:10} {status}")
+            print(f"{name:32} {spec.version:10} {status:28} {spec.implementation}")
+        families = {spec.implementation for spec in registry.PROVIDERS.values()}
+        print(
+            f"\n{len(registry.PROVIDERS)} selectable entrants backed by "
+            f"{len(families)} implementation families; signal-off controls are included."
+        )
         return 0
     if args.game not in GAMES:
         parser.error(f"unknown game {args.game!r}; choose from {sorted(GAMES)}")

@@ -55,10 +55,10 @@ def main() -> int:
         pd.testing.assert_frame_equal(frame, roundtrip)
 
         expected = {
-            "gingerm", "claude_inference", "parallax", "frequency", "unpopularity",
-            "cooccurrence_level_set", "perron_frobenius_affinity",
-            "perron_frobenius_contrarian", "perron_frobenius_uniform", "parallax_guard",
-            "parallax_guard_ablation", "ml_ensemble",
+            "gingerm", "spectral_contrarian", "parallax", "frequency", "unpopularity",
+            "perron_frobenius_affinity", "perron_frobenius_uniform",
+            "parallax_guard_ablation", "ml_ensemble", "garch_markov_branch",
+            "sequence_transformer",
         }
         assert set(registry.names()) == expected
         for name in registry.names():

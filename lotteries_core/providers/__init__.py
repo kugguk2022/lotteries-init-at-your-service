@@ -17,6 +17,8 @@ __all__ = [
     "FrequencyProvider",
     "ParallaxGuardProvider",
     "PerronFrobeniusProvider",
+    "GarchMarkovBranchProvider",
+    "SequenceTransformerProvider",
     "UnpopularityProvider",
     "load_ml_ensemble",
     "null_tv_band",
@@ -30,3 +32,10 @@ def load_ml_ensemble():
     from .ml_ensemble import MLEnsembleProvider
 
     return MLEnsembleProvider
+
+
+def load_temporal_providers():
+    """Return temporal provider classes while keeping PyTorch an optional dependency."""
+    from .temporal import GarchMarkovBranchProvider, SequenceTransformerProvider
+
+    return GarchMarkovBranchProvider, SequenceTransformerProvider

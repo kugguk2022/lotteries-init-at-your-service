@@ -70,8 +70,10 @@ def _provider_version(method: str, label: str) -> str:
 #: same protocol so any future contribution joins by adding one registry entry.
 PROVIDER_METHODS = (
     "gingerm",
-    "claude_inference",
+    "spectral_contrarian",
     "parallax",
+    "garch_markov_branch",
+    "sequence_transformer",
     "frequency",
     "unpopularity",
     "perron_frobenius",
@@ -88,7 +90,8 @@ def _spec_from_config(cfg: GameConfig) -> GameSpec:
 #: Ledger CLI names kept stable for existing ledgers, mapped onto :mod:`lotteries_core.registry`.
 #: The registry is the single list of providers; this only preserves the shorter CLI spellings.
 _REGISTRY_ALIASES = {
-    "perron_frobenius": "perron_frobenius_contrarian",
+    "perron_frobenius": "spectral_contrarian",
+    "parallax_guard": "parallax",
     "parallax_ablation": "parallax_guard_ablation",
 }
 

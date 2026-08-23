@@ -89,12 +89,12 @@ def test_providers_are_listed_with_their_ablations(client):
     names = {p["name"] for p in body}
     assert {
         "gingerm",
-        "claude_inference",
+        "spectral_contrarian",
         "parallax",
         "frequency",
         "unpopularity",
-        "parallax_guard",
-        "perron_frobenius_contrarian",
+        "garch_markov_branch",
+        "sequence_transformer",
     } <= names
 
     by_name = {p["name"]: p for p in body}
@@ -117,7 +117,7 @@ def test_games_report_the_universe_size(client):
 
 @pytest.mark.parametrize(
     "provider",
-    ["frequency", "unpopularity", "perron_frobenius_contrarian", "parallax_guard"],
+    ["frequency", "unpopularity", "spectral_contrarian", "parallax"],
 )
 def test_portfolio_returns_exactly_budget_legal_tickets(client, provider):
     response = client.post("/portfolio", json={"provider": provider, "budget": 7, "seed": 5})

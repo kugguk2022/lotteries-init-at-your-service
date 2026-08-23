@@ -39,7 +39,7 @@ test: doctor ## Run tests for the packages shipped to PyPI
 test-experiments: ## Run the separate legacy research suite
 	$(PYTHON) -m pytest -q experiments/tests --maxfail=1 --disable-warnings
 
-providers: ## List the 12 registered inference providers and availability
+providers: ## List distinct benchmark entrants, controls, and local availability
 	$(PYTHON) -c "from lotteries_core.registry import PROVIDERS, available; ready=set(available()); [print(f'{name:32} {\"available\" if name in ready else \"optional dependency missing\"}') for name in PROVIDERS]"
 
 benchmark: ## Run all registered providers forward-only at equal budget

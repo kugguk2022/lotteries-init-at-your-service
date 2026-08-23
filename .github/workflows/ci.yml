@@ -70,6 +70,7 @@ jobs:
           python-version: "3.11"
       - name: Build source and wheel distributions
         run: |
+          rm -rf dist build
           python -m pip install -U pip build twine
           python -m build
       - name: Validate metadata and archive contents

@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "mslt-lottery"
 version = "0.1.0"
-description = "MSLT: local multi-strategy lottery testing, data, and API toolkit"
+description = "Experimental local multi-strategy lottery testing toolkit; not betting advice"
 readme = { file = "README.md", content-type = "text/markdown" }
 requires-python = ">=3.10"
 authors = [{ name = "kugguk2022" }]

@@ -56,8 +56,10 @@ from .protocol import GameSpec
 from .roi import JackpotModel, portfolio_expected_roi
 
 DISCLAIMER = (
-    "Research output only. A fair draw is unpredictable, the game is negative-sum, and these "
-    "tickets are not more likely to win than any others. Nothing here places a wager or moves money."
+    "Experimental research output only; provided as-is without warranty. A fair draw is "
+    "unpredictable and negative-sum, and these tickets are not more likely to win than any others. "
+    "Not financial, gambling, or professional advice. Do not rely on this output to spend money or "
+    "place a wager. Nothing here places wagers, moves money, or is affiliated with a lottery operator."
 )
 
 GAMES: dict[str, GameSpec] = {
@@ -73,7 +75,7 @@ DEFAULT_PORT = int(os.environ.get("LOTTERIES_PORT", "8007"))
 app = FastAPI(
     title="lotteries-core",
     version="0.1.0",
-    summary="Coverage-focused lottery portfolio research framework.",
+    summary="Experimental lottery portfolio research framework; not advice or a betting service.",
     description=__doc__,
 )
 

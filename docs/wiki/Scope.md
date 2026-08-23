@@ -3,8 +3,9 @@
 This project provides a research framework for studying lottery data and fixed-budget candidate
 portfolios in simulation.
 
-> **Note:** We do not play. We supply strategies that may improve outcomes for some people,
-> somewhere, in the future.
+> **Experimental-use notice:** this project does not improve the probability of a fair lottery draw,
+> provide professional advice, or recommend spending money. All software and outputs are provided
+> without warranty. See [Experimental Use and Liability](Experimental-Use-and-Liability.md).
 
 ## Included
 
@@ -20,6 +21,8 @@ portfolios in simulation.
 - Buying tickets or executing wagers.
 - Operating a betting service.
 - Guaranteed-winnings claims or presenting an unvalidated edge as established.
+- Advice, inducements, or representations that gambling is income, investment, or financial security.
+- Production, safety-critical, regulated-gambling, payment, or wagering infrastructure.
 
 ## Evidence requirements
 

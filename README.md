@@ -4,6 +4,13 @@
 
 Lottery data playground for EuroMillions, Totoloto, and EuroDreams. The repo ships a small typed public API plus labs for modelling, bankroll experiments, and scraping. Everything is research-focused and cannot predict lottery draws. See scope below.
 
+> **EXPERIMENTAL SOFTWARE — NO WARRANTY OR ADVICE.** The repository, PyPI package, API, local app,
+> datasets, strategies, and generated outputs may be inaccurate, incomplete, insecure, or stale.
+> Nothing is a winning-number prediction, betting recommendation, promise of improved odds, or
+> financial, gambling, legal, or other professional advice. Do not rely on it to spend money or place
+> wagers. Use is at your own risk. See [NOTICE.md](NOTICE.md), [LICENSE](LICENSE), and the
+> [wiki policy](docs/wiki/Experimental-Use-and-Liability.md).
+
 ## 📖 Start with the wiki
 
 **New here? Read [`docs/wiki/Home.md`](docs/wiki/Home.md).** It explains what this project does and

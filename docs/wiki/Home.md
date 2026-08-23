@@ -11,6 +11,7 @@ the diff showing up.
 
 | Page | What it answers |
 |---|---|
+| [Experimental Use and Liability](Experimental-Use-and-Liability.md) | Warranty, reliance, responsible-use, and product-boundary notice. |
 | [Project Scope](Scope.md) | What this project includes and excludes. **Read this first.** |
 | [Getting Started](Getting-Started.md) | Install, then a set of commands verified to actually run today. |
 | [Repository Map](Repository-Map.md) | Which directories are maintained, which are labs, which are legacy. |
@@ -33,6 +34,11 @@ improve the payout *conditional* on winning. It never pools funds, buys tickets,
 
 The full argument, including which techniques are mathematically incapable of helping and why, is in
 [`docs/SCOPE.md`](../SCOPE.md).
+
+> **Important:** every repository, package, API, app, dataset, strategy, and output is experimental,
+> supplied without warranty, and must not be relied on for gambling or financial decisions. Read
+> [Experimental Use and Liability](Experimental-Use-and-Liability.md) before using or redistributing
+> the project.
 
 ## Current state in one line
 

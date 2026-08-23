@@ -36,3 +36,7 @@ executes wagers, or stores personal financial data. It makes **no** claim of
 guaranteed or improved winnings. Please use it only for lawful research,
 education, and analysis, and in accordance with the laws and regulations of your
 jurisdiction.
+
+The full experimental-use, non-reliance, warranty, and liability position is in
+[NOTICE.md](NOTICE.md). Any public-facing app built from this project should preserve and display
+the API's standing disclaimer alongside generated output.

@@ -3,6 +3,10 @@
 A read-mostly REST layer over `lotteries_core`: **pick a provider, get a portfolio**, and inspect the
 provenance behind it. It is a convenience over the library, not a product.
 
+> **Experimental API:** responses may be inaccurate, incomplete, or based on stale third-party data.
+> They are not predictions, betting recommendations, or professional advice. Do not use this API to
+> make financial or wagering decisions. See [Experimental Use and Liability](Experimental-Use-and-Liability.md).
+
 ## Install and run
 
 ```bash
@@ -111,6 +115,10 @@ that no route path contains `bet`, `wager`, `stake`, `payment`, `purchase`, `che
 — a guard on scope rather than on code, so the boundary is enforced by CI rather than by memory.
 
 See [Project Scope](Scope.md) for the project boundary.
+
+Any client or local app displaying a generated portfolio should display the response's `disclaimer`
+prominently and unchanged. Removing it does not change the experimental status or transfer
+responsibility to the maintainers.
 
 ## Testing
 

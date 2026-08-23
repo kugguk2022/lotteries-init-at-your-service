@@ -8,15 +8,33 @@ mistaken for a betting service.
 
 from __future__ import annotations
 
+import asyncio
 import json
 
+import httpx
 import pandas as pd
 import pytest
 
 fastapi = pytest.importorskip("fastapi", reason="install the 'api' extra to test the HTTP API")
-from fastapi.testclient import TestClient  # noqa: E402 - guarded by importorskip above
-
 from lotteries_core import api  # noqa: E402
+
+
+class ASGIClient:
+    """Synchronous facade over HTTPX's native async ASGI transport."""
+
+    def request(self, method, path, **kwargs):
+        async def send():
+            transport = httpx.ASGITransport(app=api.app)
+            async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+                return await client.request(method, path, **kwargs)
+
+        return asyncio.run(send())
+
+    def get(self, path, **kwargs):
+        return self.request("GET", path, **kwargs)
+
+    def post(self, path, **kwargs):
+        return self.request("POST", path, **kwargs)
 
 
 @pytest.fixture()
@@ -49,9 +67,7 @@ def history_csv(tmp_path):
 def client(history_csv, monkeypatch):
     monkeypatch.setattr(api, "DEFAULT_HISTORY", str(history_csv))
     api.load_history.cache_clear()
-    c = TestClient(api.app)
-    yield c
-    c.close()
+    yield ASGIClient()
     api.load_history.cache_clear()
 
 

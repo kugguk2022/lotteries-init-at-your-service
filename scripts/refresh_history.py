@@ -15,9 +15,10 @@ from __future__ import annotations
 
 import argparse
 import sys
+import tempfile
 from pathlib import Path
 
-from lotteries_core import dataset
+from lotteries_core import dataset, storage
 
 
 def _check(out: Path, max_age_days: int) -> int:
@@ -36,7 +37,7 @@ def _check(out: Path, max_age_days: int) -> int:
 
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument("--out", default="data/euromillions.csv", help="history CSV to write")
+    ap.add_argument("--out", default="data/lotteries.db", help="SQLite database (or legacy CSV)")
     ap.add_argument("--game", default="euromillions", choices=["euromillions"])
     ap.add_argument(
         "--max-age-days",
@@ -56,17 +57,28 @@ def main(argv: list[str] | None = None) -> int:
     if args.check:
         return _check(out, args.max_age_days)
 
-    before = dataset.read(out)
+    before = dataset.read(out, game=args.game)
     # Call the library entry point rather than the CLI `main()`, which parses sys.argv directly.
     from euromillions.get_draws import fetch_and_normalize
 
     out.parent.mkdir(parents=True, exist_ok=True)
+    fetch_path = out
+    temporary = None
+    if storage.is_database(out):
+        temporary = tempfile.TemporaryDirectory(prefix="mslt-refresh-")
+        fetch_path = Path(temporary.name) / f"{args.game}.csv"
     try:
-        result = fetch_and_normalize(out_path=out, allow_stale=args.allow_stale)
+        result = fetch_and_normalize(out_path=fetch_path, allow_stale=args.allow_stale)
     except Exception as exc:
         print(f"[refresh] fetch failed: {exc}", file=sys.stderr)
+        if temporary is not None:
+            temporary.cleanup()
         return 1
     print(f"[refresh] fetched {len(result.dataframe)} rows (cache: {result.cache_path})")
+
+    if storage.is_database(out):
+        storage.write_history(out, result.dataframe, game=args.game)
+        temporary.cleanup()
 
     meta = dataset.write(out, game=args.game)
     changed = before is None or before.content_sha256 != meta.content_sha256

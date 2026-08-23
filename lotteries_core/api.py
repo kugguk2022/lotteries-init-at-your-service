@@ -47,11 +47,12 @@ except ImportError as exc:  # pragma: no cover - exercised by the extras-not-ins
         "The HTTP API needs the 'api' extra. Install it with: pip install -e \".[api]\""
     ) from exc
 
-from . import dataset, registry
+from . import dataset, registry, storage
 from .coverage import coverage_report
 from .popularity import PopularityModel
 from .protocol import GameSpec
 from .roi import JackpotModel, portfolio_expected_roi
+from mslt.games import GAMES as GAME_DEFINITIONS
 
 DISCLAIMER = (
     "Research output only. A fair draw is unpredictable, the game is negative-sum, and these "
@@ -63,8 +64,9 @@ GAMES: dict[str, GameSpec] = {
     "totoloto": GameSpec.totoloto(),
     "eurodreams": GameSpec.eurodreams(),
 }
+GAMES.update({key: definition.spec for key, definition in GAME_DEFINITIONS.items()})
 
-DEFAULT_HISTORY = os.environ.get("LOTTERIES_HISTORY", "data/euromillions.csv")
+DEFAULT_HISTORY = os.environ.get("LOTTERIES_HISTORY", "data/lotteries.db")
 DEFAULT_PORT = int(os.environ.get("LOTTERIES_PORT", "8007"))
 
 app = FastAPI(
@@ -162,16 +164,16 @@ class LedgerInfo(BaseModel):
 # ------------------------------------------------------------------------------------------------
 
 
-@lru_cache(maxsize=4)
-def load_history(path: str) -> pd.DataFrame:
-    """Load and cache a history CSV. Cached per path for the process's lifetime."""
-    csv = Path(path)
-    if not csv.exists():
+@lru_cache(maxsize=16)
+def load_history(path: str, game: str = "euromillions") -> pd.DataFrame:
+    """Load and cache a history. Cached per path/game for the process's lifetime."""
+    history = Path(path)
+    if not history.exists():
         raise HTTPException(
             status_code=503,
-            detail=f"history file {path!r} not found; run scripts/refresh_history.py",
+            detail=f"history store {path!r} not found; run scripts/refresh_history.py",
         )
-    return pd.read_csv(csv)
+    return storage.read_history(history, game=game)
 
 
 def _history_provenance(path: str, frame: pd.DataFrame) -> dict:
@@ -261,7 +263,7 @@ def build_portfolio(request: PortfolioRequest) -> PortfolioResponse:
         )
 
     spec = GAMES[request.game]
-    frame = load_history(DEFAULT_HISTORY)
+    frame = load_history(DEFAULT_HISTORY, request.game)
     provider = registry.create(request.provider)
     try:
         provider.fit(frame, spec)

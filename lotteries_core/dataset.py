@@ -25,6 +25,8 @@ from pathlib import Path
 
 import pandas as pd
 
+from . import storage
+
 #: Sidecar suffix. ``data/euromillions.csv`` -> ``data/euromillions.meta.json``.
 META_SUFFIX = ".meta.json"
 
@@ -81,7 +83,7 @@ def describe(
 ) -> DatasetMetadata:
     """Read a history CSV and derive its metadata. Does not write anything."""
     csv_path = Path(csv_path)
-    df = pd.read_csv(csv_path)
+    df = storage.read_history(csv_path, game=game)
     if df.empty:
         raise ValueError(f"{csv_path} contains no rows")
     date_column = _date_column(df)
@@ -104,27 +106,33 @@ def describe(
 def write(csv_path: str | Path, *, game: str, source: str = "euromillions.get_draws") -> DatasetMetadata:
     """Derive and persist metadata beside ``csv_path``. Returns what was written."""
     meta = describe(csv_path, game=game, source=source)
-    meta_path(csv_path).write_text(meta.to_json(), encoding="utf-8")
+    if storage.is_database(csv_path):
+        storage.write_metadata(csv_path, game=game, metadata=asdict(meta))
+    else:
+        meta_path(csv_path).write_text(meta.to_json(), encoding="utf-8")
     return meta
 
 
-def read(csv_path: str | Path) -> DatasetMetadata | None:
+def read(csv_path: str | Path, *, game: str = "euromillions") -> DatasetMetadata | None:
     """Load the sidecar for ``csv_path``, or ``None`` when it has never been written."""
+    if storage.is_database(csv_path):
+        value = storage.read_metadata(csv_path, game=game)
+        return DatasetMetadata(**value) if value is not None else None
     path = meta_path(csv_path)
     if not path.exists():
         return None
     return DatasetMetadata.from_json(path.read_text(encoding="utf-8"))
 
 
-def verify(csv_path: str | Path) -> tuple[bool, str]:
+def verify(csv_path: str | Path, *, game: str = "euromillions") -> tuple[bool, str]:
     """Check the CSV still matches its recorded digest. Returns ``(ok, human-readable reason)``."""
     csv_path = Path(csv_path)
-    recorded = read(csv_path)
+    recorded = read(csv_path, game=game)
     if recorded is None:
         return False, f"no metadata recorded for {csv_path}"
     if not csv_path.exists():
         return False, f"dataset file missing: {csv_path}"
-    actual = content_digest(pd.read_csv(csv_path))
+    actual = content_digest(storage.read_history(csv_path, game=game))
     if actual != recorded.content_sha256:
         return False, (
             f"{csv_path} content changed since metadata was written "
@@ -133,26 +141,32 @@ def verify(csv_path: str | Path) -> tuple[bool, str]:
     return True, f"{csv_path} matches recorded metadata ({recorded.rows} draws to {recorded.last_draw})"
 
 
-def last_draw_date(csv_path: str | Path) -> pd.Timestamp:
+def last_draw_date(csv_path: str | Path, *, game: str = "euromillions") -> pd.Timestamp:
     """Newest draw date, preferring the sidecar and falling back to reading the CSV."""
-    meta = read(csv_path)
+    meta = read(csv_path, game=game)
     if meta is not None:
         return pd.Timestamp(meta.last_draw)
-    df = pd.read_csv(csv_path)
+    df = storage.read_history(csv_path, game=game)
     return pd.to_datetime(df[_date_column(df)], errors="coerce").max()
 
 
-def staleness_days(csv_path: str | Path, *, today: str | pd.Timestamp | None = None) -> int:
+def staleness_days(
+    csv_path: str | Path,
+    *,
+    game: str = "euromillions",
+    today: str | pd.Timestamp | None = None,
+) -> int:
     """Whole days between the newest draw in the file and ``today`` (default: today, UTC)."""
     now = pd.Timestamp(today) if today is not None else pd.Timestamp(datetime.now(timezone.utc).date())
-    return int((now.normalize() - last_draw_date(csv_path).normalize()).days)
+    return int((now.normalize() - last_draw_date(csv_path, game=game).normalize()).days)
 
 
 def is_stale(
     csv_path: str | Path,
     *,
     max_age_days: int = DEFAULT_STALE_AFTER_DAYS,
+    game: str = "euromillions",
     today: str | pd.Timestamp | None = None,
 ) -> bool:
     """True when the newest draw is older than ``max_age_days`` -- refresh before relying on it."""
-    return staleness_days(csv_path, today=today) > max_age_days
+    return staleness_days(csv_path, game=game, today=today) > max_age_days

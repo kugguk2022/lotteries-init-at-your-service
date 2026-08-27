@@ -7,6 +7,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- A draw settled without `--payout-table` no longer records a EUR 0 prize. Prize, net return
+  and ROI are written as NaN, the row carries `payout_table_present` and `payout_source`, and
+  `report` sums money only over draws that have a table and says how many that is. Recording
+  zero understated ROI for every such draw, invisibly, over the whole tracking window.
+- `settle` is idempotent and crash-safe. Result rows are upserted on `(draw_key, method)`,
+  every entrant is scored before anything is written, the ledger's JSONL files are rewritten
+  atomically, and an already-settled draw is skipped instead of scored twice. A crashed or
+  retried run can no longer duplicate rows in `results.csv` while leaving records pending.
+- Settled records pass their own integrity check. Settlement facts now live in a `settlement`
+  object with its own `settlement_sha256`, instead of being added to the record after
+  `record_sha256` was computed -- which made every settled entry look tampered with.
+- `ledger/**/*.csv` is exempt from the repository's `*.csv` ignore rule. `results.csv`, the
+  experiment's primary artifact, could not be committed at all.
+- `realized_roi.normalize_record` no longer back-computes ROI from a missing net return as if
+  it were 0.0, and the graduation gate treats a draw with no payout data as carrying no ROI
+  evidence rather than as a failed integrity check.
+
+### Added
+
+- Per-game operational defaults for unattended runs: `--history` defaults to the canonical
+  store, `--ledger` to `ledger/<game>`, the game to `euromillions`, and the ticket price to
+  the game's official price. `record` warns at record time when no price is known, rather
+  than surfacing it as NaN money columns hours later at settlement.
+- `settle --force` re-scores an already-settled draw in place, for correcting a mistyped
+  result, and `--payout-source approximate` marks an estimated rather than official table.
+- `.gitattributes` gives the append-only ledger files a union merge and fixed line endings.
+- Payout tables may use `5_2` or `5+2` tier keys and a `tiers` or `prizes` wrapper; a file
+  that is neither now fails with an explanatory message instead of a `TypeError`.
+
 ## [0.1.0a2] - 2026-08-23
 
 ### Added

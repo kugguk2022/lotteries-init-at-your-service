@@ -6,7 +6,14 @@ import pandas as pd
 import pytest
 
 from lotteries_core.likely_set_generator import CooccurrenceLevelSetProvider
-from lotteries_core.outcome_tracker import METHOD_CHOICES, PENDING, RESULTS
+from lotteries_core.outcome_tracker import (
+    METHOD_CHOICES,
+    PENDING,
+    RESULTS,
+    SETTLED,
+    _validate_record,
+    _validate_settlement,
+)
 from lotteries_core.outcome_tracker import main as tracker_main
 from lotteries_core.protocol import GameSpec
 
@@ -158,3 +165,134 @@ def test_settlement_rejects_tampered_prediction(tmp_path):
                 "1",
             ]
         )
+
+
+def _record(tmp_path, draw_key: str, ledger, extra: list[str] | None = None):
+    history_path = tmp_path / "history.csv"
+    if not history_path.exists():
+        _history().to_csv(history_path, index=False)
+    tracker_main(
+        [
+            "record", "--history", str(history_path), "--draw-key", draw_key,
+            "--ledger", str(ledger), "--n-sets", "6", "--ticket-price", "2.50",
+            "--main-n", "8", "--main-k", "3", "--star-n", "4", "--star-k", "1",
+            *(extra or []),
+        ]
+    )
+
+
+def _settle(ledger, draw_key: str, extra: list[str] | None = None):
+    tracker_main(
+        [
+            "settle", "--ledger", str(ledger), "--draw-key", draw_key,
+            "--actual-main", "1,3,6", "--actual-stars", "1", *(extra or []),
+        ]
+    )
+
+
+def test_missing_payout_table_is_recorded_as_missing_not_as_zero(tmp_path):
+    """A draw with no official breakdown must not settle as a EUR 0 prize.
+
+    Recording zero would understate ROI for every such draw, and the bias would be invisible in
+    `report` -- which is exactly the number the three-year experiment turns on.
+    """
+    ledger = tmp_path / "ledger"
+    _record(tmp_path, "2026-02-01", ledger)
+    _settle(ledger, "2026-02-01")
+
+    row = pd.read_csv(ledger / RESULTS).iloc[0]
+    assert row["payout_table_present"] == 0
+    assert row["payout_source"] == "none"
+    assert pd.isna(row["m_portfolio_prize"])
+    assert pd.isna(row["m_net_return"])
+    assert pd.isna(row["realized_roi"])
+    assert row["stake"] == 15.0  # the stake is known even when the prize is not
+    assert pd.isna(row["result_sha256"]) or row["result_sha256"] == ""
+
+
+def test_settle_is_idempotent_and_skips_settled_draws(tmp_path):
+    """Settlement runs unattended, so a repeat or a retried step must not duplicate evidence."""
+    ledger = tmp_path / "ledger"
+    _record(tmp_path, "2026-02-01", ledger)
+    _settle(ledger, "2026-02-01")
+    first = pd.read_csv(ledger / RESULTS)
+
+    _settle(ledger, "2026-02-01")
+    again = pd.read_csv(ledger / RESULTS)
+
+    assert len(first) == len(again) == 1
+    assert first.loc[0, "settled_utc"] == again.loc[0, "settled_utc"]
+    assert (ledger / PENDING).read_text().strip() == ""
+
+
+def test_force_rescores_a_settled_draw_in_place(tmp_path):
+    """Correcting a mistyped result replaces the row rather than appending a second one."""
+    ledger = tmp_path / "ledger"
+    payouts = tmp_path / "payouts.json"
+    payouts.write_text(json.dumps({"tiers": {"3+1": 1000}}), encoding="utf-8")
+    _record(tmp_path, "2026-02-01", ledger)
+    _settle(ledger, "2026-02-01")
+
+    _settle(ledger, "2026-02-01", ["--payout-table", str(payouts), "--force"])
+    results = pd.read_csv(ledger / RESULTS)
+    assert len(results) == 1
+    assert results.loc[0, "payout_table_present"] == 1
+    assert results.loc[0, "payout_source"] == "official"
+    settled = [json.loads(line) for line in (ledger / SETTLED).read_text().splitlines()]
+    assert len(settled) == 1
+
+
+def test_settled_records_pass_both_integrity_digests(tmp_path):
+    """Preregistration and settlement are hashed separately, so scoring cannot look like tampering."""
+    ledger = tmp_path / "ledger"
+    _record(tmp_path, "2026-02-01", ledger)
+    _settle(ledger, "2026-02-01")
+
+    record = json.loads((ledger / SETTLED).read_text().strip())
+    _validate_record(record)      # the preregistered portfolio is untouched by settlement
+    _validate_settlement(record)  # and the scoring inputs are hashed in their own right
+    assert record["settlement"]["actual_main"] == [1, 3, 6]
+    assert record["settlement"]["actual_stars"] == [1]
+
+    record["settlement"]["actual_main"] = [2, 4, 8]
+    with pytest.raises(ValueError, match="settlement failed integrity"):
+        _validate_settlement(record)
+
+
+def test_report_counts_money_only_over_draws_with_payouts(tmp_path, capsys):
+    ledger = tmp_path / "ledger"
+    payouts = tmp_path / "payouts.json"
+    payouts.write_text(json.dumps({"tiers": {"3+1": 1000}}), encoding="utf-8")
+    _record(tmp_path, "2026-02-01", ledger)
+    _record(tmp_path, "2026-02-04", ledger)
+    _settle(ledger, "2026-02-01", ["--payout-table", str(payouts)])
+    _settle(ledger, "2026-02-04")
+
+    tracker_main(["report", "--ledger", str(ledger)])
+    out = capsys.readouterr().out
+    assert "settled draws              : 2" in out
+    assert "with official payouts    : 1" in out
+    # 6 tickets at 2.50 for the one draw that has prize data -- not 30.00 across both.
+    assert "tracked stake              : 15.00 EUR" in out
+
+
+def test_euromillions_defaults_need_no_flags(tmp_path, monkeypatch):
+    """A scheduled run should not have to restate the game's price or its ledger path."""
+    history_path = tmp_path / "history.csv"
+    frame = pd.DataFrame(
+        {
+            "draw_date": [f"2026-01-{i + 1:02d}" for i in range(40)],
+            **{f"ball_{b}": [(i * b) % 50 + 1 for i in range(40)] for b in range(1, 6)},
+            **{f"star_{s}": [(i * s) % 12 + 1 for i in range(40)] for s in range(1, 3)},
+        }
+    )
+    frame.to_csv(history_path, index=False)
+    monkeypatch.chdir(tmp_path)
+
+    tracker_main(["record", "--history", str(history_path), "--draw-key", "2026-08-18",
+                  "--n-sets", "3"])
+
+    ledger = tmp_path / "ledger" / "euromillions"
+    record = json.loads((ledger / PENDING).read_text().strip())
+    assert record["game"] == "euromillions"
+    assert record["ticket_price"] == 2.50

@@ -1,5 +1,8 @@
 *.pyc
 *.csv
+# ...except the evidence ledger. results.csv is the experiment's primary artifact: it has to
+# be committable, or an unattended settle run produces nothing the repo can keep.
+!ledger/**/*.csv
 *.db
 *.sqlite
 *.sqlite3

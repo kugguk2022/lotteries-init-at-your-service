@@ -85,8 +85,14 @@ def normalize_record(row: dict[str, Any]) -> dict[str, Any]:
         "realized_roi_lift",
     ):
         out[key] = None if out[key] is None else float(out[key])
-    if out["realized_roi"] is None and out["stake"] not in (None, 0):
-        out["realized_roi"] = float(out["m_net_return"] or 0.0) / float(out["stake"])
+    # Only back-compute ROI from a net return that exists. Treating a missing net return as 0.0
+    # would turn "this draw has no payout data" into "this draw returned exactly the stake".
+    if (
+        out["realized_roi"] is None
+        and out["m_net_return"] is not None
+        and out["stake"] not in (None, 0)
+    ):
+        out["realized_roi"] = float(out["m_net_return"]) / float(out["stake"])
     if out["control_realized_roi"] is None and out["stake"] not in (None, 0):
         if out["c_net_return"] is not None:
             out["control_realized_roi"] = float(out["c_net_return"]) / float(out["stake"])

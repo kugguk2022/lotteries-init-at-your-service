@@ -76,21 +76,22 @@ all along, and the ledger will say so.
 ## The workflow
 
 ```bash
-# 1. BEFORE the draw. History must contain completed draws only, and must not drop the most recent one.
-lotto-track record --history data/euromillions.csv --preset euromillions \
-    --draw-key 2026-08-18 --ledger ledger/euromillions --n-sets 20 --ticket-price 2.50 \
-    --methods all
+# 1. BEFORE the draw. History must contain completed draws only, and must not drop the most
+#    recent one. Game, history store, ledger path and ticket price default to the tracked
+#    EuroMillions setup, so the scheduled form of this command carries no other flags.
+lotto-track record --draw-key 2026-08-18 --methods all
 
-# 2. AFTER the draw, with the official result.
-lotto-track settle --ledger ledger/euromillions --draw-key 2026-08-18 \
-    --actual-main 4,17,23,38,45 --actual-stars 3,9 \
+# 2. AFTER the draw, with the official result. Safe to re-run: an already-settled draw is
+#    skipped rather than scored twice. Without --payout-table the draw still settles, but its
+#    money columns are recorded as NaN instead of as a zero prize.
+lotto-track settle --draw-key 2026-08-18 --actual-main 4,17,23,38,45 --actual-stars 3,9 \
     --payout-table data/prizes.json
 
 # 3. Any time.
-lotto-track report --ledger ledger/euromillions
+lotto-track report
 ```
 
-> Refresh the history first (`python -m euromillions.get_draws --out data/euromillions.csv`).
+> Refresh the history first (`lottobench fetch --game euromillions`).
 > Recording against stale history means the method never sees the draws immediately preceding the one
 > it is predicting. The bundled `euromillions/euromillions_2016_2025.csv` ends 2025-08-12 and is for
 > offline examples only — never for ledger records.
@@ -100,13 +101,14 @@ lotto-track report --ledger ledger/euromillions
 | File | Contents |
 |---|---|
 | `pending_predictions.jsonl` | Recorded, not yet drawn. Each record carries `record_sha256`. |
-| `settled_predictions.jsonl` | Settled records, with the actual result attached. |
-| `results.csv` | One scored row per settled draw: method vs control, per tier, with prizes and net return. |
+| `settled_predictions.jsonl` | Settled records. The result lives in a `settlement` object with its own `settlement_sha256`, so `record_sha256` still proves the preregistration. |
+| `results.csv` | One scored row per settled draw and entrant, keyed on `(draw_key, method)`: method vs control, per tier, with prizes and net return. Re-settling replaces the row. |
 
 ## Reading the report
 
 ```
 settled draws              : 12
+  with official payouts    : 4  (money below covers these draws only)
 method mean best-main hits : 2.417
 control mean best-main hits: 2.250
 mean per-draw lift (method-control, mean-main): +0.0183

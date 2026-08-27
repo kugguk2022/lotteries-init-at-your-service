@@ -215,6 +215,11 @@ def paired_draws(
     grouped: dict[ProviderKey, dict[str, list[dict[str, Any]]]] = {}
     problems: list[str] = []
     for raw in records:
+        if raw.get("m_portfolio_prize") is None or raw.get("stake") is None:
+            # Settled, but with no official payout table or no recorded stake. That is evidence
+            # for hit rates and none at all for ROI -- not an integrity failure, so it is skipped
+            # rather than reported as a broken record.
+            continue
         try:
             row = validate_record(raw)
         except ValueError as error:

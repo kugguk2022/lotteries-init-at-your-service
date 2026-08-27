@@ -12,16 +12,21 @@ uniform-random control generated from the same draw key, so "did the method beat
 
 Workflow
 --------
-    # 1. Before a draw: generate and log this draw's portfolio (history must NOT contain the draw).
-    python outcome_tracker.py record --history history.csv --preset euromillions \
-        --draw-key 2026-08-18 --ledger ./ledger --n-sets 20
+    # 1. Before a draw: generate and log this draw's portfolio (history must NOT contain the
+    #    draw). History path, ledger path and ticket price all default per game, so a scheduled
+    #    run needs no flags beyond the draw being recorded.
+    lotto-track record --draw-key 2026-08-18 --methods all
 
-    # 2. After the draw: settle it with the official result.
-    python outcome_tracker.py settle --ledger ./ledger --draw-key 2026-08-18 \
-        --actual-main 4,17,23,38,45 --actual-stars 3,9
+    # 2. After the draw: settle it with the official result. Re-running is safe: settlement is
+    #    idempotent, and an already-settled draw is skipped rather than scored twice.
+    lotto-track settle --draw-key 2026-08-18 --actual-main 4,17,23,38,45 --actual-stars 3,9 \
+        --payout-table official-payouts/2026-08-18.json
+
+    # Without --payout-table the draw still settles, but every money column is recorded as NaN
+    # rather than as a zero prize, so ROI is never silently understated.
 
     # 3. Any time: read the cumulative verdict.
-    python outcome_tracker.py report --ledger ./ledger
+    lotto-track report
 """
 
 from __future__ import annotations
@@ -30,6 +35,7 @@ import argparse
 import hashlib
 import importlib.metadata
 import json
+import os
 from dataclasses import asdict
 from datetime import datetime, timezone
 from pathlib import Path
@@ -46,6 +52,24 @@ from .realized_roi import ROI_SCHEMA_VERSION, canonical_sha256, result_digest
 PENDING = "pending_predictions.jsonl"
 SETTLED = "settled_predictions.jsonl"
 RESULTS = "results.csv"
+
+#: Canonical local history store, matching ``lottobench fetch`` and the optional API.
+DEFAULT_HISTORY = os.environ.get("LOTTERIES_HISTORY", "data/lotteries.db")
+
+#: The game assumed when none is named. The tracked experiment in this repo is the EuroMillions
+#: one; any other game still works, it just has to be named.
+DEFAULT_GAME = "euromillions"
+
+#: Identity of a result row. Settling the same draw twice replaces the row instead of appending a
+#: second one, so a crashed or repeated run cannot inflate the evidence base.
+RESULT_KEY = ("draw_key", "method")
+
+#: Per-game operational defaults, so an unattended run needs no flags. Only values actually known
+#: for the market this repo tracks are listed; a game absent here records fine, it simply has no
+#: money columns unless ``--ticket-price`` is passed.
+GAME_DEFAULTS: dict[str, dict] = {
+    "euromillions": {"ticket_price": 2.50, "currency": "EUR"},
+}
 
 
 def _package_version() -> str:
@@ -188,16 +212,46 @@ def _random_control(cfg: GameConfig, n_sets: int, draw_key: str) -> list[tuple]:
     return out
 
 
+#: Keys written at settlement time. They are excluded from ``record_sha256`` deliberately: that
+#: digest proves what was preregistered *before* the draw, so it must not move when the draw is
+#: scored afterwards. The settlement inputs carry their own digest instead. ``actual_main`` and
+#: ``actual_stars`` are listed because records settled by earlier versions stored them at the top
+#: level, and those records must still reproduce their original preregistration digest.
+_SETTLEMENT_KEYS = ("settlement", "settlement_sha256", "actual_main", "actual_stars")
+
+
 def _record_digest(record: dict) -> str:
-    unsigned = {k: v for k, v in record.items() if k != "record_sha256"}
+    unsigned = {
+        k: v for k, v in record.items() if k != "record_sha256" and k not in _SETTLEMENT_KEYS
+    }
     payload = json.dumps(unsigned, sort_keys=True, separators=(",", ":")).encode("utf-8")
     return hashlib.sha256(payload).hexdigest()
 
 
+def _settlement_digest(settlement: dict) -> str:
+    payload = json.dumps(settlement, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    return hashlib.sha256(payload).hexdigest()
+
+
 def _validate_record(record: dict) -> None:
+    """Check the preregistration half: the portfolio is what was logged before the draw."""
     expected = record.get("record_sha256")
     if not expected or expected != _record_digest(record):
         raise ValueError(f"prediction record failed integrity check: {record.get('draw_key')}")
+
+
+def _validate_settlement(record: dict) -> None:
+    """Check the settlement half: the scoring inputs are what they were when the draw was scored.
+
+    Records settled before settlement digests existed carry no ``settlement`` block; there is
+    nothing to compare them against, so they pass.
+    """
+    settlement = record.get("settlement")
+    if not isinstance(settlement, dict):
+        return
+    expected = record.get("settlement_sha256")
+    if not expected or expected != _settlement_digest(settlement):
+        raise ValueError(f"settlement failed integrity check: {record.get('draw_key')}")
 
 
 # ------------------------------------------------------------------------------------------------
@@ -217,13 +271,38 @@ def _read_jsonl(path: Path) -> list[dict]:
     return [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
 
 
+def _atomic_write_text(path: Path, text: str) -> None:
+    """Write through a temporary file in the same directory, then rename over the target.
+
+    The ledger is the experiment's only evidence, and settlement rewrites whole files. A crash
+    mid-write has to leave the previous file intact rather than a truncated one.
+    """
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_name(path.name + ".tmp")
+    tmp.write_text(text, encoding="utf-8", newline="\n")
+    os.replace(tmp, path)
+
+
 def _rewrite_jsonl(path: Path, records: list[dict]) -> None:
-    path.write_text("".join(json.dumps(r, sort_keys=True) + "\n" for r in records), encoding="utf-8")
+    _atomic_write_text(path, "".join(json.dumps(r, sort_keys=True) + "\n" for r in records))
 
 
 # ------------------------------------------------------------------------------------------------
 # Commands
 # ------------------------------------------------------------------------------------------------
+
+
+def _default_ledger(game: str) -> Path:
+    """Per-game ledger directory, so ``--ledger`` is only needed to override it."""
+    return Path("ledger") / game
+
+
+def _resolve_ledger(args, game: str) -> Path:
+    return Path(args.ledger) if args.ledger else _default_ledger(game)
+
+
+def _game_default(game: str, key: str, fallback=None):
+    return GAME_DEFAULTS.get(game, {}).get(key, fallback)
 
 
 def _resolve_methods(raw: str) -> list[str]:
@@ -236,11 +315,31 @@ def _resolve_methods(raw: str) -> list[str]:
     return methods
 
 
+def _apply_game_default(args) -> None:
+    """Fill in the default preset when no game was named at all.
+
+    A fully custom spec (``--main-n``/``--main-k``) stays custom: defaulting the preset there
+    would relabel someone's own game as euromillions.
+    """
+    if not getattr(args, "preset", None) and not (args.main_n and args.main_k):
+        args.preset = DEFAULT_GAME
+
+
 def cmd_record(args) -> None:
+    _apply_game_default(args)
     cfg = resolve_config(args)
-    ledger = Path(args.ledger)
+    ledger = _resolve_ledger(args, cfg.name)
     df = storage.read_history(args.history, game=cfg.name)
     methods = _resolve_methods(args.methods)
+
+    # An unattended run should not have to know the price of a ticket, and a run without one has
+    # to say so now: a missing price is only felt hours later, as NaN money columns at settlement.
+    ticket_price = args.ticket_price
+    if ticket_price is None:
+        ticket_price = _game_default(cfg.name, "ticket_price")
+    if ticket_price is None:
+        print(f"[warn] no ticket price known for {cfg.name}: prize, net return and ROI will "
+              "settle as NaN. Pass --ticket-price to track money.")
 
     # One control per draw key, shared by every entrant, so the competition is paired: all methods
     # are judged against the identical luck baseline on the identical draw.
@@ -273,7 +372,7 @@ def cmd_record(args) -> None:
             "history_sha256": history_hash,
             "created_utc": datetime.now(timezone.utc).isoformat(),
             "ticket_proof_sha256": args.ticket_proof_sha256 or None,
-            "ticket_price": args.ticket_price,
+            "ticket_price": ticket_price,
         }
         provider_config = {
             "provider_name": record["provider_name"],
@@ -310,16 +409,46 @@ def _parse_nums(s: str) -> set[int]:
 
 
 def cmd_settle(args) -> None:
-    ledger = Path(args.ledger)
+    ledger = _resolve_ledger(args, args.game)
     pending = _read_jsonl(ledger / PENDING)
+    settled = _read_jsonl(ledger / SETTLED)
     actual_main = _parse_nums(args.actual_main)
     actual_stars = _parse_nums(args.actual_stars) if args.actual_stars else set()
 
-    remaining, settled_now = [], []
-    for rec in pending:
-        if rec["draw_key"] != args.draw_key:
-            remaining.append(rec)
-            continue
+    # One payout table per settlement run, resolved once. No table means "no official prize data
+    # for this draw", which is recorded as NaN and never as a zero prize: a zero would bias ROI
+    # downward for every draw settled without a table, invisibly.
+    payout_table = _load_payout_table(args.payout_table)
+    # Presence is "a table was supplied", not "the table paid out". An official breakdown under
+    # which the portfolio won nothing is real evidence of a zero prize; no table at all is not.
+    payout_present = bool(args.payout_table)
+    payout_source = args.payout_source if payout_present else "none"
+    payout_sha = (
+        hashlib.sha256(Path(args.payout_table).read_bytes()).hexdigest() if payout_present else ""
+    )
+    if not payout_present:
+        print("[settle] no payout table: prize, net return and ROI are recorded as NaN for this "
+              "draw, and report counts it as a non-monetary settlement.")
+
+    remaining = [r for r in pending if r["draw_key"] != args.draw_key]
+    candidates = [r for r in pending if r["draw_key"] == args.draw_key]
+    previously = [r for r in settled if r["draw_key"] == args.draw_key]
+
+    if args.force:
+        kept_settled = [r for r in settled if r["draw_key"] != args.draw_key]
+        candidates += previously
+    else:
+        kept_settled = settled
+        done = {(r["draw_key"], r["method"]) for r in previously}
+        for rec in previously:
+            _validate_settlement(rec)
+            print(f"[skip] {rec['method']} already settled for draw {rec['draw_key']}")
+        candidates = [r for r in candidates if (r["draw_key"], r["method"]) not in done]
+
+    # Score every entrant before writing anything: a draw that fails validation halfway through
+    # must not leave half of its entrants scored in the ledger.
+    rows, settled_now = [], []
+    for rec in candidates:
         _validate_record(rec)
         cfg = GameConfig(**rec["config"])
         if len(actual_main) != cfg.main_k or any(not (1 <= n <= cfg.main_n) for n in actual_main):
@@ -330,13 +459,17 @@ def cmd_settle(args) -> None:
         method = _score_portfolio(tickets, actual_main, actual_stars, cfg)
         control_tickets = [(tuple(m), tuple(s)) for m, s in rec["control_tickets"]]
         control = _score_portfolio(control_tickets, actual_main, actual_stars, cfg)
-        payout_table = _load_payout_table(args.payout_table)
-        method_prize = _portfolio_prize(method["tier_counts"], payout_table)
-        control_prize = _portfolio_prize(control["tier_counts"], payout_table)
+        nan = float("nan")
+        method_prize = _portfolio_prize(method["tier_counts"], payout_table) if payout_present else nan
+        control_prize = _portfolio_prize(control["tier_counts"], payout_table) if payout_present else nan
         ticket_price = rec.get("ticket_price")
-        stake = float(ticket_price) * len(tickets) if ticket_price is not None else float("nan")
-        method_net = method_prize - stake if not np.isnan(stake) else float("nan")
-        control_net = control_prize - stake if not np.isnan(stake) else float("nan")
+        stake = float(ticket_price) * len(tickets) if ticket_price is not None else nan
+        # NaN propagates through the arithmetic, which is the point: a draw missing either the
+        # stake or the payout table has no monetary result, rather than a misleading one.
+        method_net = method_prize - stake
+        control_net = control_prize - stake
+        monetary = payout_present and not np.isnan(stake) and stake > 0
+        currency = args.currency or _game_default(rec["game"], "currency", "EUR")
         row = {
             "schema_version": rec.get("schema_version", 1),
             "lottobench_version": rec.get("lottobench_version", "unknown"),
@@ -356,56 +489,84 @@ def cmd_settle(args) -> None:
             "m_tier_counts": json.dumps(method["tier_counts"], sort_keys=True),
             "m_portfolio_prize": method_prize,
             "m_net_return": method_net,
-            "realized_roi": method_net / stake if not np.isnan(stake) and stake > 0 else float("nan"),
+            "realized_roi": method_net / stake if monetary else nan,
             "c_best_main": control["best_main"],
             "c_mean_main": round(control["mean_main"], 4),
             "c_jackpot": control["jackpot"],
             "c_tier_counts": json.dumps(control["tier_counts"], sort_keys=True),
             "c_portfolio_prize": control_prize,
             "c_net_return": control_net,
-            "control_realized_roi": (
-                control_net / stake if not np.isnan(stake) and stake > 0 else float("nan")
-            ),
-            "realized_roi_lift": (
-                (method_net - control_net) / stake
-                if not np.isnan(stake) and stake > 0
-                else float("nan")
-            ),
+            "control_realized_roi": control_net / stake if monetary else nan,
+            "realized_roi_lift": (method_net - control_net) / stake if monetary else nan,
             "stake": stake,
             "lift_mean_main": round(method["mean_main"] - control["mean_main"], 4),
             "prize_lift": method_prize - control_prize,
-            "currency": args.currency,
+            "currency": currency,
             "outcome_source": args.outcome_source,
-            "payout_table_sha256": (
-                hashlib.sha256(Path(args.payout_table).read_bytes()).hexdigest()
-                if args.payout_table
-                else ""
-            ),
+            "payout_table_present": int(payout_present),
+            "payout_source": payout_source,
+            "payout_table_sha256": payout_sha,
             "settled_utc": datetime.now(timezone.utc).isoformat(),
             "purchase_proof_hash_present": int(bool(rec.get("ticket_proof_sha256"))),
             "record_sha256": rec["record_sha256"],
         }
-        row["result_sha256"] = result_digest(row) if not np.isnan(stake) and stake > 0 else ""
-        _append_results(ledger / RESULTS, row)
-        rec["actual_main"] = sorted(actual_main)
-        rec["actual_stars"] = sorted(actual_stars)
+        row["result_sha256"] = result_digest(row) if monetary else ""
+        rows.append(row)
+
+        # Settlement facts live in their own object with their own digest. record_sha256 proves
+        # what was preregistered before the draw; settlement_sha256 proves the inputs the draw was
+        # scored against. Neither can invalidate the other.
+        settlement = {
+            "actual_main": sorted(actual_main),
+            "actual_stars": sorted(actual_stars),
+            "settled_utc": row["settled_utc"],
+            "outcome_source": args.outcome_source,
+            "payout_source": payout_source,
+            "payout_table_sha256": payout_sha,
+            "result_sha256": row["result_sha256"],
+        }
+        rec = {k: v for k, v in rec.items() if k not in _SETTLEMENT_KEYS}
+        rec["settlement"] = settlement
+        rec["settlement_sha256"] = _settlement_digest(settlement)
         settled_now.append(rec)
 
     if not settled_now:
-        print(f"[settle] no pending predictions for draw_key {args.draw_key}")
+        if not previously:
+            print(f"[settle] no pending predictions for draw_key {args.draw_key}")
         return
-    for rec in settled_now:
-        _append_jsonl(ledger / SETTLED, rec)
+
+    # Results first. The upsert is keyed on (draw_key, method), so a crash before the JSONL
+    # rewrites converges on a re-run instead of duplicating rows into the evidence base.
+    _upsert_results(ledger / RESULTS, rows)
+    _rewrite_jsonl(ledger / SETTLED, kept_settled + settled_now)
     _rewrite_jsonl(ledger / PENDING, remaining)
     print(f"[settle] scored {len(settled_now)} prediction(s) for {args.draw_key}; "
-          f"appended to {ledger / RESULTS}")
+          f"written to {ledger / RESULTS}")
 
 
-def _append_results(path: Path, row: dict) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    df_row = pd.DataFrame([row])
-    header = not path.exists()
-    df_row.to_csv(path, mode="a", header=header, index=False)
+def _upsert_results(path: Path, rows: list[dict]) -> None:
+    """Write result rows, replacing any existing row carrying the same ``RESULT_KEY``.
+
+    Settlement has to be safe to repeat: a crashed run, a retried workflow step, or an operator
+    running the command twice must converge on one row per (draw, entrant) rather than stacking
+    duplicates into a ledger whose whole purpose is to be counted.
+    """
+    if not rows:
+        return
+    # keep="last" also covers the corrupt case of a draw appearing in both ledger files:
+    # one row per (draw, entrant) leaves the ledger, whatever reached this function.
+    incoming = pd.DataFrame(rows).drop_duplicates(subset=list(RESULT_KEY), keep="last")
+    if path.exists():
+        existing = pd.read_csv(path)
+        if not existing.empty and set(RESULT_KEY) <= set(existing.columns):
+            keys = set(zip(incoming["draw_key"].astype(str), incoming["method"].astype(str)))
+            keep = [
+                (str(draw), str(method)) not in keys
+                for draw, method in zip(existing["draw_key"], existing["method"])
+            ]
+            existing = existing[keep]
+        incoming = pd.concat([existing, incoming], ignore_index=True)
+    _atomic_write_text(path, incoming.to_csv(index=False))
 
 
 def _load_payout_table(path: str | None) -> dict[str, float]:
@@ -414,8 +575,14 @@ def _load_payout_table(path: str | None) -> dict[str, float]:
     # utf-8-sig so payout tables authored on Windows (Notepad, PowerShell Out-File) are accepted;
     # it strips a leading BOM if present and is a no-op otherwise.
     raw = json.loads(Path(path).read_text(encoding="utf-8-sig"))
-    tiers = raw.get("tiers", raw)
-    return {str(k): float(v) for k, v in tiers.items()}
+    tiers = raw.get("tiers", raw.get("prizes", raw)) if isinstance(raw, dict) else raw
+    if not isinstance(tiers, dict) or any(isinstance(v, (dict, list)) for v in tiers.values()):
+        raise SystemExit(
+            f"{path}: expected a JSON object mapping tiers to per-ticket payouts, either at the "
+            'top level or under a "tiers" (or "prizes") key'
+        )
+    # "5_2" and "5+2" are both accepted; published breakdowns use either spelling.
+    return {str(k).replace("_", "+"): float(v) for k, v in tiers.items()}
 
 
 def _portfolio_prize(tier_counts: dict[str, int], payouts: dict[str, float]) -> float:
@@ -458,8 +625,22 @@ def _print_leaderboard(df: pd.DataFrame) -> None:
     print("-" * 60)
 
 
+def _monetary_mask(df: pd.DataFrame) -> pd.Series:
+    """Rows that carry an official payout table, and can therefore be counted in money.
+
+    Rows settled without a table hold NaN prizes on purpose; counting them as zero would drag
+    every ROI aggregate down by exactly the draws nobody has prize data for. Legacy rows predate
+    the explicit column and are recognised by their recorded payout-table hash.
+    """
+    if "payout_table_present" in df:
+        return df["payout_table_present"].fillna(0).astype(float) > 0
+    if "payout_table_sha256" in df:
+        return df["payout_table_sha256"].fillna("").astype(str).str.len() > 0
+    return pd.Series(False, index=df.index)
+
+
 def cmd_report(args) -> None:
-    ledger = Path(args.ledger)
+    ledger = _resolve_ledger(args, args.game)
     path = ledger / RESULTS
     if not path.exists():
         print("[report] no settled results yet. Record and settle some draws first.")
@@ -472,9 +653,12 @@ def cmd_report(args) -> None:
     mean_lift = float(np.nanmean(diffs))
     pval = _permutation_pvalue(diffs)
     jackpots = int(df["m_jackpot"].sum())
-    portfolio_prize = float(df.get("m_portfolio_prize", pd.Series(dtype=float)).sum())
-    stake = float(df.get("stake", pd.Series(dtype=float)).sum(min_count=1))
-    net_return = float(df.get("m_net_return", pd.Series(dtype=float)).sum(min_count=1))
+    # Money is summed over draws with an official payout table only. The hit-rate statistics
+    # above use every settled draw; prizes cannot, because most draws have no prize data.
+    paid = df[_monetary_mask(df)]
+    portfolio_prize = float(paid.get("m_portfolio_prize", pd.Series(dtype=float)).sum(min_count=1))
+    stake = float(paid.get("stake", pd.Series(dtype=float)).sum(min_count=1))
+    net_return = float(paid.get("m_net_return", pd.Series(dtype=float)).sum(min_count=1))
     currency = str(df["currency"].dropna().iloc[-1]) if "currency" in df and df["currency"].notna().any() else ""
 
     print("=" * 60)
@@ -482,16 +666,19 @@ def cmd_report(args) -> None:
     print("=" * 60)
     _print_leaderboard(df)
     print(f"settled draws              : {n}")
+    print(f"  with official payouts    : {len(paid)}  (money below covers these draws only)")
     print(f"method mean best-main hits : {method_best:.3f}")
     print(f"control mean best-main hits: {control_best:.3f}")
     print(f"mean per-draw lift (method-control, mean-main): {mean_lift:+.4f}")
     print(f"one-sided permutation p (lift>0): {pval:.4f}")
     print(f"method jackpots            : {jackpots}")
-    if portfolio_prize:
+    if len(paid) and not np.isnan(stake):
         print(f"tracked portfolio prizes   : {portfolio_prize:.2f} {currency}".rstrip())
-    if not np.isnan(stake):
         print(f"tracked stake              : {stake:.2f} {currency}".rstrip())
         print(f"tracked net return         : {net_return:+.2f} {currency}".rstrip())
+    else:
+        print("tracked money              : not reported (no settled draw carries an official "
+              "payout table)")
     print("-" * 60)
     print("verdict:", _verdict(n, mean_lift, pval))
     print("=" * 60)
@@ -527,9 +714,13 @@ def main(argv: list[str] | None = None) -> None:
     sub = ap.add_subparsers(dest="cmd", required=True)
 
     rec = sub.add_parser("record", help="Generate and log a draw's portfolio (before the draw).")
-    rec.add_argument("--history", required=True)
+    rec.add_argument(
+        "--history",
+        default=DEFAULT_HISTORY,
+        help=f"history store, SQLite or CSV (default: {DEFAULT_HISTORY})",
+    )
     rec.add_argument("--draw-key", required=True)
-    rec.add_argument("--ledger", default="./ledger")
+    rec.add_argument("--ledger", default=None, help="ledger directory (default: ledger/<game>)")
     rec.add_argument("--n-sets", type=int, default=20)
     rec.add_argument(
         "--methods",
@@ -557,7 +748,13 @@ def main(argv: list[str] | None = None) -> None:
     rec.set_defaults(func=cmd_record)
 
     st = sub.add_parser("settle", help="Score a logged draw against the official result (after the draw).")
-    st.add_argument("--ledger", default="./ledger")
+    st.add_argument("--ledger", default=None, help="ledger directory (default: ledger/<game>)")
+    st.add_argument(
+        "--game",
+        choices=sorted(PRESETS),
+        default=DEFAULT_GAME,
+        help="game whose ledger is being settled; selects the default ledger path",
+    )
     st.add_argument("--draw-key", required=True)
     st.add_argument("--actual-main", required=True, help="comma-separated main numbers")
     st.add_argument("--actual-stars", default="", help="comma-separated star numbers (optional)")
@@ -566,7 +763,22 @@ def main(argv: list[str] | None = None) -> None:
         default=None,
         help='optional JSON file mapping tiers such as "5+2" to official per-ticket payouts',
     )
-    st.add_argument("--currency", default="EUR")
+    st.add_argument(
+        "--payout-source",
+        choices=["official", "approximate"],
+        default="official",
+        help=(
+            "provenance of --payout-table. 'approximate' marks a static or estimated table, so "
+            "ROI stays continuous without the ledger claiming precision it does not have"
+        ),
+    )
+    st.add_argument("--currency", default=None, help="default: the game's currency, else EUR")
+    st.add_argument(
+        "--force",
+        action="store_true",
+        help="re-score a draw that is already settled, replacing its rows (use to correct a "
+             "mistyped result)",
+    )
     st.add_argument(
         "--outcome-source",
         choices=["self_reported", "operator_verified"],
@@ -576,7 +788,13 @@ def main(argv: list[str] | None = None) -> None:
     st.set_defaults(func=cmd_settle)
 
     rep = sub.add_parser("report", help="Cumulative verdict across all settled draws.")
-    rep.add_argument("--ledger", default="./ledger")
+    rep.add_argument("--ledger", default=None, help="ledger directory (default: ledger/<game>)")
+    rep.add_argument(
+        "--game",
+        choices=sorted(PRESETS),
+        default=DEFAULT_GAME,
+        help="game whose ledger is being reported; selects the default ledger path",
+    )
     rep.set_defaults(func=cmd_report)
 
     args = ap.parse_args(argv)

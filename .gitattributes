@@ -1,0 +1,8 @@
+# Ledger files are append-only, machine-generated evidence. A union merge keeps both sides'
+# appended records instead of raising a conflict every time two runs settle concurrently.
+ledger/**/*.jsonl merge=union
+ledger/**/*.csv   merge=union
+
+# Records are hashed line by line; keep line endings stable across platforms.
+ledger/**/*.jsonl text eol=lf
+ledger/**/*.csv   text eol=lf

@@ -33,7 +33,12 @@ should not change silently underneath a running service.
 | `POST` | `/portfolio` | Generate a fixed-budget portfolio from a chosen provider |
 | `GET` | `/dataset` | History provenance and staleness |
 | `GET` | `/ledger/{name}` | Prospective-ledger contents and standings |
+| `GET` | `/analytics/roi/{name}` | Validated realized-ROI summary by provider version |
+| `GET` | `/analytics/roi/{name}/evolution` | Cumulative realized ROI after each settled draw |
 | `GET` | `/openapi.json` | OpenAPI 3 schema |
+
+The OpenAPI schema can also be imported by a GPT Action once the service is deployed on a public
+HTTPS URL. See [Connect LottoBench Analytics to a GPT](../GPT_ACTION.md).
 
 ## Picking a provider
 

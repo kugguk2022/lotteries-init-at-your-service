@@ -1,6 +1,6 @@
 # LottoBench
 
-Experimental, auditable benchmarking for lottery strategies.
+Experimental, auditable benchmarking and ROI analytics for lottery strategies.
 
 LottoBench compares strategy providers at equal ticket budgets using forward-only evaluation,
 coverage, diversity, and explicit ROI metrics. It includes a local SQLite history store, provenance
@@ -63,6 +63,19 @@ lotto-roi validate roi-benchmark.json
 
 Use the actual ticket price and official results/payouts for the relevant draw. Export is explicit,
 offline by default, and contains no tickets, receipt contents, user identity, or device identifier.
+
+### REST API and GPT Action
+
+```bash
+python -m pip install "lottobench[api]"
+lotto-serve
+```
+
+The **LottoBench Analytics API** serves interactive documentation at
+`http://127.0.0.1:8007/docs`, including read-only realized-ROI summaries and evolution. A deployed
+HTTPS instance can be connected to a GPT by importing its `/openapi.json` as an Action; see
+[the GPT Action guide](docs/GPT_ACTION.md). PyPI installs the server code but does not host the API
+or your ledger data.
 
 ## Quick start
 

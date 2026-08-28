@@ -30,7 +30,7 @@ each passes the same contract. See `docs/wiki/Backlog.md`.
 ## Install
 
 ```bash
-pip install lottobench==0.1.0a2
+pip install lottobench==0.1.0a3
 ```
 
 The base install carries the small numerical and retrieval stack needed for everything below.
@@ -85,8 +85,19 @@ available for compatibility and research extensions.
 | `transformer` | PyTorch | the `sequence_transformer` provider |
 
 ```bash
-pip install "lottobench[api]==0.1.0a2"
+pip install "lottobench[api]==0.1.0a3"
 ```
+
+The optional **LottoBench Analytics API** serves read-only portfolio metrics, validated realized-ROI
+summaries, and cumulative ROI evolution:
+
+```bash
+lotto-serve
+# interactive schema: http://127.0.0.1:8007/docs
+```
+
+When deployed on a public HTTPS host, its `/openapi.json` can be imported as a GPT Action. PyPI
+installs the server code; it does not host the API or ledger data.
 
 Provider discovery reports honestly whether an optional provider is actually runnable; no fallback
 model is ever substituted under the same provider name, and a provider whose dependency is missing
@@ -117,7 +128,7 @@ financial outcomes, but no tickets, receipt contents, machine identifiers, or us
 
 ## Experimental status
 
-Version `0.1.0a2` is an alpha. APIs, data schemas, strategies, and game support may change. A
+Version `0.1.0a3` is an alpha. APIs, data schemas, strategies, and game support may change. A
 passing benchmark or a high metric value is not evidence of future draw prediction unless the exact
 metric, holdout, data cutoff, ticket budget, baseline, and leakage controls are supplied and
 reproducible. Always verify game rules and official results with the relevant operator.

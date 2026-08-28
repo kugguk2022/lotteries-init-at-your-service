@@ -11,6 +11,8 @@ What it exposes
 ``GET  /games``      supported game shapes
 ``GET  /dataset``    the history's provenance and staleness
 ``GET  /ledger/{name}`` prospective-ledger standings
+``GET  /analytics/roi/{name}`` validated realized-ROI summaries by provider version
+``GET  /analytics/roi/{name}/evolution`` cumulative realized ROI after each settled draw
 ``GET  /openapi.json`` the machine-readable schema
 
 What it deliberately does not expose
@@ -33,8 +35,10 @@ provenance should not change silently underneath a running service.
 from __future__ import annotations
 
 import os
+import re
 from functools import lru_cache
 from pathlib import Path
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -53,6 +57,9 @@ from . import dataset, registry, storage
 from .coverage import coverage_report
 from .popularity import PopularityModel
 from .protocol import GameSpec
+from .realized_roi import comparison as realized_roi_comparison
+from .realized_roi import load_records as load_roi_records
+from .realized_roi import validate_record as validate_roi_record
 from .roi import default_jackpot_model, portfolio_expected_roi
 
 DISCLAIMER = (
@@ -70,7 +77,7 @@ DEFAULT_HISTORY = os.environ.get("LOTTERIES_HISTORY", "data/lotteries.db")
 DEFAULT_PORT = int(os.environ.get("LOTTERIES_PORT", "8007"))
 
 app = FastAPI(
-    title="LottoBench Experimental API",
+    title="LottoBench Analytics API",
     version="0.1.0",
     summary="Experimental lottery portfolio research framework; not advice or a betting service.",
     description=__doc__,
@@ -162,6 +169,38 @@ class LedgerInfo(BaseModel):
     standings: list[LedgerStanding]
 
 
+class RoiAnalytics(BaseModel):
+    ledger: str
+    records_found: int
+    records_analyzed: int
+    records_excluded: int
+    summaries: list[dict[str, Any]]
+    disclaimer: str
+
+
+class RoiEvolutionPoint(BaseModel):
+    draw_key: str
+    provider_name: str
+    provider_version: str
+    currency: str
+    settled_draws: int
+    cumulative_stake: float
+    cumulative_payout: float
+    cumulative_net_return: float
+    cumulative_realized_roi: float
+    cumulative_control_roi: float | None
+    cumulative_roi_lift: float | None
+
+
+class RoiEvolution(BaseModel):
+    ledger: str
+    records_found: int
+    records_analyzed: int
+    records_excluded: int
+    points: list[RoiEvolutionPoint]
+    disclaimer: str
+
+
 # ------------------------------------------------------------------------------------------------
 # Data access
 # ------------------------------------------------------------------------------------------------
@@ -192,6 +231,76 @@ def _history_provenance(path: str, frame: pd.DataFrame) -> dict:
     }
 
 
+def _ledger_path(name: str) -> Path:
+    """Resolve a ledger name without allowing paths outside the repository ledger directory."""
+    if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]*", name) or name in {".", ".."}:
+        raise HTTPException(400, "ledger name may contain only letters, numbers, '.', '_' and '-'")
+    base = Path("ledger") / name
+    if not base.is_dir():
+        raise HTTPException(404, f"no ledger at {base}")
+    return base
+
+
+def _valid_roi_records(base: Path) -> tuple[int, list[dict[str, Any]]]:
+    """Load only complete, internally consistent realized-ROI observations."""
+    records = load_roi_records(base)
+    valid: list[dict[str, Any]] = []
+    for record in records:
+        try:
+            valid.append(validate_roi_record(record))
+        except ValueError:
+            # Incomplete historical rows remain visible through the exclusion count. They must not
+            # be silently interpreted as zero payout or included in ROI aggregates.
+            continue
+    return len(records), valid
+
+
+def _roi_evolution(records: list[dict[str, Any]]) -> list[RoiEvolutionPoint]:
+    groups: dict[tuple[str, str, str, str], list[dict[str, Any]]] = {}
+    for row in records:
+        key = (
+            row["game"],
+            row["currency"],
+            row["provider_name"],
+            row["provider_version"],
+        )
+        groups.setdefault(key, []).append(row)
+
+    points: list[RoiEvolutionPoint] = []
+    for (_, currency, provider_name, provider_version), rows in sorted(groups.items()):
+        stake = payout = control_payout = 0.0
+        control_complete = True
+        draw_keys: set[str] = set()
+        for row in sorted(rows, key=lambda item: (item["draw_key"], item["settled_utc"])):
+            stake += float(row["stake"])
+            payout += float(row["m_portfolio_prize"])
+            draw_keys.add(str(row["draw_key"]))
+            if row["c_portfolio_prize"] is None:
+                control_complete = False
+            else:
+                control_payout += float(row["c_portfolio_prize"])
+            realized_roi = (payout - stake) / stake
+            control_roi = (control_payout - stake) / stake if control_complete else None
+            points.append(
+                RoiEvolutionPoint(
+                    draw_key=str(row["draw_key"]),
+                    provider_name=provider_name,
+                    provider_version=provider_version,
+                    currency=currency,
+                    settled_draws=len(draw_keys),
+                    cumulative_stake=stake,
+                    cumulative_payout=payout,
+                    cumulative_net_return=payout - stake,
+                    cumulative_realized_roi=realized_roi,
+                    cumulative_control_roi=control_roi,
+                    cumulative_roi_lift=(
+                        None if control_roi is None else realized_roi - control_roi
+                    ),
+                )
+            )
+    return points
+
+
 # ------------------------------------------------------------------------------------------------
 # Routes
 # ------------------------------------------------------------------------------------------------
@@ -205,7 +314,16 @@ async def root() -> ServiceInfo:
         version=app.version,
         disclaimer=DISCLAIMER,
         history=DEFAULT_HISTORY,
-        endpoints=["/providers", "/games", "/portfolio", "/dataset", "/ledger/{name}", "/openapi.json"],
+        endpoints=[
+            "/providers",
+            "/games",
+            "/portfolio",
+            "/dataset",
+            "/ledger/{name}",
+            "/analytics/roi/{name}",
+            "/analytics/roi/{name}/evolution",
+            "/openapi.json",
+        ],
     )
 
 
@@ -325,9 +443,7 @@ async def ledger_info(name: str) -> LedgerInfo:
     """Prospective-ledger contents and per-method standings, if any draws have settled."""
     from .outcome_tracker import PENDING, RESULTS, SETTLED, _read_jsonl
 
-    base = Path("ledger") / name
-    if not base.exists():
-        raise HTTPException(404, f"no ledger at {base}")
+    base = _ledger_path(name)
     pending = _read_jsonl(base / PENDING)
     settled = _read_jsonl(base / SETTLED)
 
@@ -352,6 +468,46 @@ async def ledger_info(name: str) -> LedgerInfo:
         settled=len(settled),
         draw_keys_pending=sorted({str(r["draw_key"]) for r in pending}),
         standings=standings,
+    )
+
+
+@app.get(
+    "/analytics/roi/{name}",
+    response_model=RoiAnalytics,
+    tags=["analytics"],
+    operation_id="getRealizedRoiAnalytics",
+)
+async def roi_analytics(name: str) -> RoiAnalytics:
+    """Aggregate validated realized ROI by provider and version for a prospective ledger."""
+    base = _ledger_path(name)
+    found, records = _valid_roi_records(base)
+    return RoiAnalytics(
+        ledger=name,
+        records_found=found,
+        records_analyzed=len(records),
+        records_excluded=found - len(records),
+        summaries=realized_roi_comparison(records),
+        disclaimer=DISCLAIMER,
+    )
+
+
+@app.get(
+    "/analytics/roi/{name}/evolution",
+    response_model=RoiEvolution,
+    tags=["analytics"],
+    operation_id="getRealizedRoiEvolution",
+)
+async def roi_evolution(name: str) -> RoiEvolution:
+    """Return cumulative realized ROI after each settled draw, separated by provider version."""
+    base = _ledger_path(name)
+    found, records = _valid_roi_records(base)
+    return RoiEvolution(
+        ledger=name,
+        records_found=found,
+        records_analyzed=len(records),
+        records_excluded=found - len(records),
+        points=_roi_evolution(records),
+        disclaimer=DISCLAIMER,
     )
 
 

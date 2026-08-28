@@ -28,6 +28,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- The read-only LottoBench Analytics API now exposes validated realized-ROI summaries and
+  cumulative evolution by provider version, with incomplete evidence counted but excluded.
+- A GPT Action setup guide uses the API's generated OpenAPI schema; no retired plugin manifest or
+  OpenAI API key is required for the LottoBench server itself.
 - Per-game operational defaults for unattended runs: `--history` defaults to the canonical
   store, `--ledger` to `ledger/<game>`, the game to `euromillions`, and the ticket price to
   the game's official price. `record` warns at record time when no price is known, rather

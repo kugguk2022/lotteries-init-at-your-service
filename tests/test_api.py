@@ -185,11 +185,72 @@ def test_ledger_404s_when_absent(client):
 def test_openapi_schema_is_served_and_well_formed(client):
     schema = client.get("/openapi.json").json()
     assert schema["openapi"].startswith("3.")
-    assert schema["info"]["title"] == "LottoBench Experimental API"
-    for path in ("/providers", "/games", "/portfolio", "/dataset"):
+    assert schema["info"]["title"] == "LottoBench Analytics API"
+    for path in (
+        "/providers",
+        "/games",
+        "/portfolio",
+        "/dataset",
+        "/analytics/roi/{name}",
+        "/analytics/roi/{name}/evolution",
+    ):
         assert path in schema["paths"]
     assert "PortfolioRequest" in schema["components"]["schemas"]
     json.dumps(schema)  # must be serialisable for client generators
+
+
+def test_realized_roi_analytics_and_evolution(client, tmp_path, monkeypatch):
+    ledger = tmp_path / "ledger" / "demo"
+    ledger.mkdir(parents=True)
+    rows = []
+    for draw_key, payout, control_payout in (
+        ("2026-01-01", 0.0, 0.0),
+        ("2026-01-08", 30.0, 10.0),
+    ):
+        stake = 10.0
+        rows.append(
+            {
+                "schema_version": 1,
+                "lottobench_version": "0.1.0a2",
+                "provider_name": "frequency",
+                "provider_version": "1",
+                "provider_config_sha256": "config",
+                "benchmark_id": "cohort",
+                "game": "euromillions",
+                "draw_key": draw_key,
+                "currency": "GBP",
+                "n_sets": 4,
+                "stake": stake,
+                "m_portfolio_prize": payout,
+                "m_net_return": payout - stake,
+                "realized_roi": (payout - stake) / stake,
+                "c_portfolio_prize": control_payout,
+                "c_net_return": control_payout - stake,
+                "control_realized_roi": (control_payout - stake) / stake,
+                "realized_roi_lift": (payout - control_payout) / stake,
+                "outcome_source": "operator_verified",
+                "purchase_proof_hash_present": 0,
+            }
+        )
+    pd.DataFrame(rows).to_csv(ledger / "results.csv", index=False)
+    monkeypatch.chdir(tmp_path)
+
+    summary = client.get("/analytics/roi/demo")
+    assert summary.status_code == 200, summary.text
+    body = summary.json()
+    assert body["records_analyzed"] == 2
+    assert body["records_excluded"] == 0
+    assert body["summaries"][0]["realized_roi"] == pytest.approx(0.5)
+    assert body["summaries"][0]["realized_roi_lift"] == pytest.approx(1.0)
+
+    evolution = client.get("/analytics/roi/demo/evolution").json()["points"]
+    assert [point["settled_draws"] for point in evolution] == [1, 2]
+    assert evolution[-1]["cumulative_realized_roi"] == pytest.approx(0.5)
+    assert evolution[-1]["cumulative_roi_lift"] == pytest.approx(1.0)
+
+
+def test_ledger_names_cannot_escape_ledger_directory(client):
+    assert client.get("/analytics/roi/..%2Foutside").status_code in {400, 404}
 
 
 def test_no_endpoint_offers_wagering_or_payment(client):

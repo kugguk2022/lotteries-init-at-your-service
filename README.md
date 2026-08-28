@@ -207,6 +207,19 @@ make test-experiments PYTHON=python
 
 See [experiments/README.md](experiments/README.md) before running historical research code.
 
+## Community benchmark mirrors
+
+The [`publishing/`](publishing/README.md) bundles prepare a redistribution-safe synthetic benchmark
+for Hugging Face and Kaggle, plus a Hugging Face Space leaderboard and executable Kaggle notebook.
+They deliberately exclude operator histories, payout tables, tickets, and user ledger records.
+
+```bash
+python scripts/build_platform_bundles.py
+```
+
+Publishing on either platform is a reproducibility mirror, not independent validation or evidence
+that a fair lottery can be predicted.
+
 ## Release validation
 
 ```bash

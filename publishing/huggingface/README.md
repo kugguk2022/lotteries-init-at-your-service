@@ -8,11 +8,13 @@ tags:
 - reproducibility
 - lottery-research
 configs:
-- config_name: default
+- config_name: history
   data_files:
-  - split: history
+  - split: train
     path: data/synthetic_history.csv
-  - split: results
+- config_name: results
+  data_files:
+  - split: train
     path: data/benchmark_results.csv
 ---
 

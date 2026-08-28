@@ -1,0 +1,7 @@
+{
+  "title": "LottoBench Community Benchmark",
+  "subtitle": "Synthetic forward-only lottery strategy benchmark with equal budgets",
+  "description": "Deterministic synthetic history, derived metrics, and a frozen evaluation contract. This is a software reproducibility benchmark, not a prediction product or gambling advice.",
+  "id": "kugguk2022/lottobench-community-benchmark",
+  "licenses": [{"name": "MIT"}]
+}

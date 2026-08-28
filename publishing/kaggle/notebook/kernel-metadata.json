@@ -1,0 +1,13 @@
+{
+  "id": "kugguk2022/lottobench-community-benchmark-report",
+  "title": "LottoBench Community Benchmark Report",
+  "code_file": "lottobench-community-benchmark.ipynb",
+  "language": "python",
+  "kernel_type": "notebook",
+  "is_private": "false",
+  "enable_gpu": "false",
+  "enable_internet": "false",
+  "dataset_sources": ["kugguk2022/lottobench-community-benchmark"],
+  "competition_sources": [],
+  "kernel_sources": []
+}

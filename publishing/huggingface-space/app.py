@@ -12,6 +12,7 @@ import pandas as pd
 
 ROOT = Path(__file__).resolve().parent
 PROFILE_ROOT = ROOT / "data" / "profiles"
+REFRESH_STATUS_PATH = ROOT / "data" / "refresh_status.json"
 PROFILE_ORDER = ("synthetic", "euromillions", "nl-lotto")
 HOUSE_AGENT = "uniform_random"
 
@@ -129,6 +130,45 @@ def _load_profile(key: str) -> Profile:
 
 
 PROFILES = {key: _load_profile(key) for key in PROFILE_ORDER}
+
+def _load_refresh_status() -> dict:
+    try:
+        payload = json.loads(REFRESH_STATUS_PATH.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {"games": {}}
+    return payload if isinstance(payload, dict) else {"games": {}}
+
+
+REFRESH_STATUS = _load_refresh_status()
+
+
+def _availability_notice() -> str:
+    games = REFRESH_STATUS.get("games", {})
+    unavailable = [
+        (key, value)
+        for key, value in games.items()
+        if isinstance(value, dict) and value.get("available") is False
+    ]
+    if not unavailable:
+        return ""
+    labels = {"euromillions": "EuroMillions", "nl-lotto": "Nederlandse Lotto"}
+    items = "".join(
+        "<li><strong>"
+        + html.escape(labels.get(key, key))
+        + "</strong> — latest verified data remains online. "
+        + html.escape(str(value.get("message", "Official source temporarily unavailable.")))
+        + " <small>Checked "
+        + html.escape(str(value.get("checked_utc", "unknown")))
+        + "</small></li>"
+        for key, value in unavailable
+    )
+    return (
+        '<section role="status" style="margin:14px 0;padding:16px 19px;'
+        'border:1px solid rgba(255,184,77,.45);border-radius:16px;'
+        'background:rgba(255,184,77,.08);color:#d6dedf">'
+        '<b style="color:#ffca70">DATA REFRESH NOTICE</b>'
+        '<ul style="margin:9px 0 0;padding-left:20px">' + items + "</ul></section>"
+    )
 
 
 def _agent_meta(agent: str) -> dict:
@@ -856,6 +896,7 @@ body,.gradio-container { color:var(--ink); font-family:'Space Grotesk',sans-seri
 
 with gr.Blocks(title="LottoBench Lottery Agent Arena", css=CSS) as demo:
     gr.HTML(_global_hero())
+    gr.HTML(_availability_notice())
     gr.HTML(PROTOCOL)
     gr.HTML(NAVIGATION_GUIDE)
     with gr.Tabs(elem_classes="profile-switcher"):

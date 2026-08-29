@@ -30,14 +30,20 @@ what you reproduce locally are the same artifact.
 
 ## What the two tables mean
 
-- **Provider track** — four strategies scored on the same 4-draw holdout at the same 5-ticket
+- **Provider track** — four strategies scored on the same 52-draw holdout at the same 5-ticket
   budget. Primary metric is `pair_coverage`. Coordinated aggregation leads it, which is the design
   claim being tested: recombining proposals beats any single contributor at equal budget.
-- **POI-G track** — a search-space reducer scored on whether its shortlist contained the true
-  ticket. It did not, at any size. The holdout is too small for that to refute the method, and too
-  small for a positive result to have supported it either.
+- **POI-G track** — a search-space reducer scored over 104 draws on **two** containment axes.
+  Main-only containment (against the main-pool universe) is primary; full-ticket containment is
+  reported beside it. They have different denominators on purpose — POI-G barely ranks on the
+  auxiliary axis at small shortlist sizes, so the full-ticket figure alone understates it.
 
 Modelled ROI is negative everywhere and always will be; a fair lottery is a negative-sum game.
+
+**Every containment lift here sits near 1.0, and that is the only possible outcome.** The draw
+history is uniform by construction, so it holds no structure for any reducer to find. These rows
+are a calibration check on the harness, not a verdict on POI-G — that would need a non-uniform or
+real-data track, which this benchmark does not yet have.
 
 ## Rebuild
 

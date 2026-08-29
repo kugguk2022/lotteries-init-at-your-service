@@ -1,0 +1,11 @@
+{
+  "draws_available": 1032,
+  "era_start": "2016-09-24",
+  "first_draw": "2016-09-27",
+  "game": "euromillions",
+  "holdout": 120,
+  "last_draw": "2026-08-14",
+  "note": "Derived metrics only. The underlying draw history is third-party data held locally and is deliberately not redistributed in this repository.",
+  "pairing": "cross",
+  "window": 26
+}

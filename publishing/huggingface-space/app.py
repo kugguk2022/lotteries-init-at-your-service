@@ -31,58 +31,81 @@ provider_view = (
     .rename(columns=PROVIDER_LABELS)
 )
 
-# The shortlist is scored on containment, so the reader needs the random baseline next to it and
-# an explicit sense of how little a four-draw holdout can resolve.
+
+def _hits(rate_column: str, count_column: str) -> pd.Series:
+    return poi_results.apply(
+        lambda row: f"{int(row[count_column])} / {int(row['holdout'])} ({row[rate_column]:.2%})",
+        axis=1,
+    )
+
+
+# Containment is reported on both axes against their own denominators. Collapsing to the
+# full-ticket figure alone understates a main-pool reducer whenever star entropy is low.
 poi_view = poi_results.assign(
-    shortlist=poi_results["subset_size"].map("{:,} tickets".format),
-    universe=poi_results["universe_fraction"].map("{:.2%}".format),
-    reduction=poi_results["reduction_factor"].map("{:g}x".format),
-    contained=poi_results.apply(
-        lambda row: f"{int(row['contained_draws'])} of {int(row['holdout'])}", axis=1
-    ),
-    random_baseline=poi_results["random_expected_containment_rate"].map("{:.2%}".format),
-    null_probability=(
-        1.0 - poi_results["random_expected_containment_rate"]
-    ).pow(poi_results["holdout"]).map("{:.0%}".format),
-    lift=poi_results["containment_lift"].round(2),
+    shortlist=poi_results["subset_size"].map("{:,}".format),
+    distinct_mains=poi_results["mean_distinct_main_sets"].round(1),
+    main_hits=_hits("containment_rate_main", "contained_draws_main"),
+    main_base=poi_results["random_expected_containment_rate_main"].map("{:.2%}".format),
+    main_lift=poi_results["containment_lift_main"].round(2),
+    full_hits=_hits("containment_rate_full", "contained_draws_full"),
+    full_base=poi_results["random_expected_containment_rate_full"].map("{:.2%}".format),
+    full_lift=poi_results["containment_lift_full"].round(2),
+    star_entropy=poi_results["star_share_entropy"].round(2),
     roi=poi_results["modeled_expected_roi_per_selected_ticket"].round(4),
 )[
-    ["shortlist", "universe", "reduction", "contained", "random_baseline", "lift", "roi", "null_probability"]
+    [
+        "shortlist",
+        "distinct_mains",
+        "main_hits",
+        "main_base",
+        "main_lift",
+        "full_hits",
+        "full_base",
+        "full_lift",
+        "star_entropy",
+        "roi",
+    ]
 ].rename(
     columns={
         "shortlist": "Shortlist",
-        "universe": "Share of universe",
-        "reduction": "Search reduction",
-        "contained": "Contained the draw",
-        "random_baseline": "Random baseline",
-        "lift": "Containment lift (primary)",
+        "distinct_mains": "Distinct main sets",
+        "main_hits": "Main contained",
+        "main_base": "Main baseline",
+        "main_lift": "Main lift (primary)",
+        "full_hits": "Full contained",
+        "full_base": "Full baseline",
+        "full_lift": "Full lift",
+        "star_entropy": "Star entropy",
         "roi": "Modelled ROI (top 5)",
-        "null_probability": "P(0 hits | random)",
     }
 )
 
 game = manifest["game"]
+poi_eval = manifest["poi_g_evaluation"]
 best = provider_view.iloc[0]
 singles = provider_view[provider_view["Provider"] != "coordinated_aggregation"]
 best_single = singles.iloc[0]
 # Stated as a comparison only when aggregation actually won; a losing run must not read as a win.
 aggregation_leads = best["Provider"] == "coordinated_aggregation"
+null_hit_recall = game["main_k"] / game["main_n"]
+worst_star_entropy = poi_results["star_share_entropy"].min()
+worst_min_star = poi_results["min_star_share"].min()
 
 if aggregation_leads:
     headline = (
         f"Coordinated aggregation leads at **{best['Pair coverage (primary)']:.4f}** against "
         f"**{best_single['Pair coverage (primary)']:.4f}** for the best single provider "
         f"(`{best_single['Provider']}`) — a "
-        f"{best['Pair coverage (primary)'] / best_single['Pair coverage (primary)'] - 1:+.1%} difference at "
-        "identical budget. That is the claim under test: recombining already-proposed tickets "
-        "reaches more of the combinatorial space than any one contributor spending the same "
+        f"{best['Pair coverage (primary)'] / best_single['Pair coverage (primary)'] - 1:+.1%} "
+        "difference at identical budget. That is the claim under test: recombining already-proposed "
+        "tickets reaches more of the combinatorial space than any one contributor spending the same "
         f"{manifest['evaluation']['budget']} tickets."
     )
 else:
     headline = (
-        f"`{best['Provider']}` leads at **{best['Pair coverage (primary)']:.4f}**, ahead of coordinated "
-        "aggregation. On this run, recombining proposals did not beat the best single provider at "
-        "equal budget — the claim under test is not supported here."
+        f"`{best['Provider']}` leads at **{best['Pair coverage (primary)']:.4f}**, ahead of "
+        "coordinated aggregation. On this run, recombining proposals did not beat the best single "
+        "provider at equal budget — the claim under test is not supported here."
     )
 
 header = f"""
@@ -97,31 +120,42 @@ a frozen, seeded run — this Space computes nothing at request time.
 [Dataset]({DATASET_URL}) · [Source]({SOURCE_URL})
 """
 
+calibration_warning = """
+> **What this data can and cannot settle.** The draw history is generated by a uniform random
+> number generator, so it contains no co-occurrence structure to find. No method can exceed
+> containment lift 1.0 on it, in expectation. Lifts near 1.0 below confirm the harness is
+> calibrated — they are **not** evidence for or against any method on real draws. A claim about
+> real draws needs a non-uniform or real-data track, which this benchmark does not yet have.
+"""
+
 provider_note = f"""
 ## Provider track
 
-Four strategies, {manifest['evaluation']['budget']} tickets per draw, scored on the last
+Four strategies, {manifest['evaluation']['budget']} tickets per draw, scored on
 {manifest['evaluation']['holdout']} draws of a {game['main_k']}-of-{game['main_n']} pool plus a
 {game['auxiliary_k']}-of-{game['auxiliary_n']} auxiliary pool.
 
 Primary metric is **pair coverage**. {headline}
 
-Hit recall is *not* the primary metric and its spread here is noise. Modelled ROI is negative for
-every row and always will be — a fair lottery is negative-sum.
+Hit recall is a secondary metric and sits on the null: every provider lands near the fair-draw
+expectation of {game['main_k']}/{game['main_n']} = {null_hit_recall:.4f}. Modelled ROI is negative
+for every row and always will be — a fair lottery is negative-sum.
 """
 
-poi_note = """
+poi_note = f"""
 ## POI-G candidate subsets
 
 POI-G is a search-space reducer, not a five-ticket strategy. Containment is scored on the entire
-shortlist; modelled ROI is scored only on the five top-ranked tickets, because those are the only
-ones anyone would buy.
+shortlist over {poi_eval['holdout']} draws; modelled ROI is scored only on the five top-ranked
+tickets, because those are the only ones anyone would buy.
 
-**The result is null: the shortlist never contained the true draw, at any size.** The last column is
-why that settles nothing — a shortlist with exactly random containment would also show zero hits
-this often on a four-draw holdout. The honest reading is *no measurable lift, and not enough holdout
-to measure one*. It is published rather than dropped because a leaderboard that hides null results
-is not a leaderboard.
+**Containment is reported on two axes, against two different denominators.** POI-G ranks by pair
+co-occurrence, which is dominated by the main pool, and ties in the integer score are broken by
+enumeration order. Small shortlists are therefore close to auxiliary-degenerate — at the smallest
+size the least-represented star takes {worst_min_star:.1%} of slots against a uniform 25%, and star
+entropy falls to {worst_star_entropy:.2f}. Scoring only the full ticket charges the reducer for an
+axis it barely ranks on, so **main-only containment against the main-only universe is the primary
+metric** and the full-ticket figure is reported beside it.
 """
 
 glossary = """
@@ -132,18 +166,25 @@ glossary = """
 | **Diversity** | 1 − mean pairwise Jaccard similarity between tickets. 1 means fully disjoint. |
 | **Unpopularity lift** | Portfolio expected payout ÷ that of an equally sized uniformly popular portfolio. Above 1 leans unpopular, which raises conditional payout by reducing jackpot sharing. |
 | **Modelled ROI/ticket** | Jackpot-tier `E[payout] · P(win) / price − 1`. A comparative diagnostic from a single-tier model, not a payout forecast, and not realised returns. |
-| **Hit recall** | Mean fraction of a ticket's numbers appearing in the actual draw. Secondary; unstable at this holdout size. |
-| **Containment lift** | Shortlist containment rate ÷ the rate an equally sized random shortlist would achieve. 1.0 is no better than random. |
+| **Hit recall** | Mean fraction of a ticket's numbers appearing in the actual draw. Fair-draw expectation is `main_k / main_n`. |
+| **Distinct main sets** | How many distinct main combinations the shortlist actually held. At small sizes this is nearly the whole shortlist, which is what makes it a main-combination shortlist. |
+| **Main lift** | Main-combination containment ÷ `distinct main sets / C(main_n, main_k)`. Does the reducer find the right numbers? |
+| **Full lift** | Whole-ticket containment ÷ `subset_size / universe`. Would you actually hold the winning ticket? |
+| **Star entropy** | How evenly shortlist slots spread over the auxiliary pool. 1.0 = uniform. Low values mean the full-ticket column understates the reducer. |
 """
 
 protocol = f"""
-- **Forward-only** — at each holdout step every provider is refitted on strictly earlier rows, so
-  there is no leakage path.
+- **Forward-only** — at each holdout step every provider and shortlist is fitted on strictly earlier
+  rows, so there is no leakage path.
 - **Equal budget** — {manifest['evaluation']['budget']} tickets per provider per draw; coverage
   comparisons are meaningless otherwise.
+- **Holdouts** — {manifest['evaluation']['holdout']} draws for the provider track,
+  {poi_eval['holdout']} for POI-G containment. Containment is a rare binary event and needs the
+  longer window.
 - **Frozen game** — `main_n={game['main_n']}, main_k={game['main_k']},
   auxiliary_n={game['auxiliary_n']}, auxiliary_k={game['auxiliary_k']}` →
-  {poi_results['universe_size'].iloc[0]:,} legal tickets.
+  {poi_results['universe_size'].iloc[0]:,} legal tickets over
+  {poi_results['main_universe_size'].iloc[0]:,} main combinations.
 - **Deterministic** — seed `{manifest['seed']}`; the aggregator is a greedy submodular selection,
   identical given identical inputs.
 - **Snapshot** — `{manifest['dataset_sha256']}`. Results are comparable only when this digest,
@@ -166,6 +207,7 @@ not to play. If gambling is causing harm, contact a local support service such a
 
 with gr.Blocks(title="LottoBench Community Leaderboard") as demo:
     gr.Markdown(header)
+    gr.Markdown(calibration_warning)
     gr.Markdown(provider_note)
     gr.Dataframe(provider_view, interactive=False, wrap=True)
     gr.Markdown(poi_note)

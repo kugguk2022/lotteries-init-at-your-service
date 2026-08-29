@@ -1,12 +1,12 @@
 {
   "benchmark_name": "LottoBench Community Benchmark",
-  "benchmark_version": "2.0.0",
+  "benchmark_version": "3.0.0",
   "claims_boundary": "Synthetic software benchmark only; not evidence of prediction, positive ROI, or performance on an operated lottery.",
   "data_kind": "deterministic_synthetic",
-  "dataset_sha256": "6bf3ff8045062e942d7445be27e2d994d16826b8735ab7b2f6f7e734c0017caf",
+  "dataset_sha256": "a7ab8eb08182a09d8d33507e42a6d1b98ec830d5e2db0d13e0a177dd86938c47",
   "evaluation": {
     "budget": 5,
-    "holdout": 4,
+    "holdout": 52,
     "protocol": "forward_only"
   },
   "game": {
@@ -18,8 +18,15 @@
   },
   "lottobench_version": "0.1.0a4",
   "poi_g_evaluation": {
-    "primary_metric": "containment_lift_over_equal_size_random",
+    "holdout": 104,
+    "metric_note": "containment_lift_main scores the main-pool combination against the main-only universe C(main_n, main_k); containment_lift_full scores the whole ticket against the full universe. They use different denominators on purpose. The full-ticket figure understates a main-pool reducer whenever star_share_entropy is low, because POI-G barely ranks on the auxiliary axis at small subset sizes.",
+    "primary_metric": "containment_lift_main",
     "protocol": "forward_only_candidate_subset",
+    "secondary_metrics": [
+      "containment_lift_full",
+      "star_share_entropy",
+      "modeled_expected_roi_per_selected_ticket"
+    ],
     "selection_budget_for_modeled_roi": 5,
     "subset_sizes": [
       20,

@@ -8,7 +8,7 @@ sdk_version: 5.44.1
 app_file: app.py
 pinned: false
 license: mit
-short_description: Three lottery profiles ranking agents against an equal-budget house null
+short_description: Three lottery profiles ranked against an equal-budget null
 tags:
 - benchmark
 - leaderboard

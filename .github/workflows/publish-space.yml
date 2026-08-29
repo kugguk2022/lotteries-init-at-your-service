@@ -1,13 +1,24 @@
 name: publish-lottery-space
 
-# Twice weekly, after the official draw windows:
-# - Wednesday morning follows Tuesday EuroMillions.
-# - Sunday morning follows Friday EuroMillions and Saturday Nederlandse Lotto.
-# GitHub cron is UTC, so 08:15 remains a London morning through DST changes.
+# Post-draw refreshes, in UTC:
+# - Wednesday 08:15: Tuesday EuroMillions result.
+# - Friday 23:15: Friday EuroMillions result.
+# - Sunday 08:15: Saturday Nederlandse Lotto result.
 on:
   schedule:
-    - cron: "15 8 * * 0,3"
+    - cron: "15 8 * * 3"
+    - cron: "15 23 * * 5"
+    - cron: "15 8 * * 0"
   workflow_dispatch:
+    inputs:
+      game:
+        description: Lottery profile to refresh
+        required: true
+        type: choice
+        default: euromillions
+        options:
+          - euromillions
+          - nl-lotto
 
 permissions:
   contents: read
@@ -23,7 +34,7 @@ env:
 jobs:
   refresh-validate-deploy:
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 75
     steps:
       - uses: actions/checkout@v6
 
@@ -38,48 +49,162 @@ jobs:
           pip install -e ".[dev]"
           pip install "huggingface_hub>=1.0,<2"
 
-      - name: Fetch post-contest histories with retry
+      - name: Resolve scheduled lottery
+        id: target
+        shell: bash
+        env:
+          REQUESTED_GAME: ${{ inputs.game }}
+        run: |
+          set -euo pipefail
+          if [[ -n "${REQUESTED_GAME:-}" ]]; then
+            game="$REQUESTED_GAME"
+          else
+            case "$(date -u +%u)" in
+              3|5) game="euromillions" ;;
+              7) game="nl-lotto" ;;
+              *)
+                echo "No lottery mapping exists for this UTC weekday" >&2
+                exit 1
+                ;;
+            esac
+          fi
+          echo "game=$game" >> "$GITHUB_OUTPUT"
+          echo "Selected profile: $game"
+
+      - name: Hydrate staging bundle from the deployed Space
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
         shell: bash
         run: |
           set -euo pipefail
-          database="$RUNNER_TEMP/lotteries.db"
-
-          fetch_game() {
-            local game="$1"
-            for attempt in 1 2 3; do
-              if lottobench fetch \
-                --game "$game" \
-                --db "$database" \
-                --no-cache \
-                --timeout 45; then
-                return 0
-              fi
-              if [[ "$attempt" -lt 3 ]]; then
-                sleep "$((attempt * 30))"
-              fi
-            done
-            echo "Failed to fetch $game after three attempts" >&2
-            return 1
+          test -n "${HF_TOKEN:-}" || {
+            echo "Repository secret HF_TOKEN is required" >&2
+            exit 1
           }
+          bundle="$RUNNER_TEMP/space-bundle"
+          current="$RUNNER_TEMP/current-space"
+          rm -rf "$bundle" "$current"
+          cp -a publishing/huggingface-space "$bundle"
 
-          fetch_game euromillions
-          fetch_game nl-lotto
+          if hf download "$SPACE_ID" --repo-type space --local-dir "$current"; then
+            if [[ -d "$current/data/profiles" ]]; then
+              mkdir -p "$bundle/data/profiles"
+              cp -a "$current/data/profiles/." "$bundle/data/profiles/"
+            fi
+            if [[ -f "$current/data/refresh_status.json" ]]; then
+              cp "$current/data/refresh_status.json" "$bundle/data/refresh_status.json"
+            fi
+          else
+            echo "::warning::Could not hydrate the deployed Space; using repository fallback profiles"
+          fi
 
-      - name: Rebuild all Space profiles
+      - name: Refresh selected history with retry
+        id: refresh
+        shell: bash
+        env:
+          GAME: ${{ steps.target.outputs.game }}
         run: |
-          python -m scripts.build_space_profiles \
-            --db "$RUNNER_TEMP/lotteries.db" \
-            --out publishing/huggingface-space/data/profiles
+          set -euo pipefail
+          database="$RUNNER_TEMP/lotteries.db"
+          log="$RUNNER_TEMP/fetch-$GAME.log"
+          success=false
 
-      - name: Validate generated profiles and Space code
+          for attempt in 1 2 3 4 5; do
+            if lottobench fetch \
+              --game "$GAME" \
+              --db "$database" \
+              --no-cache \
+              --timeout 45 >"$log" 2>&1; then
+              success=true
+              break
+            fi
+            cat "$log" >&2
+            if [[ "$attempt" -lt 5 ]]; then
+              sleep "$((attempt * 30))"
+            fi
+          done
+
+          checked_utc="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          echo "success=$success" >> "$GITHUB_OUTPUT"
+          echo "checked_utc=$checked_utc" >> "$GITHUB_OUTPUT"
+
+          if [[ "$success" == true ]]; then
+            python -m scripts.build_space_profiles \
+              --db "$database" \
+              --out "$RUNNER_TEMP/space-bundle/data/profiles" \
+              --profiles "$GAME"
+          else
+            echo "::warning::$GAME official source remained unavailable after five attempts; preserving the last verified profile"
+          fi
+
+          GAME="$GAME" SUCCESS="$success" CHECKED_UTC="$checked_utc" \
+          STATUS_PATH="$RUNNER_TEMP/space-bundle/data/refresh_status.json" \
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          path = Path(os.environ["STATUS_PATH"])
+          try:
+              status = json.loads(path.read_text(encoding="utf-8"))
+          except (OSError, json.JSONDecodeError):
+              status = {"schema_version": "1.0.0", "games": {}}
+
+          game = os.environ["GAME"]
+          available = os.environ["SUCCESS"] == "true"
+          status.setdefault("games", {})[game] = {
+              "available": available,
+              "checked_utc": os.environ["CHECKED_UTC"],
+              "message": (
+                  None
+                  if available
+                  else "The official source did not answer after five automated attempts."
+              ),
+          }
+          path.parent.mkdir(parents=True, exist_ok=True)
+          path.write_text(json.dumps(status, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+          PY
+
+      - name: Validate staged profiles and Space code
+        shell: bash
         run: |
-          ruff check publishing/huggingface-space/app.py scripts/build_space_profiles.py
-          python -m py_compile publishing/huggingface-space/app.py
+          set -euo pipefail
+          bundle="$RUNNER_TEMP/space-bundle"
+          ruff check "$bundle/app.py" scripts/build_space_profiles.py
+          python -m py_compile "$bundle/app.py"
           pytest -q tests/test_space_profiles.py tests/test_benchmark_output_contract.py
+
+          BUNDLE="$bundle" python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          root = Path(os.environ["BUNDLE"])
+          profiles = root / "data" / "profiles"
+          expected = ("synthetic", "euromillions", "nl-lotto")
+          index = json.loads((profiles / "index.json").read_text(encoding="utf-8"))
+          assert tuple(item["key"] for item in index["profiles"]) == expected
+          for key in expected:
+              directory = profiles / key
+              for name in (
+                  "manifest.json",
+                  "contests.csv",
+                  "tickets.csv",
+                  "leaderboard.csv",
+                  "prospective.csv",
+              ):
+                  assert (directory / name).is_file(), f"{key}/{name} is missing"
+          status = json.loads(
+              (root / "data" / "refresh_status.json").read_text(encoding="utf-8")
+          )
+          assert set(status["games"]) >= {"euromillions", "nl-lotto"}
+          PY
 
       - name: Publish validated bundle to Hugging Face Space
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          GAME: ${{ steps.target.outputs.game }}
+          REFRESH_OK: ${{ steps.refresh.outputs.success }}
         shell: bash
         run: |
           set -euo pipefail
@@ -88,10 +213,10 @@ jobs:
             exit 1
           }
           hf upload "$SPACE_ID" \
-            publishing/huggingface-space \
+            "$RUNNER_TEMP/space-bundle" \
             . \
             --repo-type space \
-            --commit-message "Scheduled post-draw refresh ${GITHUB_RUN_ID}"
+            --commit-message "Post-draw $GAME refresh (source available: $REFRESH_OK) run $GITHUB_RUN_ID"
 
       - name: Wait for Space and verify public health
         env:
@@ -114,7 +239,11 @@ jobs:
           {
             echo "## LottoBench Space refresh"
             echo
-            echo "- Schedule: Wednesday and Sunday at 08:15 UTC"
+            echo "- Profile: ${{ steps.target.outputs.game }}"
+            echo "- Source refresh succeeded: ${{ steps.refresh.outputs.success }}"
+            echo "- Source checked: ${{ steps.refresh.outputs.checked_utc }}"
+            echo "- Policy: preserve last verified profile and publish a Space notice on outage"
+            echo "- Schedule: Wednesday EuroMillions, Friday EuroMillions, Sunday NL Lotto"
             echo "- Space: $SPACE_ID"
             echo "- Run: $GITHUB_RUN_ID"
             echo "- Result: ${{ job.status }}"

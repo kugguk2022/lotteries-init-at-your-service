@@ -18,5 +18,24 @@ The Hugging Face dataset, Hugging Face Space, and Kaggle dataset/notebook must u
 `benchmark_version` and `dataset_sha256`. A platform upload is a distribution channel, not an
 independent validation or endorsement.
 
+## Publishing to Hugging Face
+
+Rebuilding only refreshes the local bundles; the mirrors are uploaded by hand and will silently
+drift until they are pushed. Upload both, always together — a Space rendering a different snapshot
+than the dataset it cites is worse than a stale Space.
+
+```bash
+huggingface-cli upload kugguk/lottobench-community-benchmark publishing/huggingface . \
+  --repo-type=dataset
+huggingface-cli upload kugguk/lottobench-community-leaderboard publishing/huggingface-space . \
+  --repo-type=space
+```
+
+Then confirm the mirrors match this working tree:
+
+- both repos list `data/poi_g_subset_results.csv`,
+- `dataset_sha256` in each `data/benchmark_manifest.json` matches `common/benchmark_manifest.json`,
+- the dataset card exposes the `history`, `results`, and `poi_g_subsets` configs in the viewer.
+
 Do not add operator-sourced history, payout tables, prospective tickets, or user ledger records to
 these folders without a separate redistribution-rights and privacy review.

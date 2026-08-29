@@ -213,6 +213,9 @@ The [`publishing/`](publishing/README.md) bundles prepare a redistribution-safe 
 for Hugging Face and Kaggle, plus a Hugging Face Space leaderboard and executable Kaggle notebook.
 They deliberately exclude operator histories, payout tables, tickets, and user ledger records.
 
+- [Hugging Face benchmark dataset](https://huggingface.co/datasets/kugguk/lottobench-community-benchmark)
+- [Hugging Face community leaderboard](https://huggingface.co/spaces/kugguk/lottobench-community-leaderboard)
+
 ```bash
 python scripts/build_platform_bundles.py
 ```

@@ -3,6 +3,11 @@
 These bundles publish LottoBench without redistributing third-party lottery histories. They contain
 only deterministic synthetic draws, derived benchmark metrics, and the evaluation contract.
 
+Published mirrors:
+
+- Dataset: https://huggingface.co/datasets/kugguk/lottobench-community-benchmark
+- Leaderboard: https://huggingface.co/spaces/kugguk/lottobench-community-leaderboard
+
 Rebuild every mirrored artifact from the repository root:
 
 ```bash

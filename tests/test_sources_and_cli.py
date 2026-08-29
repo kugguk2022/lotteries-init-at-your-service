@@ -246,6 +246,15 @@ def test_netherlands_official_result_normalization_keeps_metadata():
     assert rows[0]["jackpot_color"] == "yellow"
 
 
+def test_netherlands_published_dates_only_uses_completed_draw_slider_links():
+    html = """
+    <script>Christmas 2024-12-17 to 2024-12-27; upcoming 2999-01-01</script>
+    <a href="/trekkingsuitslag/2024-12-21" data-test="date-slider-item">result</a>
+    <a href="/trekkingsuitslag/2999-01-01" data-test="upcoming-draw">open</a>
+    """
+    assert nl.published_dates(html) == ["2024-12-21"]
+
+
 def test_netherlands_cli_fetch_store_and_benchmark(monkeypatch, tmp_path):
     dates = [
         (pd.Timestamp("2025-01-04") + pd.Timedelta(days=index * 7)).date().isoformat()
@@ -254,7 +263,10 @@ def test_netherlands_cli_fetch_store_and_benchmark(monkeypatch, tmp_path):
 
     def fake_get(url, *, timeout):
         if url == nl.RESULTS_PAGE:
-            return " ".join(dates)
+            return " ".join(
+                f'<a href="/trekkingsuitslag/{value}" data-test="date-slider-item">draw</a>'
+                for value in dates
+            )
         draw_date = url.rsplit("/", 1)[-1]
         index = dates.index(draw_date)
         numbers = sorted({(index + step * 7) % 45 + 1 for step in range(6)})

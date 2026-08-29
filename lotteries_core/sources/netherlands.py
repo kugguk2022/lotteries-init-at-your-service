@@ -9,10 +9,10 @@ training history returned here.
 from __future__ import annotations
 
 import json
-import re
 import urllib.error
 import urllib.request
 from datetime import date
+from html.parser import HTMLParser
 
 import pandas as pd
 
@@ -25,6 +25,26 @@ RESULT_API = "https://lotto-api.nederlandseloterij.nl/api/draws/results/{draw_da
 USER_AGENT = "lottobench/0.1 (+https://github.com/kugguk2022/lotteries)"
 
 
+class _PublishedDrawParser(HTMLParser):
+    def __init__(self) -> None:
+        super().__init__()
+        self.dates: set[str] = set()
+
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        attributes = dict(attrs)
+        if tag != "a" or attributes.get("data-test") != "date-slider-item":
+            return
+        prefix = "/trekkingsuitslag/"
+        href = attributes.get("href") or ""
+        if not href.startswith(prefix):
+            return
+        candidate = href.removeprefix(prefix)
+        try:
+            self.dates.add(date.fromisoformat(candidate).isoformat())
+        except ValueError:
+            return
+
+
 def _get_text(url: str, *, timeout: float) -> str:
     request = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
     try:
@@ -35,10 +55,11 @@ def _get_text(url: str, *, timeout: float) -> str:
 
 
 def published_dates(html: str) -> list[str]:
-    """Extract the official page's published draw dates, excluding future schedule dates."""
+    """Extract completed draws from the official result slider, excluding page metadata."""
+    parser = _PublishedDrawParser()
+    parser.feed(html)
     today = date.today().isoformat()
-    dates = sorted(set(re.findall(r'20\d{2}-\d{2}-\d{2}', html)))
-    return [value for value in dates if value <= today]
+    return sorted(value for value in parser.dates if value <= today)
 
 
 def normalize_result(payload: dict) -> list[dict]:

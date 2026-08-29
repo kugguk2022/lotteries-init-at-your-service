@@ -88,3 +88,13 @@ def test_observed_profiles_publish_derived_outputs_not_raw_histories():
         assert manifest["source"]["raw_history_published"] is False
         assert not (PROFILES / key / "history.csv").exists()
         assert len(manifest["history"]["snapshot_sha256"]) == 64
+
+def test_space_refresh_status_has_fail_soft_contract():
+    status_path = PROFILES.parent / "refresh_status.json"
+    status = json.loads(status_path.read_text(encoding="utf-8"))
+    assert status["schema_version"] == "1.0.0"
+    assert set(status["games"]) == {"euromillions", "nl-lotto"}
+    for game in status["games"].values():
+        assert isinstance(game["available"], bool)
+        assert set(game) == {"available", "checked_utc", "message"}
+

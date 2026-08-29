@@ -131,6 +131,7 @@ def _load_profile(key: str) -> Profile:
 
 PROFILES = {key: _load_profile(key) for key in PROFILE_ORDER}
 
+
 def _load_refresh_status() -> dict:
     try:
         payload = json.loads(REFRESH_STATUS_PATH.read_text(encoding="utf-8"))

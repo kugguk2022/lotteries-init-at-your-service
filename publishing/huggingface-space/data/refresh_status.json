@@ -1,0 +1,15 @@
+{
+  "schema_version": "1.0.0",
+  "games": {
+    "euromillions": {
+      "available": true,
+      "checked_utc": null,
+      "message": null
+    },
+    "nl-lotto": {
+      "available": true,
+      "checked_utc": null,
+      "message": null
+    }
+  }
+}

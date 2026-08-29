@@ -137,7 +137,10 @@ def _published_csv(rows: int = 400) -> str:
 
 
 def _nl_results_page() -> str:
-    listed = "".join(f'<li data-draw-date="{value}">{value}</li>' for value in NL_DATES)
+    listed = "".join(
+        f'<a href="/trekkingsuitslag/{value}" data-test="date-slider-item">{value}</a>'
+        for value in NL_DATES
+    )
     return f"<html><body><ul>{listed}</ul></body></html>"
 
 

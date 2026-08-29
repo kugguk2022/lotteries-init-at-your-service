@@ -1,41 +1,50 @@
 # Community benchmark publishing
 
-These bundles publish LottoBench without redistributing third-party lottery histories. They contain
-only deterministic synthetic draws, derived benchmark metrics, and the evaluation contract.
+LottoBench has two deliberately separate public release tracks:
+
+- The Hugging Face and Kaggle dataset mirrors contain deterministic synthetic draws, POI-G
+  diagnostics, derived benchmark metrics, and the reproducibility contract.
+- The Hugging Face Space contains three derived profiles: a deterministic EuroMillions-format
+  control, observed EuroMillions results, and observed Nederlandse Lotto results. Raw operator
+  histories are never redistributed.
 
 Published mirrors:
 
 - Dataset: https://huggingface.co/datasets/kugguk/lottobench-community-benchmark
-- Leaderboard: https://huggingface.co/spaces/kugguk/lottobench-community-leaderboard
+- Agent arena: https://huggingface.co/spaces/kugguk/lottobench-community-leaderboard
 
-Rebuild every mirrored artifact from the repository root:
-
-```bash
-python scripts/build_platform_bundles.py
-```
-
-The Hugging Face dataset, Hugging Face Space, and Kaggle dataset/notebook must use the same
-`benchmark_version` and `dataset_sha256`. A platform upload is a distribution channel, not an
-independent validation or endorsement.
-
-## Publishing to Hugging Face
-
-Rebuilding only refreshes the local bundles; the mirrors are uploaded by hand and will silently
-drift until they are pushed. Upload both, always together — a Space rendering a different snapshot
-than the dataset it cites is worse than a stale Space.
+Rebuild the synthetic dataset mirrors from the repository root:
 
 ```bash
-huggingface-cli upload kugguk/lottobench-community-benchmark publishing/huggingface . \
-  --repo-type=dataset
-huggingface-cli upload kugguk/lottobench-community-leaderboard publishing/huggingface-space . \
-  --repo-type=space
+python -m scripts.build_platform_bundles
 ```
 
-Then confirm the mirrors match this working tree:
+Build all three Space profiles from a validated local multi-game database:
 
-- both repos list `data/poi_g_subset_results.csv`,
-- `dataset_sha256` in each `data/benchmark_manifest.json` matches `common/benchmark_manifest.json`,
-- the dataset card exposes the `history`, `results`, and `poi_g_subsets` configs in the viewer.
+```bash
+python -m scripts.build_space_profiles --db data/lotteries.db
+```
 
-Do not add operator-sourced history, payout tables, prospective tickets, or user ledger records to
-these folders without a separate redistribution-rights and privacy review.
+## Scheduled Space refresh
+
+`.github/workflows/publish-space.yml` runs at 08:15 UTC every Wednesday and Sunday, after the
+Tuesday EuroMillions and Friday EuroMillions/Saturday Nederlandse Lotto draw windows. It fetches
+fresh histories, rebuilds every profile, runs the output contracts, uploads the Space only after
+validation, waits for startup, and checks the public endpoint.
+
+The workflow requires a GitHub Actions repository secret named `HF_TOKEN` with write access to
+`kugguk/lottobench-community-leaderboard`. It also supports a manual `workflow_dispatch` run.
+
+Every profile records its source class, date range, retrieval timestamp, normalized history digest,
+game shape, agent cohort, budget, holdout, and seed. Pending submissions remain explicitly
+unscored and carry snapshot-bound commitment hashes.
+
+## Dataset release
+
+The synthetic Hugging Face and Kaggle bundles should still be uploaded together after running
+`scripts.build_platform_bundles`; their `benchmark_version`, `dataset_sha256`, and POI-G artifacts
+must match. The observed-lottery Space refresh is independent because it advances after official
+draws and publishes derived outputs only.
+
+Do not add raw operator history, payout tables, or user ledger records to public bundles without a
+separate redistribution-rights and privacy review.

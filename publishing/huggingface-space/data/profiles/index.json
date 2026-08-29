@@ -1,0 +1,26 @@
+{
+  "profiles": [
+    {
+      "data_kind": "deterministic_synthetic",
+      "display_name": "EuroMillions lab control",
+      "key": "synthetic",
+      "last_draw": "2025-11-26",
+      "snapshot_sha256": "7e6d1c34526bef4d3ad1a42ac6a62b0402139fe6277bae0ee399254a24c71b82"
+    },
+    {
+      "data_kind": "observed_public_history",
+      "display_name": "EuroMillions",
+      "key": "euromillions",
+      "last_draw": "2026-08-28",
+      "snapshot_sha256": "2c3ab58166ca1d39e42b56eb5e6b0833678fd1c477607e2aebe587129b3d580a"
+    },
+    {
+      "data_kind": "observed_public_history",
+      "display_name": "Nederlandse Lotto",
+      "key": "nl-lotto",
+      "last_draw": "2026-08-22",
+      "snapshot_sha256": "650e6e33706b76519aea5522ec7becadde5078b6ec27d8650b7450b383e3dbc4"
+    }
+  ],
+  "schema_version": "2.0.0"
+}

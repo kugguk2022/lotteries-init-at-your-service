@@ -1,0 +1,44 @@
+{
+  "claims_boundary": "ROI alpha is modeled expected-ROI difference from the equal-budget uniform null. It is not realized profit, improved draw probability, or betting advice.",
+  "data_kind": "observed_public_history",
+  "display_name": "EuroMillions",
+  "evaluation": {
+    "budget_per_agent": 12,
+    "coordinator": "coordinated_aggregation",
+    "holdout_contests": 12,
+    "house_reference": "uniform_random",
+    "protocol": "forward_only",
+    "providers": [
+      "uniform_random",
+      "frequency",
+      "unpopularity",
+      "gingerm",
+      "spectral_contrarian",
+      "parallax"
+    ],
+    "seed": 20261829
+  },
+  "game": {
+    "auxiliary_k": 2,
+    "auxiliary_n": 12,
+    "main_k": 5,
+    "main_n": 50,
+    "name": "euromillions"
+  },
+  "history": {
+    "first_draw": "2016-01-01",
+    "last_draw": "2026-08-28",
+    "retrieved_utc": "2026-08-29T11:32:22+00:00",
+    "rows": 1113,
+    "snapshot_sha256": "2c3ab58166ca1d39e42b56eb5e6b0833678fd1c477607e2aebe587129b3d580a"
+  },
+  "profile_key": "euromillions",
+  "schema_version": "2.0.0",
+  "source": {
+    "class": "PUBLIC ARCHIVE",
+    "label": "Validated EuroMillions archive fallback",
+    "raw_history_published": false,
+    "retrieval_record": "lottobench.fetch:auto",
+    "url": "https://www.euro-millions.com/results-history-2026"
+  }
+}

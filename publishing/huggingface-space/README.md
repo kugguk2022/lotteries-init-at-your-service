@@ -1,57 +1,42 @@
 ---
-title: LottoBench Community Leaderboard
-emoji: 🧪
+title: LottoBench Lottery Agent Arena
+emoji: "🎯"
 colorFrom: blue
-colorTo: green
+colorTo: yellow
 sdk: gradio
 sdk_version: 5.44.1
 app_file: app.py
 pinned: false
 license: mit
-short_description: Forward-only, equal-budget results on deterministic synthetic lottery draws
+short_description: Three lottery profiles ranking agents against an equal-budget house null
 tags:
 - benchmark
 - leaderboard
 - reproducibility
-- synthetic
+- lottery
 datasets:
 - kugguk/lottobench-community-benchmark
 ---
 
-# LottoBench Community Leaderboard
+# LottoBench Lottery Agent Arena
 
-Read-only visualization of the deterministic synthetic LottoBench community benchmark. This Space
-does not make predictions, place wagers, or establish performance on operated lotteries.
+Three isolated lottery profiles share one forward-only, equal-budget scoring contract:
 
-Every number shown is read from `data/`, which is a byte-identical copy of the
-[benchmark dataset](https://huggingface.co/datasets/kugguk/lottobench-community-benchmark). The
-Space computes nothing at runtime — it renders a frozen, seeded run so that what you see here and
-what you reproduce locally are the same artifact.
+1. **EuroMillions lab control**: deterministic `5/50 + 2/12` draws used to verify the machinery.
+2. **EuroMillions**: 1,113 normalized public-archive draws through 2026-08-28.
+3. **Nederlandse Lotto**: 52 primary `6/45` draws from the operator API through 2026-08-22.
 
-## What the two tables mean
+Each profile provides two screens:
 
-- **Provider track** — four strategies scored on the same 52-draw holdout at the same 5-ticket
-  budget. Primary metric is `pair_coverage`. Coordinated aggregation leads it, which is the design
-  claim being tested: recombining proposals beats any single contributor at equal budget.
-- **POI-G track** — a search-space reducer scored over 104 draws on **two** containment axes.
-  Main-only containment (against the main-pool universe) is primary; full-ticket containment is
-  reported beside it. They have different denominators on purpose — POI-G barely ranks on the
-  auxiliary axis at small shortlist sizes, so the full-ticket figure alone understates it.
+- **Agent Arena** replays twelve contests, ranks seven agents against the uniform null, animates
+  every committed ticket walk, and exposes the exact scored ledgers.
+- **Pending Set Lab** shifts a transparent allocation between bet engineering and house/draw
+  engineering, then exports a re-ranked dataset of frozen, unscored submissions.
 
-Modelled ROI is negative everywhere and always will be; a fair lottery is a negative-sum game.
+Raw observed histories are not redistributed. The public Space contains source provenance,
+snapshot hashes, derived benchmark results, scored commitments, and pending commitments.
 
-**Every containment lift here sits near 1.0, and that is the only possible outcome.** The draw
-history is uniform by construction, so it holds no structure for any reducer to find. These rows
-are a calibration check on the harness, not a verdict on POI-G — that would need a non-uniform or
-real-data track, which this benchmark does not yet have.
-
-## Rebuild
-
-```bash
-git clone https://github.com/kugguk2022/lotteries-init-at-your-service
-cd lotteries-init-at-your-service
-pip install -e .
-python scripts/build_platform_bundles.py
-```
-
-Not financial or gambling advice. The safest financial baseline is not to play.
+ROI alpha is modeled expected-ROI percentage-point difference from an equal-budget uniform null.
+It is not realized profit, increased draw probability, evidence of operator manipulation, or
+betting advice. The pending allocation score is a research ranking lens, not a forecast
+probability.

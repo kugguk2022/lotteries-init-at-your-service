@@ -32,8 +32,13 @@ from .roi import JackpotModel, default_jackpot_model, portfolio_expected_roi
 @dataclass
 class StepResult:
     t: int
+    draw_date: str = ""
+    actual_main: tuple[int, ...] = ()
+    actual_star: tuple[int, ...] = ()
     per_provider: dict[str, dict] = field(default_factory=dict)
+    per_provider_tickets: dict[str, list[Ticket]] = field(default_factory=dict)
     aggregated: dict = field(default_factory=dict)
+    aggregated_tickets: list[Ticket] = field(default_factory=list)
 
 
 def _actual_main(row: pd.Series, spec: GameSpec, main_cols: list[str]) -> set[int]:
@@ -60,8 +65,13 @@ def evaluate_forward(
     popularity: PopularityModel | None = None,
     weights: AggregationWeights | None = None,
     main_cols: list[str] | None = None,
+    include_steps: bool = False,
 ) -> dict:
-    """Run the forward-only, equal-budget benchmark and return a JSON-serialisable summary."""
+    """Run the forward-only, equal-budget benchmark and return a JSON-serialisable summary.
+
+    Set ``include_steps`` to expose the precommitted tickets and observed metrics for each holdout
+    contest. The default summary contract stays compact for existing CLI and API consumers.
+    """
     jackpot = jackpot or default_jackpot_model(spec)
     popularity = popularity or PopularityModel()
 
@@ -69,6 +79,11 @@ def evaluate_forward(
         main_cols = [c for c in history.columns if str(c).lower().startswith(("ball_", "n"))][
             : spec.main_k
         ]
+    star_cols = [
+        c
+        for c in history.columns
+        if str(c).lower().startswith(("star_", "dream", "lucky"))
+    ][: spec.star_k]
     n = len(history)
     if n <= holdout + 5:
         raise ValueError("history too short for the requested holdout window")
@@ -79,9 +94,21 @@ def evaluate_forward(
         train = history.iloc[:t]
         actual = history.iloc[t]
         actual_main = _actual_main(actual, spec, main_cols)
+        actual_star = tuple(sorted(int(actual[c]) for c in star_cols))
+        raw_draw_date = actual.get("draw_date", t)
+        draw_date = (
+            raw_draw_date.date().isoformat()
+            if isinstance(raw_draw_date, pd.Timestamp)
+            else str(raw_draw_date)
+        )
 
         envelopes: list[InferenceEnvelope] = []
-        step = StepResult(t=t)
+        step = StepResult(
+            t=t,
+            draw_date=draw_date,
+            actual_main=tuple(sorted(actual_main)),
+            actual_star=actual_star,
+        )
         for prov in providers:
             # Fit forward-only; providers that accept a spec get it.
             try:
@@ -94,6 +121,7 @@ def evaluate_forward(
                 training_data=train, created_utc="",
             )
             envelopes.append(env)
+            step.per_provider_tickets[prov.name] = list(result.tickets)
             cov = coverage_report(spec, result.tickets)
             roi = portfolio_expected_roi(spec, result.tickets, jackpot, popularity)
             step.per_provider[prov.name] = {
@@ -112,9 +140,41 @@ def evaluate_forward(
             **agg_cov,
             **agg_roi,
         }
+        step.aggregated_tickets = list(agg_tickets)
         steps.append(step)
 
-    return _summarise(steps, providers, budget, holdout, seed, spec)
+    summary = _summarise(steps, providers, budget, holdout, seed, spec)
+    if include_steps:
+        summary["steps"] = [_serialise_step(step) for step in steps]
+    return summary
+
+
+def _serialise_ticket(ticket: Ticket) -> dict[str, list[int]]:
+    main, star = ticket
+    return {"main": list(main), "auxiliary": list(star)}
+
+
+def _serialise_step(step: StepResult) -> dict:
+    agents = {
+        provider: {
+            "metrics": metrics,
+            "tickets": [_serialise_ticket(ticket) for ticket in step.per_provider_tickets[provider]],
+        }
+        for provider, metrics in step.per_provider.items()
+    }
+    agents["coordinated_aggregation"] = {
+        "metrics": step.aggregated,
+        "tickets": [_serialise_ticket(ticket) for ticket in step.aggregated_tickets],
+    }
+    return {
+        "t": step.t,
+        "draw_date": step.draw_date,
+        "actual": {
+            "main": list(step.actual_main),
+            "auxiliary": list(step.actual_star),
+        },
+        "agents": agents,
+    }
 
 
 def _mean_metric(steps: list[StepResult], who: str, key: str) -> float:

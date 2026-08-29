@@ -8,6 +8,7 @@ import pandas as pd
 
 ROOT = Path(__file__).resolve().parent
 results = pd.read_csv(ROOT / "data" / "benchmark_results.csv")
+poi_results = pd.read_csv(ROOT / "data" / "poi_g_subset_results.csv")
 manifest = json.loads((ROOT / "data" / "benchmark_manifest.json").read_text(encoding="utf-8"))
 
 display = results[
@@ -37,6 +38,11 @@ not evidence that a fair lottery is predictable and are not financial or gamblin
 with gr.Blocks(title="LottoBench Community Leaderboard") as demo:
     gr.Markdown(description)
     gr.Dataframe(display, interactive=False)
+    gr.Markdown(
+        "## POI-G candidate subsets\n\nContainment is scored on the full shortlist. Modeled ROI "
+        "is scored only on the declared fixed-budget selection and is not realized ROI."
+    )
+    gr.Dataframe(poi_results, interactive=False)
 
 if __name__ == "__main__":
     demo.launch()

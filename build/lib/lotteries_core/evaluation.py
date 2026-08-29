@@ -1,0 +1,165 @@
+"""Forward-only, equal-budget evaluation -- the framework's single source of truth for "is it better?".
+
+Rules enforced here (see ``repurpose.md`` for why they are non-negotiable):
+
+* **Forward-only.** At holdout draw ``t`` every provider is fit on draws ``< t`` only, then scored
+  against draw ``t``. No holdout draw ever informs the state that scores it.
+* **Equal budget.** Every provider and the aggregated portfolio spend the *same* number of tickets
+  ``B`` at every step, so comparisons are fair by construction.
+* **Coverage + ROI, not just hits.** Because hitting a fair draw is astronomically unlikely in any
+  realistic window, the primary reported metrics are combinatorial coverage and expected
+  unpopularity-adjusted ROI; realised hit-recall is reported too but treated as high-variance noise.
+
+The headline comparison is *best single provider* versus *coordinated aggregation* at identical
+budget -- the operational form of the research question.
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+
+import numpy as np
+import pandas as pd
+
+from .aggregation import AggregationWeights, aggregate
+from .coverage import coverage_report
+from .envelope import InferenceEnvelope
+from .popularity import PopularityModel
+from .protocol import GameSpec, InferenceProvider, Ticket
+from .roi import JackpotModel, default_jackpot_model, portfolio_expected_roi
+
+
+@dataclass
+class StepResult:
+    t: int
+    per_provider: dict[str, dict] = field(default_factory=dict)
+    aggregated: dict = field(default_factory=dict)
+
+
+def _actual_main(row: pd.Series, spec: GameSpec, main_cols: list[str]) -> set[int]:
+    return {int(row[c]) for c in main_cols}
+
+
+def _hit_recall(tickets: list[Ticket], actual_main: set[int], spec: GameSpec) -> float:
+    """Mean fraction of a ticket's main numbers that appear in the actual draw (coverage of truth)."""
+    if not tickets:
+        return 0.0
+    recalls = [len(set(main) & actual_main) / spec.main_k for main, _ in tickets]
+    return float(np.mean(recalls))
+
+
+def evaluate_forward(
+    history: pd.DataFrame,
+    spec: GameSpec,
+    providers: list[InferenceProvider],
+    *,
+    budget: int = 25,
+    holdout: int = 20,
+    seed: int = 1234,
+    jackpot: JackpotModel | None = None,
+    popularity: PopularityModel | None = None,
+    weights: AggregationWeights | None = None,
+    main_cols: list[str] | None = None,
+) -> dict:
+    """Run the forward-only, equal-budget benchmark and return a JSON-serialisable summary."""
+    jackpot = jackpot or default_jackpot_model(spec)
+    popularity = popularity or PopularityModel()
+
+    if main_cols is None:
+        main_cols = [c for c in history.columns if str(c).lower().startswith(("ball_", "n"))][
+            : spec.main_k
+        ]
+    n = len(history)
+    if n <= holdout + 5:
+        raise ValueError("history too short for the requested holdout window")
+    start = n - holdout
+
+    steps: list[StepResult] = []
+    for t in range(start, n):
+        train = history.iloc[:t]
+        actual = history.iloc[t]
+        actual_main = _actual_main(actual, spec, main_cols)
+
+        envelopes: list[InferenceEnvelope] = []
+        step = StepResult(t=t)
+        for prov in providers:
+            # Fit forward-only; providers that accept a spec get it.
+            try:
+                prov.fit(train, spec)  # type: ignore[call-arg]
+            except TypeError:
+                prov.fit(train)
+            result = prov.propose(spec, budget, np.random.default_rng(seed + t))
+            env = InferenceEnvelope.build(
+                provider=prov.name, game=spec, result=result, seed=seed + t,
+                training_data=train, created_utc="",
+            )
+            envelopes.append(env)
+            cov = coverage_report(spec, result.tickets)
+            roi = portfolio_expected_roi(spec, result.tickets, jackpot, popularity)
+            step.per_provider[prov.name] = {
+                "hit_recall": _hit_recall(result.tickets, actual_main, spec),
+                **cov,
+                **roi,
+            }
+
+        agg_tickets = aggregate(
+            envelopes, spec, budget, weights=weights, jackpot=jackpot, popularity=popularity
+        )
+        agg_cov = coverage_report(spec, agg_tickets)
+        agg_roi = portfolio_expected_roi(spec, agg_tickets, jackpot, popularity)
+        step.aggregated = {
+            "hit_recall": _hit_recall(agg_tickets, actual_main, spec),
+            **agg_cov,
+            **agg_roi,
+        }
+        steps.append(step)
+
+    return _summarise(steps, providers, budget, holdout, seed, spec)
+
+
+def _mean_metric(steps: list[StepResult], who: str, key: str) -> float:
+    if who == "aggregated":
+        vals = [s.aggregated.get(key, np.nan) for s in steps]
+    else:
+        vals = [s.per_provider.get(who, {}).get(key, np.nan) for s in steps]
+    return float(np.nanmean(vals)) if vals else float("nan")
+
+
+def _summarise(
+    steps: list[StepResult],
+    providers: list[InferenceProvider],
+    budget: int,
+    holdout: int,
+    seed: int,
+    spec: GameSpec,
+) -> dict:
+    metric_keys = ["hit_recall", "pair_coverage", "number_coverage", "mean_jaccard_diversity",
+                   "expected_roi_per_ticket", "unpopularity_lift"]
+    provider_summary = {
+        prov.name: {k: _mean_metric(steps, prov.name, k) for k in metric_keys}
+        for prov in providers
+    }
+    aggregated_summary = {k: _mean_metric(steps, "aggregated", k) for k in metric_keys}
+
+    # Headline: does aggregation beat the best single provider on the two levers we control?
+    best_cov_provider = max(provider_summary, key=lambda p: provider_summary[p]["pair_coverage"])
+    best_roi_provider = max(
+        provider_summary, key=lambda p: provider_summary[p]["unpopularity_lift"]
+    )
+    return {
+        "game": spec.name,
+        "budget": budget,
+        "holdout": holdout,
+        "seed": seed,
+        "providers": provider_summary,
+        "aggregated": aggregated_summary,
+        "headline": {
+            "best_single_pair_coverage": provider_summary[best_cov_provider]["pair_coverage"],
+            "best_single_pair_coverage_provider": best_cov_provider,
+            "aggregated_pair_coverage": aggregated_summary["pair_coverage"],
+            "coverage_improvement": aggregated_summary["pair_coverage"]
+            - provider_summary[best_cov_provider]["pair_coverage"],
+            "best_single_unpopularity_lift": provider_summary[best_roi_provider]["unpopularity_lift"],
+            "aggregated_unpopularity_lift": aggregated_summary["unpopularity_lift"],
+        },
+    }

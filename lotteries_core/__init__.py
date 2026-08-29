@@ -32,14 +32,17 @@ Public surface:
 from __future__ import annotations
 
 from .envelope import InferenceEnvelope
+from .poi_g import PoiGSubset, generate_poi_g_subset
 from .protocol import GameSpec, InferenceProvider, Ticket
 
 __all__ = [
     "GameSpec",
     "InferenceEnvelope",
     "InferenceProvider",
+    "PoiGSubset",
     "Ticket",
+    "generate_poi_g_subset",
     "__version__",
 ]
 
-__version__ = "0.1.0a3"
+__version__ = "0.1.0a4"

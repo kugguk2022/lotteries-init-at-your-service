@@ -1,6 +1,6 @@
 {
   "benchmark_name": "LottoBench Community Benchmark",
-  "benchmark_version": "1.0.0",
+  "benchmark_version": "2.0.0",
   "claims_boundary": "Synthetic software benchmark only; not evidence of prediction, positive ROI, or performance on an operated lottery.",
   "data_kind": "deterministic_synthetic",
   "dataset_sha256": "6bf3ff8045062e942d7445be27e2d994d16826b8735ab7b2f6f7e734c0017caf",
@@ -16,7 +16,17 @@
     "main_n": 12,
     "name": "synthetic-community"
   },
-  "lottobench_version": "0.1.0a3",
+  "lottobench_version": "0.1.0a4",
+  "poi_g_evaluation": {
+    "primary_metric": "containment_lift_over_equal_size_random",
+    "protocol": "forward_only_candidate_subset",
+    "selection_budget_for_modeled_roi": 5,
+    "subset_sizes": [
+      20,
+      100,
+      500
+    ]
+  },
   "primary_metric": "pair_coverage",
   "providers": [
     "uniform_random",

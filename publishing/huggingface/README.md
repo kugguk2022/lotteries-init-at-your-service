@@ -16,6 +16,10 @@ configs:
   data_files:
   - split: train
     path: data/benchmark_results.csv
+- config_name: poi_g_subsets
+  data_files:
+  - split: train
+    path: data/poi_g_subset_results.csv
 ---
 
 # LottoBench Community Benchmark
@@ -28,14 +32,18 @@ fair lottery is predictable.
 
 - `synthetic_history.csv`: generated integer-pool draws with no operator data.
 - `benchmark_results.csv`: provider and coordinated-aggregation metrics.
+- `poi_g_subset_results.csv`: causal POI-G candidate-set containment, matched random expectation,
+  reduction factor, and modeled ROI for a separate fixed-budget selection.
 - `benchmark_manifest.json`: frozen game shape, seed, budget, holdout and dataset digest.
 
-The primary metric is pair coverage. Expected ROI is a modeled diagnostic and hit recall is
-high-variance; neither is evidence of future performance or positive user returns.
+The provider track's primary metric is pair coverage. The POI-G track's primary metric is
+next-draw containment lift over an equally sized random subset. Its ROI column applies only to the
+five ranked tickets selected from each subset, not to buying the entire subset. Expected ROI is a
+modeled diagnostic and the four-draw synthetic holdout is far too small for predictive claims.
 
 ## Reproduce
 
-From LottoBench `0.1.0a3` source:
+From LottoBench `0.1.0a4` source:
 
 ```bash
 python scripts/build_platform_bundles.py

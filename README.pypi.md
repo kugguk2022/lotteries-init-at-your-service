@@ -30,7 +30,7 @@ each passes the same contract. See `docs/wiki/Backlog.md`.
 ## Install
 
 ```bash
-pip install lottobench==0.1.0a3
+pip install lottobench==0.1.0a4
 ```
 
 The base install carries the small numerical and retrieval stack needed for everything below.
@@ -85,7 +85,7 @@ available for compatibility and research extensions.
 | `transformer` | PyTorch | the `sequence_transformer` provider |
 
 ```bash
-pip install "lottobench[api]==0.1.0a3"
+pip install "lottobench[api]==0.1.0a4"
 ```
 
 The optional **LottoBench Analytics API** serves read-only portfolio metrics, validated realized-ROI
@@ -123,12 +123,36 @@ lotto-roi validate roi-benchmark.json
 lotto-roi compare roi-benchmark.json another-benchmark.json
 ```
 
+## Causal POI-G candidate subsets
+
+POI-G is exposed separately from the equal-ticket provider protocol because a shortlist is not a
+purchased portfolio:
+
+```python
+import pandas as pd
+from lotteries_core import GameSpec, generate_poi_g_subset
+from lotteries_core.roi import JackpotModel
+
+history = pd.read_csv("history.csv")
+spec = GameSpec.euromillions()
+subset = generate_poi_g_subset(history, spec, subset_size=3_000)
+
+print(subset.size, subset.universe_fraction, subset.reduction_factor)
+portfolio = subset.select(budget=20)
+modeled = subset.modeled_portfolio_roi(spec, 20, JackpotModel())
+```
+
+The subset is ranked from history available at invocation time. For forward tests, call it before
+appending the target draw. `modeled_portfolio_roi` is jackpot-tier model output for the bounded
+selection only; realized ROI exists only after a preregistered portfolio is settled with actual
+cost and payout. Exact enumeration of very large game universes can be computationally expensive.
+
 Exports are deterministic and integrity-hashed. They contain benchmark provenance and aggregate
 financial outcomes, but no tickets, receipt contents, machine identifiers, or user identity.
 
 ## Experimental status
 
-Version `0.1.0a3` is an alpha. APIs, data schemas, strategies, and game support may change. A
+Version `0.1.0a4` is an alpha. APIs, data schemas, strategies, and game support may change. A
 passing benchmark or a high metric value is not evidence of future draw prediction unless the exact
 metric, holdout, data cutoff, ticket budget, baseline, and leakage controls are supplied and
 reproducible. Always verify game rules and official results with the relevant operator.

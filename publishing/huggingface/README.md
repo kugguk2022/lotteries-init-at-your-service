@@ -27,6 +27,14 @@ configs:
   data_files:
   - split: train
     path: data/poi_g_subset_results.csv
+- config_name: poi_g_candidates
+  data_files:
+  - split: train
+    path: data/poi_g_candidates.csv
+- config_name: poi_g_fixed_budget
+  data_files:
+  - split: train
+    path: data/poi_g_fixed_budget.csv
 ---
 
 # LottoBench Community Benchmark
@@ -55,6 +63,7 @@ is not evidence that a fair lottery is predictable, and it contains no operator-
 | Does coordinating several providers beat the best single provider at equal budget? | Yes on the primary metric — coordinated aggregation reaches **0.4050** pair coverage vs **0.3814** for the best single provider (**+6.2 %**). |
 | Does any provider predict the next draw? | No. `hit_recall` lands at 0.336–0.349 for every provider against a fair-draw expectation of `k/n` = **0.3333**. That is noise around the null. |
 | Does POI-G reduce the search space usefully? | Unresolved here. Containment lift sits at **0.48 / 1.07 / 1.07** (main axis) — indistinguishable from 1.0. See the caveat below: this data *cannot* show a lift. |
+| Can the extensive POI-G subset be inspected directly? | Yes. `poi_g_candidates` publishes all 500 ranked candidates; `poi_g_fixed_budget` contains only the five tickets eligible for modeled or realized ROI. |
 | Does any strategy produce positive ROI? | No. Modelled jackpot-tier ROI is between **−0.92 and −0.95** per ticket everywhere. |
 | Is the run reproducible? | Yes. Fixed seed, frozen game shape, and a SHA-256 over the draw snapshot pinned in the manifest. |
 
@@ -185,6 +194,17 @@ top-ranked tickets, because those are the only ones anyone would actually buy.
 Frozen game shape, seed, budget, holdouts, provider list, metric names, snapshot digest, and the
 claims boundary. Load this first when comparing runs.
 
+### POI-G candidate snapshot — configs `poi_g_candidates` and `poi_g_fixed_budget`
+
+`poi_g_candidates` exposes the complete 500-row ranked search-space reduction for the next
+synthetic snapshot. Every row carries its draw key, training-history hash, G score, distance from
+the causal target, crowd-popularity share, modeled expected ROI, and an integrity hash.
+
+`poi_g_fixed_budget` contains exactly the first five ranked candidates. Only these five appear in
+`data/poi_g_prediction.json`, the sealed inference envelope eligible for settlement. The extensive
+subset is never priced as though all 500 candidates were purchased. File hashes and the modeled
+portfolio ROI are recorded in `data/poi_g_candidate_manifest.json`.
+
 ## Load it
 
 ```python
@@ -193,6 +213,12 @@ from datasets import load_dataset
 history = load_dataset("kugguk/lottobench-community-benchmark", "history")["train"]
 results = load_dataset("kugguk/lottobench-community-benchmark", "results")["train"]
 poi_g   = load_dataset("kugguk/lottobench-community-benchmark", "poi_g_subsets")["train"]
+candidates = load_dataset(
+    "kugguk/lottobench-community-benchmark", "poi_g_candidates"
+)["train"]
+selection = load_dataset(
+    "kugguk/lottobench-community-benchmark", "poi_g_fixed_budget"
+)["train"]
 ```
 
 The manifest is a plain file rather than a config:
@@ -230,6 +256,7 @@ git clone https://github.com/kugguk2022/lotteries-init-at-your-service
 cd lotteries-init-at-your-service
 pip install -e .
 python scripts/build_platform_bundles.py
+python -m scripts.build_hf_poi_g_artifacts
 sha256sum publishing/common/synthetic_history.csv
 ```
 

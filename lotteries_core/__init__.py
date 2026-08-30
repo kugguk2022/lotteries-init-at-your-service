@@ -33,16 +33,26 @@ from __future__ import annotations
 
 from .envelope import InferenceEnvelope
 from .poi_g import PoiGSubset, generate_poi_g_subset
+from .poi_g_artifacts import (
+    PoiGArtifactBundle,
+    build_poi_g_artifacts,
+    settle_poi_g_artifacts,
+    validate_poi_g_artifacts,
+)
 from .protocol import GameSpec, InferenceProvider, Ticket
 
 __all__ = [
     "GameSpec",
     "InferenceEnvelope",
     "InferenceProvider",
+    "PoiGArtifactBundle",
     "PoiGSubset",
     "Ticket",
+    "build_poi_g_artifacts",
     "generate_poi_g_subset",
+    "settle_poi_g_artifacts",
+    "validate_poi_g_artifacts",
     "__version__",
 ]
 
-__version__ = "0.1.0a4"
+__version__ = "0.1.0a5"

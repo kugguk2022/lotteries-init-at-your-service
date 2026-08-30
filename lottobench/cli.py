@@ -16,10 +16,15 @@ from __future__ import annotations
 import argparse
 import json
 from dataclasses import asdict
+from datetime import datetime, timezone
 from pathlib import Path
 
 from lotteries_core import dataset, registry, storage
 from lotteries_core.evaluation import evaluate_forward
+from lotteries_core.poi_g_artifacts import (
+    build_poi_g_artifacts,
+    settle_poi_g_artifacts,
+)
 from lotteries_core.sources import fetch_euromillions, fetch_netherlands
 from lotteries_core.sources.euromillions import SOURCE_CHOICES
 
@@ -73,6 +78,41 @@ def build_parser() -> argparse.ArgumentParser:
     exporter = commands.add_parser("export-csv", help="export a history for legacy tools")
     exporter.add_argument("csv", type=Path)
     _add_games(exporter)
+
+    poi_export = commands.add_parser(
+        "poi-export",
+        help="seal an extensive POI-G candidate subset and its fixed-budget selection",
+    )
+    _add_games(poi_export)
+    poi_export.add_argument("--draw-key", required=True, help="target draw identifier")
+    poi_export.add_argument("--subset-size", type=int, default=500)
+    poi_export.add_argument("--budget", type=int, default=25)
+    poi_export.add_argument("--window", type=int, default=26)
+    poi_export.add_argument("--pairing", choices=["cross", "main", "pooled"], default="cross")
+    poi_export.add_argument("--seed", type=int, default=0)
+    poi_export.add_argument(
+        "--created-utc",
+        default=None,
+        help="optional ISO-8601 seal time; defaults to the current UTC time",
+    )
+    poi_export.add_argument("--out", type=Path, required=True, help="artifact output directory")
+
+    poi_settle = commands.add_parser(
+        "poi-settle", help="settle a sealed POI-G fixed-budget selection"
+    )
+    poi_settle.add_argument("bundle", type=Path, help="directory produced by poi-export")
+    poi_settle.add_argument("--actual-main", required=True, help="comma-separated main numbers")
+    poi_settle.add_argument(
+        "--actual-auxiliary", default="", help="comma-separated star/auxiliary numbers"
+    )
+    poi_settle.add_argument(
+        "--payout-table", type=Path, default=None, help="optional JSON tier-to-payout mapping"
+    )
+    poi_settle.add_argument("--ticket-price", type=float, default=None)
+    poi_settle.add_argument("--currency", default="EUR")
+    poi_settle.add_argument("--outcome-source", default="official")
+    poi_settle.add_argument("--payout-source", default="official")
+    poi_settle.add_argument("--settled-utc", default=None)
     return parser
 
 
@@ -184,6 +224,82 @@ def _cmd_benchmark(args, parser) -> int:
     return 0
 
 
+def _require_history(args, parser):
+    definition = _resolve(args.game, parser)
+    if not args.db.exists() or not storage.is_database(args.db):
+        parser.error(
+            f"no LottoBench database at {args.db}. Run: "
+            f"lottobench fetch --game {definition.key} --db {args.db}"
+        )
+    history = storage.read_history(args.db, game=definition.key)
+    if history.empty:
+        parser.error(
+            f"no stored draws for {definition.key}. Run: "
+            f"lottobench fetch --game {definition.key} --db {args.db}"
+        )
+    return definition, history
+
+
+def _cmd_poi_export(args, parser) -> int:
+    definition, history = _require_history(args, parser)
+    created_utc = args.created_utc or datetime.now(timezone.utc).isoformat()
+    bundle = build_poi_g_artifacts(
+        history,
+        definition.spec,
+        draw_key=args.draw_key,
+        subset_size=args.subset_size,
+        budget=args.budget,
+        window=args.window,
+        pairing=args.pairing,
+        seed=args.seed,
+        created_utc=created_utc,
+        evidence_kind="prospective",
+        repo_dir=Path.cwd(),
+    )
+    paths = bundle.write(args.out)
+    print(
+        f"POI-G: {len(bundle.candidates)} ranked candidates; "
+        f"{len(bundle.selection)} sealed for ROI"
+    )
+    print(f"Prediction: {bundle.manifest['prediction_id']}")
+    print(f"Artifacts: {paths['manifest'].parent}")
+    return 0
+
+
+def _read_payout_table(path: Path | None) -> dict[str, float] | None:
+    if path is None:
+        return None
+    raw = json.loads(path.read_text(encoding="utf-8-sig"))
+    tiers = raw.get("tiers", raw.get("prizes", raw)) if isinstance(raw, dict) else raw
+    if not isinstance(tiers, dict) or any(isinstance(value, (dict, list)) for value in tiers.values()):
+        raise ValueError(f"{path}: expected a JSON object mapping tiers to payouts")
+    return {str(key): float(value) for key, value in tiers.items()}
+
+
+def _cmd_poi_settle(args, parser) -> int:
+    try:
+        payouts = _read_payout_table(args.payout_table)
+        result = settle_poi_g_artifacts(
+            args.bundle,
+            actual_main=args.actual_main,
+            actual_auxiliary=args.actual_auxiliary,
+            payout_table=payouts,
+            ticket_price=args.ticket_price,
+            currency=args.currency,
+            outcome_source=args.outcome_source,
+            payout_source=args.payout_source,
+            settled_utc=args.settled_utc,
+        )
+    except (OSError, ValueError, json.JSONDecodeError) as exc:
+        parser.error(str(exc))
+    roi = result["realized_roi"]
+    roi_text = "not available (no complete payout evidence)" if roi is None else f"{roi:+.6f}"
+    print(f"Settled {result['prediction_id']} for {result['draw_key']}")
+    print(f"Realized ROI: {roi_text}")
+    print(f"Result: {args.bundle / 'poi_g_settlement.json'}")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
@@ -196,6 +312,10 @@ def main(argv: list[str] | None = None) -> int:
         return _cmd_fetch(args, parser)
     if args.command == "benchmark":
         return _cmd_benchmark(args, parser)
+    if args.command == "poi-export":
+        return _cmd_poi_export(args, parser)
+    if args.command == "poi-settle":
+        return _cmd_poi_settle(args, parser)
 
     definition = _resolve(args.game, parser)
     if args.command == "import-csv":

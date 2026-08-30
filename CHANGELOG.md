@@ -28,6 +28,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `lottobench poi-export` publishes an integrity-hashed extensive POI-G candidate set separately
+  from the fixed-budget inference envelope eligible for ROI. `poi-settle` validates that envelope,
+  scores only the selected budget against a matched equal-budget random control, and leaves money
+  missing when no payout table is supplied. The Hugging Face dataset gains additive candidate and
+  fixed-budget configs without changing the Space bundle or its refresh workflow.
 - The read-only LottoBench Analytics API now exposes validated realized-ROI summaries and
   cumulative evolution by provider version, with incomplete evidence counted but excluded.
 - A GPT Action setup guide uses the API's generated OpenAPI schema; no retired plugin manifest or

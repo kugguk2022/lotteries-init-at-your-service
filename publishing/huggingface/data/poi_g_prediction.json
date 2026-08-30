@@ -1,0 +1,98 @@
+{
+  "budget": 5,
+  "config": {
+    "benchmark_version": "3.0.0",
+    "candidate_subset_size": 500,
+    "draw_key": "synthetic-community-next",
+    "evidence_kind": "deterministic_synthetic_snapshot",
+    "pairing": "cross",
+    "selection_budget": 5,
+    "window": 26
+  },
+  "created_utc": "",
+  "data_sha256": "a7ab8eb08182a09d8d33507e42a6d1b98ec830d5e2db0d13e0a177dd86938c47",
+  "diagnostics": {
+    "candidate_subset_size": 500,
+    "evidence_kind": "deterministic_synthetic_snapshot",
+    "prediction_id": "636a86dcd1e54f4eb99f3c9b3f5571b3d5eade536040955e3f830f0ddb67408b",
+    "reduction_factor": 3.96,
+    "target_g": 231.1153846153846,
+    "universe_size": 1980
+  },
+  "framework_version": "0.1.0a5",
+  "game": {
+    "main_k": 4,
+    "main_n": 12,
+    "name": "synthetic-community",
+    "star_k": 1,
+    "star_n": 4
+  },
+  "git_sha": "227074b322fbdd8fad82233c8675c7ab5183f1db",
+  "provider": "poi_g_causal",
+  "schema_version": 1,
+  "scores": [
+    -0.1153846153846132,
+    -0.1153846153846132,
+    -0.1153846153846132,
+    -0.1153846153846132,
+    -0.1153846153846132
+  ],
+  "seed": 20260828,
+  "tickets": [
+    [
+      [
+        4,
+        6,
+        7,
+        10
+      ],
+      [
+        1
+      ]
+    ],
+    [
+      [
+        1,
+        7,
+        10,
+        11
+      ],
+      [
+        1
+      ]
+    ],
+    [
+      [
+        4,
+        5,
+        10,
+        11
+      ],
+      [
+        1
+      ]
+    ],
+    [
+      [
+        2,
+        3,
+        7,
+        8
+      ],
+      [
+        1
+      ]
+    ],
+    [
+      [
+        2,
+        3,
+        10,
+        11
+      ],
+      [
+        1
+      ]
+    ]
+  ]
+}

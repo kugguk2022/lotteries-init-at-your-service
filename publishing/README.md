@@ -19,6 +19,16 @@ Rebuild the synthetic dataset mirrors from the repository root:
 python -m scripts.build_platform_bundles
 ```
 
+Build the additive extensive POI-G candidate set and its separate fixed-budget ROI selection for
+the Hugging Face dataset only:
+
+```bash
+python -m scripts.build_hf_poi_g_artifacts
+```
+
+This second command writes only under `publishing/huggingface/data`; it does not rebuild or deploy
+the Space and does not change any scheduled workflow.
+
 Build all three Space profiles from a validated local multi-game database:
 
 ```bash

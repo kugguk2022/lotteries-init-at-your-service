@@ -1,0 +1,50 @@
+{
+  "artifacts": {
+    "poi_g_candidates.csv": "9f9cc72088fa19df261bbbfd5636ba85989683061e888d73c47bcd96423fe095",
+    "poi_g_fixed_budget.csv": "59e25ff16f79777e36934d45e72ca3474cc8d2065df3685a82c6e8ae2ed33394",
+    "poi_g_prediction.json": "dd251c0906dbc9366237b5f9f952773335315140c5057745dd80344a972cd0d0"
+  },
+  "benchmark_version": "3.0.0",
+  "budget": 5,
+  "candidate_rows": 500,
+  "candidate_rows_sha256": "4a05112fd8fe37f29da4562b39af47772dc7759dcd106f32e78561d6bfac1f7e",
+  "created_utc": "",
+  "draw_key": "synthetic-community-next",
+  "evidence_kind": "deterministic_synthetic_snapshot",
+  "game": {
+    "main_k": 4,
+    "main_n": 12,
+    "name": "synthetic-community",
+    "star_k": 1,
+    "star_n": 4
+  },
+  "history_rows": 260,
+  "history_sha256": "a7ab8eb08182a09d8d33507e42a6d1b98ec830d5e2db0d13e0a177dd86938c47",
+  "modeled_roi": {
+    "best_ticket_roi": -0.9404613967409654,
+    "expected_roi_per_ticket": -0.9519761959366024,
+    "mean_popularity_share": 1.0829097882315863,
+    "selection_budget": 5,
+    "unpopularity_lift": 0.9666686546554445
+  },
+  "pairing": "cross",
+  "prediction_id": "636a86dcd1e54f4eb99f3c9b3f5571b3d5eade536040955e3f830f0ddb67408b",
+  "provider": "poi_g_causal",
+  "reduction_factor": 3.96,
+  "roi_boundary": "ROI applies only to the fixed-budget selection. The extensive candidate subset is a ranked search space and is never treated as a purchased portfolio.",
+  "schema_version": 1,
+  "seed": 20260828,
+  "selected_candidate_sha256": [
+    "1d82b5881c16b4a9c5c0e19f2fc739d60d908f8344ce67fc8d5694ffb9b5685b",
+    "234ee29f310145195877f933a744780f0a87caeca7847ec0d10a689e2b98b34b",
+    "01e51921299819ddd7d7ff3c927121a0c066b8ea0de2c748c449ef8ad5ca9564",
+    "b09c1bfe39dcd6961b7d67a18afa88526469e3d08d59df45fcce63d22bab1902",
+    "90a9679aa501055dac50047e7ea4d069ea66ab0107acf55c9fc9310bcf710b85"
+  ],
+  "selection_rows": 5,
+  "subset_size": 500,
+  "target_g": 231.1153846153846,
+  "universe_fraction": 0.25252525252525254,
+  "universe_size": 1980,
+  "window": 26
+}

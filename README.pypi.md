@@ -30,7 +30,7 @@ each passes the same contract. See `docs/wiki/Backlog.md`.
 ## Install
 
 ```bash
-pip install lottobench==0.1.0a4
+pip install lottobench==0.1.0a5
 ```
 
 The base install carries the small numerical and retrieval stack needed for everything below.
@@ -85,7 +85,7 @@ available for compatibility and research extensions.
 | `transformer` | PyTorch | the `sequence_transformer` provider |
 
 ```bash
-pip install "lottobench[api]==0.1.0a4"
+pip install "lottobench[api]==0.1.0a5"
 ```
 
 The optional **LottoBench Analytics API** serves read-only portfolio metrics, validated realized-ROI
@@ -147,12 +147,28 @@ appending the target draw. `modeled_portfolio_roi` is jackpot-tier model output 
 selection only; realized ROI exists only after a preregistered portfolio is settled with actual
 cost and payout. Exact enumeration of very large game universes can be computationally expensive.
 
-Exports are deterministic and integrity-hashed. They contain benchmark provenance and aggregate
-financial outcomes, but no tickets, receipt contents, machine identifiers, or user identity.
+The same boundary is available as a verifiable CLI bundle:
+
+```bash
+lottobench poi-export --game euromillions --db data/lotteries.db \
+  --draw-key 2026-09-01 --subset-size 3000 --budget 20 --out poi-run
+
+lottobench poi-settle poi-run --actual-main 1,2,3,4,5 --actual-auxiliary 6,7 \
+  --ticket-price 2.50 --payout-table official-payouts.json
+```
+
+`poi-export` writes the extensive ranked candidates separately from the fixed-budget inference
+envelope. `poi-settle` validates those hashes and prices only the selected budget against an
+identically sized deterministic random control. Without a payout table, money and realized ROI
+remain missing rather than silently becoming zero.
+
+Candidate bundles intentionally contain generated tickets so another evaluator can inspect them.
+Privacy-minimized realized-ROI exports remain separate and contain hashes plus aggregate financial
+outcomes, but no tickets, receipt contents, machine identifiers, or user identity.
 
 ## Experimental status
 
-Version `0.1.0a4` is an alpha. APIs, data schemas, strategies, and game support may change. A
+Version `0.1.0a5` is an alpha. APIs, data schemas, strategies, and game support may change. A
 passing benchmark or a high metric value is not evidence of future draw prediction unless the exact
 metric, holdout, data cutoff, ticket budget, baseline, and leakage controls are supplied and
 reproducible. Always verify game rules and official results with the relevant operator.

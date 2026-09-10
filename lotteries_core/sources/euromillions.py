@@ -192,7 +192,7 @@ def fetch_irish_official(
         try:
             return parse_irish_official(cache_file.read_text(encoding="utf-8"))
         except (OSError, UnicodeError, NormalizationError, ValueError):
-            pass
+            cache_file.unlink(missing_ok=True)
     try:
         html = _get(IRISH_OFFICIAL_URL, {}, timeout=timeout, attempts=attempts)
         frame = parse_irish_official(html)

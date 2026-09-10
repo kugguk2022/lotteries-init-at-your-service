@@ -21,6 +21,7 @@ on:
           - nl-lotto
 
 permissions:
+  actions: read
   contents: read
 
 concurrency:
@@ -70,6 +71,36 @@ jobs:
           fi
           echo "game=$game" >> "$GITHUB_OUTPUT"
           echo "Selected profile: $game"
+
+      - name: Restore last validated history snapshot
+        env:
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+          GAME: ${{ steps.target.outputs.game }}
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          artifact_id="$(
+            gh api "/repos/$GITHUB_REPOSITORY/actions/artifacts?name=$GAME-validated-history&per_page=100" |
+              jq -r --arg branch "$DEFAULT_BRANCH" \
+                '[.artifacts[] | select(.expired == false and .workflow_run.head_branch == $branch)]
+                 | sort_by(.created_at) | reverse | .[0].id // empty'
+          )"
+          if [[ -z "$artifact_id" ]]; then
+            echo "No prior $GAME snapshot; using the packaged validated seed"
+            exit 0
+          fi
+
+          snapshot="$RUNNER_TEMP/history-snapshot"
+          mkdir -p "$snapshot"
+          gh api "/repos/$GITHUB_REPOSITORY/actions/artifacts/$artifact_id/zip" > "$snapshot.zip"
+          unzip -q "$snapshot.zip" -d "$snapshot"
+          test -f "$snapshot/lotteries.db" || {
+            echo "Snapshot artifact $artifact_id has no lotteries.db" >&2
+            exit 1
+          }
+          cp "$snapshot/lotteries.db" "$RUNNER_TEMP/lotteries.db"
+          echo "Restored validated $GAME snapshot artifact $artifact_id"
 
       - name: Hydrate staging bundle from the deployed Space
         env:
@@ -164,6 +195,16 @@ jobs:
           path.parent.mkdir(parents=True, exist_ok=True)
           path.write_text(json.dumps(status, indent=2, sort_keys=True) + "\n", encoding="utf-8")
           PY
+
+      - name: Preserve validated history snapshot
+        if: steps.refresh.outputs.success == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.target.outputs.game }}-validated-history
+          path: ${{ runner.temp }}/lotteries.db
+          if-no-files-found: error
+          overwrite: true
+          retention-days: 90
 
       - name: Validate staged profiles and Space code
         shell: bash

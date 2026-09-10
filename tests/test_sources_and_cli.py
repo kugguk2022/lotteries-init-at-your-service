@@ -16,7 +16,7 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
-from lotteries_core import storage
+from lotteries_core import dataset, storage
 from lotteries_core.sources import euromillions as em
 from lotteries_core.sources import netherlands as nl
 from lotteries_core.sources.errors import ContentTypeError, FetchError, NormalizationError
@@ -34,6 +34,25 @@ def _archive_csv(rows: int = 400) -> str:
             f"{base + 7},{base + 10},{index % 12 + 1},{(index + 5) % 12 + 1}"
         )
     return "\n".join(lines) + "\n"
+
+
+def _official_html(draws: list[tuple[str, list[int], list[int]]] | None = None) -> str:
+    """Minimal version of the official page's structured Next.js result payload."""
+    draws = draws or [
+        ("2026-09-04T18:30:00.000Z", [11, 12, 19, 27, 46], [4, 12]),
+        ("2026-09-08T18:30:00.000Z", [13, 17, 33, 35, 39], [7, 12]),
+    ]
+    entries = [
+        {
+            "standard": {
+                "drawDates": [draw_date],
+                "grids": [{"standard": [mains], "additional": [stars]}],
+            }
+        }
+        for draw_date, mains, stars in draws
+    ]
+    payload = {"props": {"pageProps": {"list": entries}}}
+    return f'<html><script id="__NEXT_DATA__" type="application/json">{json.dumps(payload)}</script></html>'
 
 
 class _Response(io.BytesIO):
@@ -75,7 +94,7 @@ def _stub_urlopen(monkeypatch, handler):
 def test_fetch_normalizes_the_published_column_spellings(isolated_cache, monkeypatch):
     _stub_urlopen(monkeypatch, lambda request: _Response(_archive_csv()))
 
-    frame = em.fetch_euromillions()
+    frame = em.fetch_euromillions(source="national-lottery")
 
     assert list(frame.columns) == em.CANONICAL_COLUMNS
     assert len(frame) == 400
@@ -95,7 +114,7 @@ def test_a_truncated_payload_falls_through_to_the_next_source(isolated_cache, mo
         return _Response(_archive_csv())
 
     _stub_urlopen(monkeypatch, handler)
-    frame = em.fetch_euromillions()
+    frame = em.normalize(em.fetch_raw_csv(urls=em.CSV_URLS))
 
     assert len(seen) == 2, "the truncated primary should not have satisfied the request"
     assert len(frame) == 400
@@ -165,16 +184,20 @@ def test_headerless_payloads_are_recovered():
 
 def test_cli_fetch_then_benchmark_is_the_whole_journey(isolated_cache, monkeypatch, capsys, tmp_path):
     """Item under test: `lottobench fetch` followed by `lottobench benchmark`, no CSV in sight."""
-    _stub_urlopen(monkeypatch, lambda request: _Response(_archive_csv()))
+    _stub_urlopen(monkeypatch, lambda request: _Response(_official_html(), "text/html"))
     db = tmp_path / "lotteries.db"
 
-    assert cli.main(["fetch", "--game", "euromillions", "--db", str(db)]) == 0
+    assert cli.main(
+        [
+            "fetch", "--game", "euromillions", "--db", str(db), "--from", "2026-06-01",
+        ]
+    ) == 0
     fetch_output = capsys.readouterr().out
-    assert "400 draws" in fetch_output
+    assert "29 draws" in fetch_output
     assert "lottobench benchmark" in fetch_output, "fetch should name the next step"
 
     stored = storage.read_history(db, game="euromillions")
-    assert len(stored) == 400
+    assert len(stored) == 29
 
     summary_path = tmp_path / "summary.json"
     assert (
@@ -315,7 +338,7 @@ def test_cache_avoids_a_second_request(isolated_cache, monkeypatch):
 
     def handler(request):
         calls.append(request.full_url)
-        return _Response(_archive_csv())
+        return _Response(_official_html(), "text/html")
 
     _stub_urlopen(monkeypatch, handler)
     em.fetch_euromillions()
@@ -330,7 +353,7 @@ def test_no_cache_forces_a_request(isolated_cache, monkeypatch):
 
     def handler(request):
         calls.append(request.full_url)
-        return _Response(_archive_csv())
+        return _Response(_official_html(), "text/html")
 
     _stub_urlopen(monkeypatch, handler)
     em.fetch_euromillions()
@@ -340,23 +363,23 @@ def test_no_cache_forces_a_request(isolated_cache, monkeypatch):
 
 
 def test_stored_history_round_trips_through_export(isolated_cache, monkeypatch, tmp_path):
-    _stub_urlopen(monkeypatch, lambda request: _Response(_archive_csv()))
+    _stub_urlopen(monkeypatch, lambda request: _Response(_official_html(), "text/html"))
     db = tmp_path / "lotteries.db"
     cli.main(["fetch", "--game", "euromillions", "--db", str(db)])
 
     out = tmp_path / "exported.csv"
     assert cli.main(["export-csv", str(out), "--game", "euromillions", "--db", str(db)]) == 0
-    assert len(pd.read_csv(out)) == 400
+    assert len(pd.read_csv(out)) == 1979
 
 
 def test_fetch_records_provenance_for_the_stored_rows(isolated_cache, monkeypatch, tmp_path):
-    _stub_urlopen(monkeypatch, lambda request: _Response(_archive_csv()))
+    _stub_urlopen(monkeypatch, lambda request: _Response(_official_html(), "text/html"))
     db = tmp_path / "lotteries.db"
     cli.main(["fetch", "--game", "euromillions", "--db", str(db)])
 
     metadata = storage.read_metadata(db, game="euromillions")
     assert metadata is not None
-    assert metadata["rows"] == 400
+    assert metadata["rows"] == 1979
     assert metadata["source"].startswith("lottobench.fetch:")
     assert len(metadata["content_sha256"]) == 64
 
@@ -364,6 +387,88 @@ def test_fetch_records_provenance_for_the_stored_rows(isolated_cache, monkeypatc
 def test_source_choice_is_validated():
     with pytest.raises(ValueError, match="unknown source"):
         em.fetch_euromillions(source="wikipedia")
+
+
+def test_irish_official_parser_reads_structured_results():
+    frame = em.parse_irish_official(_official_html())
+
+    assert list(frame.columns) == em.CANONICAL_COLUMNS
+    assert frame["draw_date"].dt.strftime("%Y-%m-%d").tolist() == [
+        "2026-09-04",
+        "2026-09-08",
+    ]
+    assert frame.iloc[-1][["ball_1", "ball_5", "star_1", "star_2"]].tolist() == [
+        13,
+        39,
+        7,
+        12,
+    ]
+
+
+def test_irish_official_strategy_appends_only_after_exact_overlap(isolated_cache, monkeypatch):
+    html = _official_html(
+        [
+            ("2026-09-08T18:30:00.000Z", [13, 17, 33, 35, 39], [7, 12]),
+            ("2026-09-11T18:30:00.000Z", [4, 9, 17, 31, 42], [2, 11]),
+        ]
+    )
+    _stub_urlopen(monkeypatch, lambda request: _Response(html, "text/html"))
+
+    frame = em.fetch_euromillions(use_cache=False)
+
+    assert len(frame) == 1980
+    assert str(frame.iloc[-1]["draw_date"].date()) == "2026-09-11"
+
+
+def test_cli_refresh_extends_its_last_validated_snapshot(isolated_cache, monkeypatch, tmp_path):
+    responses = iter(
+        [
+            _official_html(),
+            _official_html(
+                [
+                    ("2026-09-08T18:30:00.000Z", [13, 17, 33, 35, 39], [7, 12]),
+                    ("2026-09-11T18:30:00.000Z", [4, 9, 17, 31, 42], [2, 11]),
+                ]
+            ),
+        ]
+    )
+    _stub_urlopen(monkeypatch, lambda request: _Response(next(responses), "text/html"))
+    db = tmp_path / "lotteries.db"
+
+    assert cli.main(["fetch", "--game", "euromillions", "--db", str(db), "--no-cache"]) == 0
+    assert cli.main(["fetch", "--game", "euromillions", "--db", str(db), "--no-cache"]) == 0
+
+    stored = storage.read_history(db, game="euromillions")
+    verified, _ = dataset.verify(db, game="euromillions")
+    assert len(stored) == 1980
+    assert str(pd.to_datetime(stored.iloc[-1]["draw_date"]).date()) == "2026-09-11"
+    assert verified
+
+
+def test_irish_official_conflict_fails_closed(isolated_cache, monkeypatch):
+    html = _official_html(
+        [("2026-09-08T18:30:00.000Z", [1, 2, 3, 4, 5], [6, 7])]
+    )
+    _stub_urlopen(monkeypatch, lambda request: _Response(html, "text/html"))
+
+    with pytest.raises(NormalizationError, match="conflict"):
+        em.fetch_euromillions(use_cache=False)
+
+
+def test_irish_official_requires_overlap_with_validated_history():
+    baseline = em.load_validated_history().head(2)
+    official = em.parse_irish_official(_official_html())
+
+    with pytest.raises(NormalizationError, match="does not overlap"):
+        em.merge_validated_history(baseline, official)
+
+
+def test_bundled_euromillions_history_matches_its_manifest():
+    frame = em.load_validated_history()
+
+    assert len(frame) == 1979
+    assert str(frame.iloc[0]["draw_date"].date()) == "2004-02-13"
+    assert str(frame.iloc[-1]["draw_date"].date()) == "2026-09-08"
 
 
 def test_wheel_entry_point_is_importable():

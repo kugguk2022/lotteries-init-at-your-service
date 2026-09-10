@@ -150,14 +150,30 @@ def _cmd_providers() -> int:
 def _cmd_fetch(args, parser) -> int:
     definition = _resolve(args.game, parser)
     if definition.key == "euromillions":
+        baseline = None
+        if args.db.exists() and args.db.stat().st_size > 0 and storage.is_database(args.db):
+            try:
+                existing = storage.read_history(args.db, game=definition.key)
+            except Exception as exc:
+                parser.error(f"cannot read the existing EuroMillions history: {exc}")
+            if not existing.empty:
+                verified, reason = dataset.verify(args.db, game=definition.key)
+                if not verified:
+                    parser.error(f"existing EuroMillions history is not validated: {reason}")
+                baseline = existing
         frame = fetch_euromillions(
             source=args.source,
             date_from=args.date_from,
             date_to=args.date_to,
             use_cache=not args.no_cache,
             timeout=args.timeout,
+            baseline=baseline,
         )
-        source_label = args.source
+        source_label = (
+            "irish-national-lottery+validated-history"
+            if args.source in {"auto", "irish-official"}
+            else args.source
+        )
     elif definition.key == "nl-lotto":
         if args.source != "auto":
             parser.error("nl-lotto currently supports only --source auto (official operator API)")

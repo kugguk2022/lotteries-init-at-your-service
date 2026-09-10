@@ -45,8 +45,9 @@ lottobench fetch --game nl-lotto --db data/lotteries.db
 lottobench benchmark --game nl-lotto --db data/lotteries.db
 ```
 
-`fetch` retrieves published EuroMillions history, validates every draw against the game's declared
-shape, and writes it into the local SQLite database together with its provenance digest.
+`fetch` extends a digest-pinned EuroMillions history from the Irish National Lottery's official
+results page, requires an exact overlap before appending, validates every draw against the game's
+declared shape, and writes it into SQLite together with its provenance digest.
 `benchmark` reads that database and runs every available provider forward-only at equal budget
 against the `uniform_random` control.
 

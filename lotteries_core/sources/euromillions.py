@@ -1,12 +1,13 @@
-"""EuroMillions retrieval from published CSV archives, on the base install only.
+"""EuroMillions retrieval from the Irish National Lottery and a validated history.
 
-HTTP here is ``urllib.request`` rather than ``requests``, and parsing is ``pandas`` rather than
-``beautifulsoup4``. That is deliberate: ``lottobench fetch`` is the first step of the documented
-journey, so it has to work on a plain ``pip install lottobench``. The two HTML archive fallbacks
-that genuinely need a parser live in :mod:`.html_archive` and are only reached when asked for.
+The official operator page publishes roughly 90 days of structured results. ``auto`` merges that
+increment with a digest-pinned seed and requires at least one identical overlap draw. A changed
+official result or a damaged seed therefore fails closed instead of silently rewriting benchmark
+history. Repeated CLI/workflow runs may pass their last validated snapshot as the new baseline.
 
 Retrieved payloads are cached on disk by URL so that repeated benchmark runs, tests, and offline
-work do not re-hit a public archive.
+work do not re-hit the operator page. Historical archive adapters remain explicit diagnostic
+choices; they are no longer part of the scheduled/default provider chain.
 """
 
 from __future__ import annotations
@@ -18,25 +19,34 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
+from html.parser import HTMLParser
+from importlib.resources import files
 from io import StringIO
 from pathlib import Path
 
 import pandas as pd
 
+from ..dataset import content_digest
 from ..protocol import GameSpec
 from .errors import ContentTypeError, FetchError, NormalizationError
 from .schema import finalize
 
+IRISH_OFFICIAL_URL = "https://www.lottery.ie/draw-games/results/view?game=euromillions"
 PRIMARY_URL = "https://www.national-lottery.co.uk/results/euromillions/draw-history/csv"
 SECONDARY_URL = "https://www.merseyworld.com/euromillions/resultsArchive.php?format=csv"
 CSV_URLS = (PRIMARY_URL, SECONDARY_URL)
 
-#: ``auto`` tries the CSV archives in order, then falls back to the HTML archive. Every
-#: choice runs on the base install: ``requests`` and ``beautifulsoup4`` are base dependencies.
-SOURCE_CHOICES = ("auto", "merseyworld", "national-lottery", "archive", "lottology")
+#: ``auto`` and ``irish-official`` use the validated-history strategy. Legacy sources remain
+#: selectable for diagnosis and one-off baseline maintenance, never as silent fallbacks.
+SOURCE_CHOICES = (
+    "auto", "irish-official", "merseyworld", "national-lottery", "archive", "lottology",
+)
 
 CACHE_DIR = Path(".cache/euromillions")
-USER_AGENT = "lottobench/0.1 (+https://github.com/kugguk2022/lotteries)"
+USER_AGENT = (
+    "lottobench/0.1 "
+    "(+https://github.com/kugguk2022/lotteries-init-at-your-service)"
+)
 
 #: A full EuroMillions archive is thousands of draws. A handful of rows means a truncated or
 #: error payload, which must not be mistaken for "the history is short".
@@ -47,6 +57,9 @@ _RETRY_STATUS = frozenset({429, 500, 502, 503, 504})
 CANONICAL_COLUMNS = [
     "draw_date", "ball_1", "ball_2", "ball_3", "ball_4", "ball_5", "star_1", "star_2",
 ]
+
+_BASELINE_CSV = "data/euromillions_history.csv"
+_BASELINE_METADATA = "data/euromillions_history.meta.json"
 
 #: Every column spelling seen across upstream sources and bundled files, mapped to the canonical
 #: schema. ``n1..n5``/``star1``/``star2`` is the bundled-file spelling.
@@ -105,6 +118,135 @@ def _get(url: str, params: dict[str, str], *, timeout: float, attempts: int) -> 
         if attempt + 1 < attempts:
             time.sleep(0.5 * (2**attempt))
     raise FetchError(f"{target}: {last}")
+
+
+class _NextDataParser(HTMLParser):
+    """Extract the JSON script without coupling the adapter to presentation CSS classes."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self._inside = False
+        self.parts: list[str] = []
+
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        if tag == "script" and dict(attrs).get("id") == "__NEXT_DATA__":
+            self._inside = True
+
+    def handle_endtag(self, tag: str) -> None:
+        if tag == "script" and self._inside:
+            self._inside = False
+
+    def handle_data(self, data: str) -> None:
+        if self._inside:
+            self.parts.append(data)
+
+
+def parse_irish_official(html: str, spec: GameSpec | None = None) -> pd.DataFrame:
+    """Parse EuroMillions draws from the operator page's structured Next.js payload."""
+    parser = _NextDataParser()
+    parser.feed(html)
+    if not parser.parts:
+        raise NormalizationError("Irish official page has no __NEXT_DATA__ payload")
+    try:
+        payload = json.loads("".join(parser.parts))
+        entries = payload["props"]["pageProps"]["list"]
+    except (json.JSONDecodeError, KeyError, TypeError) as exc:
+        raise NormalizationError(f"Irish official result payload changed shape: {exc}") from exc
+    if not isinstance(entries, list) or not entries:
+        raise NormalizationError("Irish official result payload contains no draws")
+
+    rows: list[dict[str, object]] = []
+    try:
+        for entry in entries:
+            result = entry["standard"]
+            grid = result["grids"][0]
+            mains = grid["standard"][0]
+            stars = grid["additional"][0]
+            if len(mains) != 5 or len(stars) != 2:
+                raise ValueError("expected five main numbers and two Lucky Stars")
+            rows.append(
+                dict(
+                    zip(
+                        CANONICAL_COLUMNS,
+                        [str(result["drawDates"][0])[:10], *mains, *stars],
+                        strict=True,
+                    )
+                )
+            )
+    except (IndexError, KeyError, TypeError, ValueError) as exc:
+        raise NormalizationError(f"Irish official result entry changed shape: {exc}") from exc
+    return finalize(pd.DataFrame(rows, columns=CANONICAL_COLUMNS), spec or GameSpec.euromillions())
+
+
+def fetch_irish_official(
+    *,
+    cache: Path | None = None,
+    use_cache: bool = True,
+    timeout: float = 15.0,
+    attempts: int = 3,
+) -> pd.DataFrame:
+    """Fetch and validate the current Irish National Lottery result window."""
+    directory = cache_dir(cache)
+    cache_file = _cache_key(IRISH_OFFICIAL_URL, {}, directory)
+    if use_cache and cache_file.exists():
+        try:
+            return parse_irish_official(cache_file.read_text(encoding="utf-8"))
+        except (OSError, UnicodeError, NormalizationError, ValueError):
+            pass
+    try:
+        html = _get(IRISH_OFFICIAL_URL, {}, timeout=timeout, attempts=attempts)
+        frame = parse_irish_official(html)
+    except (ContentTypeError, FetchError, NormalizationError, urllib.error.HTTPError) as exc:
+        raise FetchError(f"Irish official EuroMillions results unavailable: {exc}") from exc
+    cache_file.write_text(html, encoding="utf-8")
+    return frame
+
+
+def load_validated_history() -> pd.DataFrame:
+    """Load the immutable seed after verifying its canonical digest and declared span."""
+    package = files("lotteries_core")
+    try:
+        csv_text = package.joinpath(_BASELINE_CSV).read_text(encoding="utf-8")
+        metadata = json.loads(package.joinpath(_BASELINE_METADATA).read_text(encoding="utf-8"))
+    except (FileNotFoundError, json.JSONDecodeError) as exc:
+        raise NormalizationError(f"Validated EuroMillions baseline is unavailable: {exc}") from exc
+    frame = normalize(csv_text)
+    actual = {
+        "rows": len(frame),
+        "first_draw": str(frame["draw_date"].min().date()),
+        "last_draw": str(frame["draw_date"].max().date()),
+        "content_sha256": content_digest(frame),
+    }
+    mismatches = {
+        key: (metadata.get(key), value)
+        for key, value in actual.items()
+        if metadata.get(key) != value
+    }
+    if mismatches:
+        raise NormalizationError(f"Validated EuroMillions baseline metadata mismatch: {mismatches}")
+    return frame
+
+
+def merge_validated_history(baseline: pd.DataFrame, official: pd.DataFrame) -> pd.DataFrame:
+    """Append official draws only after an exact overlap proves continuity."""
+    spec = GameSpec.euromillions()
+    baseline = finalize(baseline[CANONICAL_COLUMNS], spec)
+    official = finalize(official[CANONICAL_COLUMNS], spec)
+    overlap = baseline.merge(official, on="draw_date", suffixes=("_baseline", "_official"))
+    if overlap.empty:
+        raise NormalizationError(
+            "Irish official window does not overlap the validated EuroMillions history"
+        )
+    conflicts: list[str] = []
+    for column in CANONICAL_COLUMNS[1:]:
+        different = overlap[f"{column}_baseline"] != overlap[f"{column}_official"]
+        conflicts.extend(str(value.date()) for value in overlap.loc[different, "draw_date"])
+    if conflicts:
+        raise NormalizationError(
+            "Irish official results conflict with validated history for draw date(s): "
+            + ", ".join(sorted(set(conflicts)))
+        )
+    return finalize(pd.concat([baseline, official], ignore_index=True), spec)
 
 
 def _looks_like_draw_csv(text: str) -> bool:
@@ -225,11 +367,12 @@ def fetch_euromillions(
     use_cache: bool = True,
     timeout: float = 15.0,
     allow_partial: bool = False,
+    baseline: pd.DataFrame | None = None,
 ) -> pd.DataFrame:
     """Retrieve and normalize EuroMillions history.
 
-    ``source`` selects an archive. ``archive`` and ``lottology`` are HTML-parsed rather than CSV;
-    every choice, including those, runs on a plain ``pip install lottobench``.
+    The default strategy extends ``baseline`` (or the bundled seed) with the Irish operator's
+    recent window. ``archive`` and ``lottology`` remain explicit maintenance sources.
     """
     if source not in SOURCE_CHOICES:
         raise ValueError(f"unknown source {source!r}; choose from {list(SOURCE_CHOICES)}")
@@ -240,31 +383,32 @@ def fetch_euromillions(
 
         return fetch_html_archive(source, spec=spec)
 
+    if source in ("auto", "irish-official"):
+        history = load_validated_history() if baseline is None else baseline
+        frame = merge_validated_history(
+            history,
+            fetch_irish_official(cache=cache, use_cache=use_cache, timeout=timeout),
+        )
+        if date_from:
+            frame = frame[frame["draw_date"] >= pd.to_datetime(date_from)]
+        if date_to:
+            frame = frame[frame["draw_date"] <= pd.to_datetime(date_to)]
+        return frame.reset_index(drop=True)
+
     urls = {
-        "auto": CSV_URLS,
         "national-lottery": (PRIMARY_URL,),
         "merseyworld": (SECONDARY_URL,),
     }[source]
-    try:
-        raw = fetch_raw_csv(
-            date_from,
-            date_to,
-            urls=urls,
-            cache=cache,
-            use_cache=use_cache,
-            timeout=timeout,
-            allow_partial=allow_partial,
-        )
-        frame = normalize(raw, spec)
-    except FetchError:
-        if source != "auto":
-            raise
-        # Both historical CSV URLs have changed before. The maintained HTML archive is the
-        # deterministic backfill for the current rule epoch; keeping it in auto prevents one dead
-        # redirect from making a fresh PyPI installation unusable.
-        from .html_archive import fetch_html_archive
-
-        frame = fetch_html_archive("archive", spec=spec, start_year=2016)
+    raw = fetch_raw_csv(
+        date_from,
+        date_to,
+        urls=urls,
+        cache=cache,
+        use_cache=use_cache,
+        timeout=timeout,
+        allow_partial=allow_partial,
+    )
+    frame = normalize(raw, spec)
     if date_from:
         frame = frame[frame["draw_date"] >= pd.to_datetime(date_from)]
     if date_to:

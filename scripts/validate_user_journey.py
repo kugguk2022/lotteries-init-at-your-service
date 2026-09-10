@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import io
+import json
 import os
 import tempfile
 import urllib.request
@@ -38,11 +39,11 @@ def _history(rows: int = 24) -> pd.DataFrame:
 
 
 class _StubResponse(io.BytesIO):
-    """What urlopen returns, reduced to what the CSV adapter actually reads."""
+    """What urlopen returns, reduced to what the operator adapter reads."""
 
-    def __init__(self, body: str) -> None:
+    def __init__(self, body: str, content_type: str = "text/html") -> None:
         super().__init__(body.encode("utf-8"))
-        self.headers = _StubHeaders()
+        self.headers = _StubHeaders(content_type)
 
     def __enter__(self):
         return self
@@ -52,24 +53,32 @@ class _StubResponse(io.BytesIO):
 
 
 class _StubHeaders:
+    def __init__(self, content_type: str) -> None:
+        self.content_type = content_type
+
     def get(self, key, default=""):
-        return "text/csv" if key == "Content-Type" else default
+        return self.content_type if key == "Content-Type" else default
 
     def get_content_charset(self):
         return "utf-8"
 
 
-def _published_csv(rows: int = 400) -> str:
-    """A payload shaped like the published archive, including its column spellings."""
-    lines = ["DrawDate,Ball1,Ball2,Ball3,Ball4,Ball5,Lucky Star1,Lucky Star2"]
-    for index in range(rows):
-        day = pd.Timestamp("2019-01-01") + pd.Timedelta(days=index * 3)
-        base = index % 40
-        lines.append(
-            f"{day.date().isoformat()},{base + 1},{base + 2},{base + 4},"
-            f"{base + 7},{base + 10},{index % 12 + 1},{(index + 5) % 12 + 1}"
+def _official_html() -> str:
+    entries = []
+    for draw_date, mains, stars in (
+        ("2026-09-04T18:30:00.000Z", [11, 12, 19, 27, 46], [4, 12]),
+        ("2026-09-08T18:30:00.000Z", [13, 17, 33, 35, 39], [7, 12]),
+    ):
+        entries.append(
+            {
+                "standard": {
+                    "drawDates": [draw_date],
+                    "grids": [{"standard": [mains], "additional": [stars]}],
+                }
+            }
         )
-    return "\n".join(lines) + "\n"
+    payload = {"props": {"pageProps": {"list": entries}}}
+    return f'<script id="__NEXT_DATA__" type="application/json">{json.dumps(payload)}</script>'
 
 
 def _validate_retrieval() -> None:
@@ -83,17 +92,22 @@ def _validate_retrieval() -> None:
     with tempfile.TemporaryDirectory(prefix="lottobench-fetch-") as directory:
         root = Path(directory)
         os.environ["LOTTOBENCH_CACHE_DIR"] = str(root / "cache")
-        urllib.request.urlopen = lambda request, timeout=None: _StubResponse(_published_csv())
+        urllib.request.urlopen = lambda request, timeout=None: _StubResponse(_official_html())
         try:
-            frame = em.fetch_euromillions()
+            frame = em.fetch_euromillions(date_from="2026-06-01")
             assert list(frame.columns) == em.CANONICAL_COLUMNS
-            assert len(frame) == 400
+            assert len(frame) == 29
             assert frame["draw_date"].is_monotonic_increasing
 
             db = root / "lotteries.db"
-            assert cli_main(["fetch", "--game", "euromillions", "--db", str(db)]) == 0
+            assert cli_main(
+                [
+                    "fetch", "--game", "euromillions", "--db", str(db),
+                    "--from", "2026-06-01",
+                ]
+            ) == 0
             stored = storage.read_history(db, game="euromillions")
-            assert len(stored) == 400
+            assert len(stored) == 29
 
             assert cli_main(
                 ["benchmark", "--game", "euromillions", "--db", str(db),
@@ -101,7 +115,7 @@ def _validate_retrieval() -> None:
             ) == 0
 
             provenance = storage.read_metadata(db, game="euromillions")
-            assert provenance is not None and provenance["rows"] == 400
+            assert provenance is not None and provenance["rows"] == 29
             assert provenance["source"].startswith("lottobench.fetch:")
         finally:
             urllib.request.urlopen = original

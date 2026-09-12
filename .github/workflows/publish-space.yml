@@ -53,11 +53,21 @@ jobs:
         id: target
         shell: bash
         env:
+          TRIGGER_CRON: ${{ github.event.schedule }}
           REQUESTED_GAME: ${{ inputs.game }}
         run: |
           set -euo pipefail
           if [[ -n "${REQUESTED_GAME:-}" ]]; then
             game="$REQUESTED_GAME"
+          elif [[ -n "${TRIGGER_CRON:-}" ]]; then
+            case "$TRIGGER_CRON" in
+              "15 8 * * 3"|"15 23 * * 5") game="euromillions" ;;
+              "15 8 * * 0") game="nl-lotto" ;;
+              *)
+                echo "No lottery mapping exists for scheduled trigger: $TRIGGER_CRON" >&2
+                exit 1
+                ;;
+            esac
           else
             case "$(date -u +%u)" in
               3|5) game="euromillions" ;;

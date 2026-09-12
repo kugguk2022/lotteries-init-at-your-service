@@ -16,6 +16,7 @@ import pandas as pd
 
 from lotteries_core import registry, storage
 from lotteries_core.aggregation import aggregate
+from lotteries_core.crowd_escape_forecast import build_crowd_escape_forecast
 from lotteries_core.dataset import content_digest
 from lotteries_core.envelope import InferenceEnvelope
 from lotteries_core.evaluation import evaluate_forward
@@ -285,6 +286,7 @@ def _build_profile(key: str, database: Path, output: Path) -> dict:
     profile_dir.mkdir(parents=True, exist_ok=True)
     pair_raster = None
     temporal_candidates = None
+    crowd_escape_forecast = None
     if key != "synthetic":
         pair_raster = build_pair_raster(
             history,
@@ -302,6 +304,15 @@ def _build_profile(key: str, database: Path, output: Path) -> dict:
             snapshot_sha256=snapshot_sha256,
             jackpot=jackpot,
             seed=profile_seed + 200_000,
+        )
+        crowd_escape_forecast = build_crowd_escape_forecast(
+            prospective,
+            spec,
+            output_directory=profile_dir,
+            history_cutoff=str(metadata["last_draw"]),
+            target_draw_date=target_draw_date,
+            snapshot_sha256=snapshot_sha256,
+            jackpot=jackpot,
         )
     contests.to_csv(profile_dir / "contests.csv", index=False, lineterminator="\n")
     tickets.to_csv(profile_dir / "tickets.csv", index=False, lineterminator="\n")
@@ -361,6 +372,9 @@ def _build_profile(key: str, database: Path, output: Path) -> dict:
             "temporal_candidate_set": (
                 temporal_candidates.summary if temporal_candidates is not None else None
             ),
+            "crowd_escape_forecast": (
+                crowd_escape_forecast.summary if crowd_escape_forecast is not None else None
+            ),
         },
         "claims_boundary": (
             "ROI alpha is modeled expected-ROI difference from the equal-budget uniform null. "
@@ -412,6 +426,9 @@ def _build_profile(key: str, database: Path, output: Path) -> dict:
         "pair_raster": pair_raster.summary if pair_raster is not None else None,
         "temporal_candidate_set": (
             temporal_candidates.summary if temporal_candidates is not None else None
+        ),
+        "crowd_escape_forecast": (
+            crowd_escape_forecast.summary if crowd_escape_forecast is not None else None
         ),
         "claims_boundary": manifest["claims_boundary"],
     }

@@ -113,7 +113,22 @@ class Profile:
     contests: pd.DataFrame
     tickets: pd.DataFrame
     prospective: pd.DataFrame
+    pair_raster: pd.DataFrame
+    pair_raster_distribution: pd.DataFrame
+    pair_raster_summary: dict
+    summary: dict
     directory: Path
+
+
+def _read_csv_or_empty(path: Path) -> pd.DataFrame:
+    return pd.read_csv(path) if path.is_file() else pd.DataFrame()
+
+
+def _read_json_or_empty(path: Path) -> dict:
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {}
 
 
 def _load_profile(key: str) -> Profile:
@@ -125,6 +140,12 @@ def _load_profile(key: str) -> Profile:
         contests=pd.read_csv(directory / "contests.csv"),
         tickets=pd.read_csv(directory / "tickets.csv"),
         prospective=pd.read_csv(directory / "prospective.csv"),
+        pair_raster=_read_csv_or_empty(directory / "pair_raster_top.csv"),
+        pair_raster_distribution=_read_csv_or_empty(
+            directory / "pair_raster_distribution.csv"
+        ),
+        pair_raster_summary=_read_json_or_empty(directory / "pair_raster_summary.json"),
+        summary=_read_json_or_empty(directory / "summary.json"),
         directory=directory,
     )
 
@@ -269,6 +290,7 @@ def _profile_identity(profile: Profile) -> str:
     source = manifest["source"]
     evaluation = manifest["evaluation"]
     leader = profile.leaderboard.iloc[0]
+    leader_delta = _roi_delta(profile, str(leader["agent"]))
     source_link = (
         f'<a href="{html.escape(source["url"], quote=True)}" target="_blank" rel="noopener">View source record</a>'
         if source.get("url")
@@ -287,7 +309,7 @@ def _profile_identity(profile: Profile) -> str:
         <span>HOLDOUT LEADER</span>
         <strong>{_agent_name(str(leader['agent']))}</strong>
         <b>{leader['mean_roi_alpha_pp']:+.3f} pp ROI alpha</b>
-        <small>{int(leader['contests_above_null'])}/{int(leader['contests'])} contests above null</small>
+        <small>{int(leader['contests_above_null'])}/{int(leader['contests'])} contests above null / latest movement {leader_delta:+.3f} pp</small>
       </div>
       <div class="identity-ledger">
         <div><span>DATA</span><b>{'SYNTHETIC' if profile.key == 'synthetic' else 'OBSERVED'}</b></div>
@@ -300,6 +322,16 @@ def _profile_identity(profile: Profile) -> str:
     """
 
 
+def _roi_delta(profile: Profile, agent: str) -> float:
+    frame = profile.contests[profile.contests["agent"] == agent].sort_values(
+        "contest_number"
+    )
+    if len(frame) < 2:
+        return 0.0
+    values = frame["mean_roi_alpha_vs_house_pp"].astype(float)
+    return float(values.iloc[-1] - values.iloc[-2])
+
+
 def _overall_agent_ladder(profile: Profile) -> str:
     cards = []
     for row in profile.leaderboard.sort_values("rank").itertuples(index=False):
@@ -307,6 +339,7 @@ def _overall_agent_ladder(profile: Profile) -> str:
         is_house = row.agent == HOUSE_AGENT
         badge = "REFERENCE" if is_house else f"{row.mean_roi_alpha_pp:+.3f} pp"
         consistency = max(0.0, min(100.0, float(row.consistency_pct)))
+        delta = _roi_delta(profile, str(row.agent))
         cards.append(
             f"""
             <article class="overall-agent" style="--agent:{meta['color']}">
@@ -316,7 +349,7 @@ def _overall_agent_ladder(profile: Profile) -> str:
                 <strong class="{'null-badge' if is_house else 'alpha-badge'}">{badge}</strong>
               </div>
               <div class="overall-track"><i style="width:{consistency:.1f}%"></i></div>
-              <footer><span>Above null <b>{'CONTROL' if is_house else f'{int(row.contests_above_null)}/{int(row.contests)}'}</b></span><span>Consistency <b>{row.consistency_pct:.0f}%</b></span><span>Pair reach <b>{row.mean_pair_coverage_pct:.2f}%</b></span></footer>
+              <footer><span>Latest movement <b>{delta:+.3f} pp</b></span><span>Above null <b>{'CONTROL' if is_house else f'{int(row.contests_above_null)}/{int(row.contests)}'}</b></span><span>Consistency <b>{row.consistency_pct:.0f}%</b></span><span>Pair reach <b>{row.mean_pair_coverage_pct:.2f}%</b></span></footer>
             </article>
             """
         )
@@ -324,6 +357,75 @@ def _overall_agent_ladder(profile: Profile) -> str:
     <section class="leader-section">
       <div class="panel-heading"><div><span>TWELVE-CONTEST TABLE</span><h2>Agents ranked against the house</h2></div><p>The principal result is ROI alpha, not absolute return. Consistency shows how often an agent remained above the equal-budget uniform reference.</p></div>
       <div class="overall-ladder">{''.join(cards)}</div>
+    </section>
+    """
+
+
+def _roi_evolution_chart(profile: Profile) -> str:
+    width, height = 960, 470
+    left, right, top, bottom = 72, 835, 44, 390
+    frame = profile.contests.sort_values(["contest_number", "agent"])
+    values = frame["mean_roi_alpha_vs_house_pp"].astype(float)
+    minimum = min(0.0, float(values.min()))
+    maximum = max(0.0, float(values.max()))
+    padding = max(0.25, (maximum - minimum) * 0.10)
+    minimum -= padding
+    maximum += padding
+    span = maximum - minimum or 1.0
+    contests = sorted(frame["contest_number"].astype(int).unique())
+
+    def x_position(contest: int) -> float:
+        index = contests.index(contest)
+        return left + (right - left) * index / max(1, len(contests) - 1)
+
+    def y_position(value: float) -> float:
+        return bottom - (bottom - top) * (value - minimum) / span
+
+    grid = []
+    for step in range(5):
+        value = minimum + span * step / 4
+        y = y_position(value)
+        grid.append(
+            f'<line x1="{left}" y1="{y:.1f}" x2="{right}" y2="{y:.1f}" class="roi-grid" />'
+            f'<text x="{left - 9}" y="{y + 4:.1f}" class="roi-tick">{value:+.2f}</text>'
+        )
+    for contest in contests:
+        x = x_position(contest)
+        grid.append(
+            f'<text x="{x:.1f}" y="{bottom + 24}" class="roi-x-tick">{contest:02d}</text>'
+        )
+
+    paths = []
+    legend = []
+    for agent, agent_frame in frame.groupby("agent", sort=False):
+        meta = _agent_meta(str(agent))
+        agent_frame = agent_frame.sort_values("contest_number")
+        points = " ".join(
+            f"{x_position(int(row.contest_number)):.1f},{y_position(float(row.mean_roi_alpha_vs_house_pp)):.1f}"
+            for row in agent_frame.itertuples(index=False)
+        )
+        dash = ' stroke-dasharray="5 7"' if agent == HOUSE_AGENT else ""
+        paths.append(
+            f'<polyline points="{points}" fill="none" stroke="{meta["color"]}" '
+            f'stroke-width="{2 if agent == HOUSE_AGENT else 3}"{dash} class="roi-path" />'
+        )
+        latest = float(agent_frame.iloc[-1]["mean_roi_alpha_vs_house_pp"])
+        legend.append(
+            f'<span><i style="background:{meta["color"]}"></i>{meta["name"]} '
+            f'<b>{latest:+.3f}</b></span>'
+        )
+
+    return f"""
+    <section class="roi-panel">
+      <div class="panel-heading"><div><span>ROI EVOLUTION / FORWARD ONLY</span><h2>How the twelve-contest mean actually moved</h2></div><p>Each point is the cumulative mean ROI alpha available after that contest. A new draw replaces only one observation in the twelve-contest holdout, so small endpoint movement is expected.</p></div>
+      <div class="roi-legend">{''.join(legend)}</div>
+      <svg viewBox="0 0 {width} {height}" role="img" aria-label="Cumulative mean ROI alpha by contest and agent">
+        {''.join(grid)}
+        <line x1="{left}" y1="{y_position(0):.1f}" x2="{right}" y2="{y_position(0):.1f}" class="roi-zero" />
+        {''.join(paths)}
+        <text x="{(left + right) / 2}" y="445" class="axis-label">FORWARD CONTEST NUMBER</text>
+        <text x="19" y="{(top + bottom) / 2}" transform="rotate(-90 19 {(top + bottom) / 2})" class="axis-label">CUMULATIVE MEAN ROI ALPHA (PP)</text>
+      </svg>
     </section>
     """
 
@@ -613,6 +715,54 @@ def _candidate_display(frame: pd.DataFrame) -> pd.DataFrame:
     )
 
 
+def _pair_raster_panel(profile: Profile) -> str:
+    summary = profile.pair_raster_summary
+    if not summary or profile.pair_raster.empty:
+        return f"""
+        <section class="raster-panel pending" style="--profile:{PROFILE_STYLE[profile.key]['accent']}">
+          <span>EXHAUSTIVE PRE-DRAW RASTER</span>
+          <h2>Queued for the next verified refresh.</h2>
+          <p>This profile predates the raster artifact. Its next automatic post-draw build will score every legal ticket before the following draw and publish the compact top table plus the exact distribution.</p>
+        </section>
+        """
+    distribution = summary["score_distribution"]
+    leader = profile.pair_raster.iloc[0]
+    auxiliary = _number_balls(leader["auxiliary_draw"], auxiliary=True)
+    plus = '<span class="draw-plus">+</span>' if auxiliary else ""
+    return f"""
+    <section class="raster-panel" style="--profile:{PROFILE_STYLE[profile.key]['accent']}">
+      <div class="panel-heading"><div><span>EXHAUSTIVE PRE-DRAW RASTER</span><h2>Every legal first-prize combination, scored before the draw</h2></div><p>The complete universe was ranked by historical pair density using draws only through {html.escape(str(summary['history_cutoff']))}. This is a descriptive co-occurrence score—not a higher chance of winning.</p></div>
+      <div class="raster-kpis">
+        <div><span>TICKETS SCORED</span><strong>{int(summary['ticket_combinations_scored']):,}</strong><small>exact full universe</small></div>
+        <div><span>TARGET DRAW</span><strong>{html.escape(str(summary['target_draw_date']))}</strong><small>status PENDING</small></div>
+        <div><span>SCORE RANGE</span><strong>{int(distribution['minimum'])}–{int(distribution['maximum'])}</strong><small>median {int(distribution['median'])} / p99 {int(distribution['p99'])}</small></div>
+        <div><span>PUBLISHED ROWS</span><strong>{int(summary['published_top_rows']):,}</strong><small>plus exact distribution</small></div>
+      </div>
+      <div class="raster-leader"><span>TOP HISTORICAL PAIR-DENSITY SET</span><div>{_number_balls(leader['main_draw'])}{plus}{auxiliary}</div><strong>Score {int(leader['historical_pair_density_score'])} / percentile {float(leader['universe_percentile_pct']):.5f}%</strong></div>
+    </section>
+    """
+
+
+def _pair_raster_display(profile: Profile) -> pd.DataFrame:
+    if profile.pair_raster.empty:
+        return pd.DataFrame()
+    frame = profile.pair_raster.head(50)
+    return pd.DataFrame(
+        {
+            "Rank": frame["rank"].astype(int),
+            "Main numbers": frame["main_draw"],
+            "Lucky stars / Aux": frame["auxiliary_draw"].fillna(""),
+            "Pair-density score": frame["historical_pair_density_score"].astype(int),
+            "Universe percentile": frame["universe_percentile_pct"].map(
+                lambda value: f"{value:.5f}%"
+            ),
+            "Target draw": frame["target_draw_date"],
+            "Status": frame["score_status"],
+            "Commitment": frame["commitment_sha256"].str[:12],
+        }
+    )
+
+
 def render_candidates(
     key: str, house_balance: int, top_n: int
 ) -> tuple[str, str, pd.DataFrame, str]:
@@ -662,6 +812,7 @@ def _build_profile_tab(profile: Profile) -> None:
     with gr.Tabs(elem_classes="screen-switcher"):
         with gr.Tab("SCREEN A / AGENT ARENA"):
             gr.HTML(_overall_agent_ladder(profile))
+            gr.HTML(_roi_evolution_chart(profile))
             contests = [
                 int(value)
                 for value in sorted(profile.contests["contest_number"].astype(int).unique())
@@ -722,6 +873,26 @@ def _build_profile_tab(profile: Profile) -> None:
             gr.HTML(CLAIMS_NOTE)
 
         with gr.Tab("SCREEN B / PENDING SET LAB"):
+            gr.HTML(_pair_raster_panel(profile))
+            if not profile.pair_raster.empty:
+                gr.Dataframe(
+                    _pair_raster_display(profile),
+                    interactive=False,
+                    label="Top 50 exhaustive historical pair-density sets",
+                )
+                with gr.Row():
+                    gr.File(
+                        value=str(profile.directory / "pair_raster_top.csv"),
+                        label="Download top 250 pre-draw raster",
+                    )
+                    gr.File(
+                        value=str(profile.directory / "pair_raster_distribution.csv"),
+                        label="Download exact full-universe score distribution",
+                    )
+                    gr.File(
+                        value=str(profile.directory / "summary.json"),
+                        label="Download machine-readable profile summary",
+                    )
             gr.HTML(
                 f"""
                 <section class="lab-intro" style="--profile:{PROFILE_STYLE[profile.key]['accent']}">
@@ -836,7 +1007,7 @@ body,.gradio-container { color:var(--ink); font-family:'Space Grotesk',sans-seri
 .identity-ledger div:first-child { padding-left:0; }.identity-ledger div:last-child { border:0; }
 .identity-ledger b { font-size:11px; line-height:1.5; }.identity-ledger a { color:var(--profile); text-decoration:none; }
 .mono { font-family:'DM Mono',monospace; }
-.leader-section,.walk-panel,.candidate-map { border:1px solid var(--line); border-radius:24px; padding:22px; background:rgba(8,22,28,.94); margin:16px 0; }
+.leader-section,.walk-panel,.candidate-map,.roi-panel,.raster-panel { border:1px solid var(--line); border-radius:24px; padding:22px; background:rgba(8,22,28,.94); margin:16px 0; }
 .panel-heading { display:flex; justify-content:space-between; gap:28px; align-items:start; }
 .panel-heading h2 { font-size:28px; letter-spacing:-.035em; margin:7px 0 17px; }
 .panel-heading p { max-width:470px; color:var(--muted); font-size:12px; line-height:1.55; }
@@ -853,6 +1024,9 @@ body,.gradio-container { color:var(--ink); font-family:'Space Grotesk',sans-seri
 .overall-track i,.consistency-track i { display:block; height:100%; background:var(--agent); }
 .overall-agent footer,.rank-metrics { display:flex; flex-wrap:wrap; gap:12px; color:var(--muted); font:9px 'DM Mono',monospace; margin-top:10px; }
 .overall-agent footer b,.rank-metrics b { color:var(--ink); }
+.roi-legend { display:flex; flex-wrap:wrap; gap:9px 14px; color:var(--muted); font:9px 'DM Mono',monospace; }
+.roi-legend span { display:inline-flex; align-items:center; gap:6px; }.roi-legend i { width:8px; height:8px; border-radius:50%; }.roi-legend b { color:var(--ink); }
+.roi-panel svg { display:block; width:100%; height:auto; margin-top:8px; }.roi-grid { stroke:rgba(255,255,255,.055); }.roi-zero { stroke:rgba(216,243,92,.42); stroke-width:1.5; }.roi-tick,.roi-x-tick { fill:#789097; font:9px 'DM Mono',monospace; }.roi-tick { text-anchor:end; }.roi-x-tick { text-anchor:middle; }.roi-path { stroke-linecap:round; stroke-linejoin:round; stroke-dasharray:1500; stroke-dashoffset:1500; animation:trace 2.6s ease forwards; }
 .round-head { display:grid; grid-template-columns:1.25fr .75fr; gap:25px; border:1px solid var(--line); border-top:3px solid var(--profile); border-radius:24px; padding:24px; margin:18px 0 12px; background:linear-gradient(135deg,rgba(15,43,51,.98),rgba(9,20,27,.97)); }
 .round-head h2 { font-size:28px; margin:7px 0 17px; }
 .draw-stage>span,.candidate-pick>span { display:block; color:var(--muted); font:9px 'DM Mono',monospace; letter-spacing:.12em; margin-bottom:10px; }
@@ -881,6 +1055,8 @@ body,.gradio-container { color:var(--ink); font-family:'Space Grotesk',sans-seri
 .walk-path { stroke-dasharray:1200; stroke-dashoffset:1200; animation:trace 3s ease forwards; opacity:.78; }.walk-node,.candidate-dot { opacity:0; animation:nodeIn .35s ease forwards; }.signal-ring { transform-box:fill-box; transform-origin:center; animation:ring 1.8s ease-out infinite; }
 .lab-intro { border:1px solid var(--line); border-left:4px solid var(--profile); border-radius:22px; padding:25px; margin:17px 0; background:linear-gradient(135deg,rgba(14,42,49,.97),rgba(9,20,27,.97)); }
 .lab-intro>span { color:var(--profile); }.lab-intro h2 { font-size:31px; margin:9px 0; }.lab-intro p { max-width:820px; color:#b4c5c8; line-height:1.6; }
+.raster-panel { border-top:3px solid var(--profile); }.raster-panel.pending { border-style:dashed; }.raster-panel>span { color:var(--profile); font:500 10px 'DM Mono',monospace; letter-spacing:.16em; }.raster-panel.pending h2 { margin:9px 0; }.raster-panel.pending p { color:var(--muted); max-width:820px; line-height:1.6; }
+.raster-kpis { display:grid; grid-template-columns:repeat(4,1fr); gap:9px; margin:9px 0 16px; }.raster-kpis div { border:1px solid var(--line); border-radius:14px; padding:14px; background:rgba(0,0,0,.13); }.raster-kpis span,.raster-leader>span { display:block; color:var(--muted); font:9px 'DM Mono',monospace; letter-spacing:.09em; }.raster-kpis strong { display:block; margin:8px 0 4px; font-size:18px; color:var(--profile); }.raster-kpis small { color:var(--muted); }.raster-leader { border-left:3px solid var(--profile); padding:13px 16px; background:rgba(255,255,255,.025); }.raster-leader>div { display:flex; flex-wrap:wrap; align-items:center; gap:6px; margin:11px 0; }.raster-leader strong { color:var(--profile); font:11px 'DM Mono',monospace; }
 .candidate-summary { display:grid; grid-template-columns:1.35fr 1fr 1fr 1fr; gap:10px; border:1px solid var(--line); border-top:3px solid var(--profile); border-radius:22px; padding:19px; margin:16px 0; background:rgba(11,28,35,.95); }
 .candidate-summary>div { border-left:1px solid var(--line); padding:7px 13px; }.candidate-summary>div:first-child { border:0; }
 .candidate-summary strong { display:block; font-size:15px; margin-top:10px; }.candidate-summary small { display:block; color:var(--muted); margin-top:6px; }
@@ -890,8 +1066,8 @@ body,.gradio-container { color:var(--ink); font-family:'Space Grotesk',sans-seri
 .claims-note strong { color:#ffca70; }.claims-note p { color:#b7c4c4; font-size:12px; line-height:1.6; margin:6px 0 0; }
 @keyframes pulse { 70% { box-shadow:0 0 0 9px rgba(216,243,92,0); } 100% { box-shadow:0 0 0 0 rgba(216,243,92,0); } }
 @keyframes trace { to { stroke-dashoffset:0; } } @keyframes nodeIn { from { opacity:0; transform:scale(.35); transform-origin:center; } to { opacity:1; transform:scale(1); } } @keyframes ring { 0% { opacity:.8; transform:scale(.6); } 80%,100% { opacity:0; transform:scale(1.45); } }
-@media(max-width:900px) { .gradio-container{padding:12px!important}.profile-deck,.overall-ladder,.agent-ladder,.round-head,.candidate-summary{grid-template-columns:1fr}.protocol-strip{grid-template-columns:1fr 1fr}.protocol-strip>i{display:none}.navigation-guide{grid-template-columns:1fr 1fr}.navigation-guide>span{grid-column:1/-1}.navigation-guide>i{display:none}.lottery-identity{grid-template-columns:1fr}.identity-ledger{grid-template-columns:1fr 1fr}.identity-ledger div{border-right:0;border-bottom:1px solid var(--line);padding:10px 0}.panel-heading{display:block}.global-hero h1{font-size:46px}.profile-card p{min-height:0} }
-@media(max-width:560px) { .profile-deck,.protocol-strip,.identity-ledger,.round-kpis{grid-template-columns:1fr}.global-hero{padding:27px 22px}.global-hero h1{font-size:39px}.lottery-identity,.leader-section,.walk-panel,.candidate-map{padding:17px}.overall-agent{padding-left:64px}.lottery-ball{width:34px;height:34px;font-size:11px}.agent-rank{grid-template-columns:1fr}.rank-orbit{width:36px;height:36px}.agent-line{display:block}.edge-badge{display:inline-block;margin-top:8px} }
+@media(max-width:900px) { .gradio-container{padding:12px!important}.profile-deck,.overall-ladder,.agent-ladder,.round-head,.candidate-summary,.raster-kpis{grid-template-columns:1fr}.protocol-strip{grid-template-columns:1fr 1fr}.protocol-strip>i{display:none}.navigation-guide{grid-template-columns:1fr 1fr}.navigation-guide>span{grid-column:1/-1}.navigation-guide>i{display:none}.lottery-identity{grid-template-columns:1fr}.identity-ledger{grid-template-columns:1fr 1fr}.identity-ledger div{border-right:0;border-bottom:1px solid var(--line);padding:10px 0}.panel-heading{display:block}.global-hero h1{font-size:46px}.profile-card p{min-height:0} }
+@media(max-width:560px) { .profile-deck,.protocol-strip,.identity-ledger,.round-kpis{grid-template-columns:1fr}.global-hero{padding:27px 22px}.global-hero h1{font-size:39px}.lottery-identity,.leader-section,.walk-panel,.candidate-map,.roi-panel,.raster-panel{padding:17px}.overall-agent{padding-left:64px}.lottery-ball{width:34px;height:34px;font-size:11px}.agent-rank{grid-template-columns:1fr}.rank-orbit{width:36px;height:36px}.agent-line{display:block}.edge-badge{display:inline-block;margin-top:8px} }
 """
 
 

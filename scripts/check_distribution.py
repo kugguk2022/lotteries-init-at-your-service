@@ -9,6 +9,10 @@ from pathlib import Path, PurePosixPath
 
 FORBIDDEN_ROOTS = {"data", "experiments", "ledger", "outputs", "runs", "tests"}
 FORBIDDEN_SUFFIXES = {".csv", ".db", ".jsonl", ".parquet", ".pt", ".xlsx"}
+VALIDATED_PACKAGE_DATA = {
+    "lotteries_core/data/euromillions_history.csv",
+    "lotteries_core/data/euromillions_history.meta.json",
+}
 REQUIRED = {
     "lottobench/__init__.py",
     "lottobench/cli.py",
@@ -16,7 +20,7 @@ REQUIRED = {
     "lotteries_core/registry.py",
     "lotteries_core/realized_roi.py",
     "lotteries_core/storage.py",
-}
+} | VALIDATED_PACKAGE_DATA
 
 
 def _members(path: Path) -> list[str]:
@@ -39,7 +43,10 @@ def check(path: Path) -> None:
         parts = PurePosixPath(name).parts
         if not parts:
             continue
-        if parts[0] in FORBIDDEN_ROOTS or PurePosixPath(name).suffix.lower() in FORBIDDEN_SUFFIXES:
+        forbidden_suffix = PurePosixPath(name).suffix.lower() in FORBIDDEN_SUFFIXES
+        if parts[0] in FORBIDDEN_ROOTS or (
+            forbidden_suffix and name not in VALIDATED_PACKAGE_DATA
+        ):
             leaked.append(name)
     if leaked:
         raise SystemExit(f"{path}: repository artifacts leaked: {sorted(leaked)}")

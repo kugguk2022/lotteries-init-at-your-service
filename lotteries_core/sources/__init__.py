@@ -4,10 +4,9 @@ This package is *shipped*. Retrieval used to live in ``experiments/``, which mea
 user journey -- install, fetch, benchmark -- could not actually be completed from the published
 wheel. A benchmark whose data step is unavailable to its users is not a benchmark.
 
-Dependency contract: the CSV sources here run on the base install (numpy + pandas only). The two
-HTML archive fallbacks need ``beautifulsoup4`` and ``requests``, so they live in
-:mod:`lotteries_core.sources.html_archive` and are imported lazily. A user who only ever fetches
-CSV never pays for a scraper.
+Dependency contract: the Irish operator's structured HTML is parsed with the standard library.
+The two explicit historical-maintenance adapters use ``beautifulsoup4`` and ``requests`` and live
+in :mod:`lotteries_core.sources.html_archive`.
 
 Only EuroMillions is wired end to end. See ``docs/wiki/Backlog.md`` for the games that are defined
 but not yet retrievable.

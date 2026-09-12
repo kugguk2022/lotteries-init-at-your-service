@@ -1,0 +1,15 @@
+{
+  "content_sha256": "4657f005483226704a9672c25d2cfffc9abdaba285e6987ecbbe2e37b182f6ba",
+  "first_draw": "2004-02-13",
+  "historical_source": "https://www.euro-millions.com/results-history-{year}",
+  "last_draw": "2026-09-08",
+  "official_overlap_end": "2026-09-08",
+  "official_overlap_rows": 26,
+  "official_overlap_start": "2026-06-12",
+  "official_validation_source": "https://www.lottery.ie/draw-games/results/view?game=euromillions",
+  "previous_canonical_content_sha256": "857727f639e408f21dd9451dbc377579899cdd5f66b59a42a0861596c52fbb89",
+  "previous_canonical_last_draw": "2026-08-14",
+  "previous_canonical_rows": 1972,
+  "rows": 1979,
+  "schema_version": "1.0.0"
+}

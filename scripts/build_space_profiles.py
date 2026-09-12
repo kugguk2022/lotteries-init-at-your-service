@@ -19,6 +19,7 @@ from lotteries_core.aggregation import aggregate
 from lotteries_core.dataset import content_digest
 from lotteries_core.envelope import InferenceEnvelope
 from lotteries_core.evaluation import evaluate_forward
+from lotteries_core.pair_raster import build_pair_raster
 from lotteries_core.protocol import GameSpec
 from lotteries_core.roi import JackpotModel, default_jackpot_model
 from lottobench.games import GAMES
@@ -47,6 +48,19 @@ AGENT_LABELS = {
     "parallax": "Parallax guard",
     "coordinated_aggregation": "Coordinator",
 }
+
+
+def _next_draw_date(key: str, last_draw: str) -> str:
+    """Return the next expected contest date after a verified history cutoff."""
+    current = pd.Timestamp(last_draw)
+    weekdays = {"euromillions": {1, 4}, "nl-lotto": {5}}
+    if key == "synthetic":
+        return str((current + pd.Timedelta(days=7)).date())
+    for days in range(1, 8):
+        candidate = current + pd.Timedelta(days=days)
+        if candidate.weekday() in weekdays[key]:
+            return str(candidate.date())
+    raise RuntimeError(f"could not resolve the next draw date for {key}")
 
 
 def _synthetic_profile_history(rows: int = 48) -> pd.DataFrame:
@@ -110,9 +124,9 @@ def _source_manifest(key: str, metadata: dict) -> dict:
         }
     if key == "euromillions":
         return {
-            "class": "PUBLIC ARCHIVE",
-            "label": "Validated EuroMillions archive fallback",
-            "url": "https://www.euro-millions.com/results-history-2026",
+            "class": "OPERATOR PAGE + VALIDATED HISTORY",
+            "label": "Irish National Lottery official results with digest-pinned history",
+            "url": "https://www.lottery.ie/draw-games/results/view?game=euromillions",
             "raw_history_published": False,
             "retrieval_record": metadata["source"],
         }
@@ -265,12 +279,34 @@ def _build_profile(key: str, database: Path, output: Path) -> dict:
         jackpot,
     )
 
+    target_draw_date = _next_draw_date(key, str(metadata["last_draw"]))
+    pair_raster = None
+    if key != "synthetic":
+        pair_raster = build_pair_raster(
+            history,
+            spec,
+            snapshot_sha256=snapshot_sha256,
+            history_cutoff=str(metadata["last_draw"]),
+            target_draw_date=target_draw_date,
+        )
+
     profile_dir = output / key
     profile_dir.mkdir(parents=True, exist_ok=True)
     contests.to_csv(profile_dir / "contests.csv", index=False, lineterminator="\n")
     tickets.to_csv(profile_dir / "tickets.csv", index=False, lineterminator="\n")
     leaderboard.to_csv(profile_dir / "leaderboard.csv", index=False, lineterminator="\n")
     prospective.to_csv(profile_dir / "prospective.csv", index=False, lineterminator="\n")
+    if pair_raster is not None:
+        pair_raster.top.to_csv(
+            profile_dir / "pair_raster_top.csv", index=False, lineterminator="\n"
+        )
+        pair_raster.distribution.to_csv(
+            profile_dir / "pair_raster_distribution.csv", index=False, lineterminator="\n"
+        )
+        (profile_dir / "pair_raster_summary.json").write_text(
+            json.dumps(pair_raster.summary, indent=2, sort_keys=True) + "\n",
+            encoding="utf-8",
+        )
 
     display_name = {
         "synthetic": "EuroMillions lab control",
@@ -278,7 +314,7 @@ def _build_profile(key: str, database: Path, output: Path) -> dict:
         "nl-lotto": "Nederlandse Lotto",
     }[key]
     manifest = {
-        "schema_version": "2.0.0",
+        "schema_version": "2.1.0",
         "profile_key": key,
         "display_name": display_name,
         "data_kind": "deterministic_synthetic" if key == "synthetic" else "observed_public_history",
@@ -306,6 +342,12 @@ def _build_profile(key: str, database: Path, output: Path) -> dict:
             "providers": list(PROVIDER_NAMES),
             "coordinator": "coordinated_aggregation",
         },
+        "prospective": {
+            "history_cutoff": str(metadata["last_draw"]),
+            "target_draw_date": target_draw_date,
+            "status": "PENDING",
+            "pair_raster": pair_raster.summary if pair_raster is not None else None,
+        },
         "claims_boundary": (
             "ROI alpha is modeled expected-ROI difference from the equal-budget uniform null. "
             "It is not realized profit, improved draw probability, or betting advice."
@@ -314,10 +356,60 @@ def _build_profile(key: str, database: Path, output: Path) -> dict:
     (profile_dir / "manifest.json").write_text(
         json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8"
     )
+
+    latest_contest = int(contests["contest_number"].max())
+    prior_contest = latest_contest - 1
+    prior_means = (
+        contests[contests["contest_number"].astype(int) == prior_contest]
+        .set_index("agent")["mean_roi_alpha_vs_house_pp"]
+        .to_dict()
+    )
+    summary = {
+        "schema_version": "1.0.0",
+        "profile_key": key,
+        "display_name": display_name,
+        "history": manifest["history"],
+        "refresh": {
+            "automatic": key != "synthetic",
+            "cadence": PROFILE_REFRESH_CADENCE[key],
+            "next_target_draw": target_draw_date,
+        },
+        "leaderboard": [
+            {
+                "rank": int(row.rank),
+                "agent": str(row.agent),
+                "agent_label": str(row.agent_label),
+                "mean_roi_alpha_pp": float(row.mean_roi_alpha_pp),
+                "delta_vs_prior_contest_pp": float(row.mean_roi_alpha_pp)
+                - float(prior_means.get(str(row.agent), row.mean_roi_alpha_pp)),
+                "consistency_pct": float(row.consistency_pct),
+            }
+            for row in leaderboard.itertuples(index=False)
+        ],
+        "roi_evolution": [
+            {
+                "contest_number": int(row.contest_number),
+                "draw_date": str(row.draw_date),
+                "agent": str(row.agent),
+                "cumulative_mean_roi_alpha_pp": float(row.mean_roi_alpha_vs_house_pp),
+            }
+            for row in contests.itertuples(index=False)
+        ],
+        "pair_raster": pair_raster.summary if pair_raster is not None else None,
+        "claims_boundary": manifest["claims_boundary"],
+    }
+    (profile_dir / "summary.json").write_text(
+        json.dumps(summary, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
     return manifest
 
 
 PROFILE_KEYS = ("synthetic", "euromillions", "nl-lotto")
+PROFILE_REFRESH_CADENCE = {
+    "synthetic": "repository-generated control",
+    "euromillions": "after Tuesday and Friday draws",
+    "nl-lotto": "after Saturday draws",
+}
 
 
 def build(

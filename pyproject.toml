@@ -83,6 +83,9 @@ lotto-serve = "lotteries_core.api:main"          # needs the [api] extra
 [tool.setuptools.packages.find]
 include = ["lottobench", "lottobench.*", "lotteries_core", "lotteries_core.*"]
 
+[tool.setuptools.package-data]
+lotteries_core = ["data/*.csv", "data/*.json"]
+
 [tool.ruff]
 line-length = 100
 extend-exclude = ["experiments"]

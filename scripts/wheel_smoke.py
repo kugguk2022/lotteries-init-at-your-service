@@ -72,9 +72,8 @@ else:  # pragma: no cover
 
 # --- the base install carries the retrieval stack ----------------------------------------------
 #
-# ``requests`` and ``beautifulsoup4`` are base dependencies, not an extra: automatic retrieval,
-# including the HTML archive fallback that ``--source auto`` reaches for when both CSV archives
-# fail, has to work on a plain ``pip install lottobench``.
+# ``requests`` and ``beautifulsoup4`` remain base dependencies for explicit archive maintenance.
+# The default Irish operator adapter itself uses only the standard library plus pandas.
 
 from lotteries_core.sources.html_archive import (  # noqa: E402
     _require_scrape_dependencies,
@@ -136,6 +135,24 @@ def _published_csv(rows: int = 400) -> str:
     return "\n".join(lines) + "\n"
 
 
+def _official_html() -> str:
+    draws = [
+        ("2026-09-04T18:30:00.000Z", [11, 12, 19, 27, 46], [4, 12]),
+        ("2026-09-08T18:30:00.000Z", [13, 17, 33, 35, 39], [7, 12]),
+    ]
+    entries = [
+        {
+            "standard": {
+                "drawDates": [draw_date],
+                "grids": [{"standard": [mains], "additional": [stars]}],
+            }
+        }
+        for draw_date, mains, stars in draws
+    ]
+    payload = {"props": {"pageProps": {"list": entries}}}
+    return f'<script id="__NEXT_DATA__" type="application/json">{json.dumps(payload)}</script>'
+
+
 def _nl_results_page() -> str:
     listed = "".join(
         f'<a href="/trekkingsuitslag/{value}" data-test="date-slider-item">{value}</a>'
@@ -176,6 +193,8 @@ def _fake_urlopen(request, timeout=None):
         return _Response(_nl_result_payload(url.rsplit("/", 1)[-1]), "application/json")
     if NL_RESULTS_HOST in url:
         return _Response(_nl_results_page(), "text/html")
+    if "lottery.ie/draw-games/results/view" in url:
+        return _Response(_official_html(), "text/html")
     return _Response(_published_csv(), "text/csv")
 
 
@@ -186,7 +205,13 @@ from lottobench.cli import main as cli_main  # noqa: E402  (must follow the tran
 #: Per game: how many draws the stubbed source publishes, the provenance label ``fetch`` records,
 #: and a benchmark small enough to stay a smoke test. Every entry of ``GAMES`` must appear here.
 JOURNEYS = {
-    "euromillions": {"rows": 400, "budget": 10, "holdout": 5, "source": "auto"},
+    "euromillions": {
+        "rows": 29,
+        "budget": 10,
+        "holdout": 5,
+        "source": "irish-national-lottery+validated-history",
+        "fetch_args": ["--from", "2026-06-01"],
+    },
     "nl-lotto": {
         "rows": len(NL_DATES), "budget": 4, "holdout": 3, "source": "official-operator-api",
     },
@@ -199,7 +224,9 @@ with tempfile.TemporaryDirectory(prefix="lottobench-wheel-journey-") as director
     database = root / "lotteries.db"
 
     for game_key, journey in JOURNEYS.items():
-        assert cli_main(["fetch", "--game", game_key, "--db", str(database)]) == 0
+        fetch_args = ["fetch", "--game", game_key, "--db", str(database)]
+        fetch_args.extend(journey.get("fetch_args", []))
+        assert cli_main(fetch_args) == 0
 
         stored = storage.read_history(database, game=game_key)
         assert len(stored) == journey["rows"], f"{game_key}: stored {len(stored)} draws"

@@ -110,9 +110,9 @@ def _source_manifest(key: str, metadata: dict) -> dict:
         }
     if key == "euromillions":
         return {
-            "class": "PUBLIC ARCHIVE",
-            "label": "Validated EuroMillions archive fallback",
-            "url": "https://www.euro-millions.com/results-history-2026",
+            "class": "OPERATOR PAGE + VALIDATED HISTORY",
+            "label": "Irish National Lottery official results with digest-pinned history",
+            "url": "https://www.lottery.ie/draw-games/results/view?game=euromillions",
             "raw_history_published": False,
             "retrieval_record": metadata["source"],
         }

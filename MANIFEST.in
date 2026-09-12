@@ -15,3 +15,4 @@ prune euromillions
 prune euromillions_agent
 prune totoloto
 global-exclude *.csv *.db *.jsonl *.parquet *.pt *.py[cod] *.xlsx
+include lotteries_core/data/euromillions_history.csv

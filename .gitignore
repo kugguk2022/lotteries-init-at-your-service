@@ -1,5 +1,7 @@
 *.pyc
 *.csv
+# The immutable seed used by the Irish-official incremental adapter is source data, not output.
+!lotteries_core/data/euromillions_history.csv
 # ...except the evidence ledger. results.csv is the experiment's primary artifact: it has to
 # be committable, or an unattended settle run produces nothing the repo can keep.
 !ledger/**/*.csv

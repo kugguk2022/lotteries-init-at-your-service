@@ -119,6 +119,8 @@ class Profile:
     temporal_candidates: pd.DataFrame
     temporal_backtest: pd.DataFrame
     temporal_summary: dict
+    crowd_escape_draws: pd.DataFrame
+    crowd_escape_summary: dict
     summary: dict
     directory: Path
 
@@ -151,6 +153,10 @@ def _load_profile(key: str) -> Profile:
         temporal_candidates=_read_csv_or_empty(directory / "temporal_hybrid_preview.csv"),
         temporal_backtest=_read_csv_or_empty(directory / "temporal_hybrid_backtest.csv"),
         temporal_summary=_read_json_or_empty(directory / "temporal_hybrid_summary.json"),
+        crowd_escape_draws=_read_csv_or_empty(
+            directory / "crowd_escape_forecasted_draws.csv"
+        ),
+        crowd_escape_summary=_read_json_or_empty(directory / "crowd_escape_summary.json"),
         summary=_read_json_or_empty(directory / "summary.json"),
         directory=directory,
     )
@@ -820,6 +826,59 @@ def _temporal_candidate_display(profile: Profile) -> pd.DataFrame:
     )
 
 
+def _crowd_escape_panel(profile: Profile) -> str:
+    summary = profile.crowd_escape_summary
+    if not summary or profile.crowd_escape_draws.empty:
+        return f"""
+        <section class="raster-panel pending" style="--profile:{PROFILE_STYLE[profile.key]['accent']}">
+          <span>CROWD ESCAPE PRE-DRAW SLATE</span>
+          <h2>Queued for the next verified refresh.</h2>
+          <p>The next build will publish the provider's 12 sealed, low-crowding ticket selections for the following draw, with modeled jackpot-sharing diagnostics and immutable commitments.</p>
+        </section>
+        """
+    leader = profile.crowd_escape_draws.iloc[0]
+    auxiliary = _number_balls(leader["auxiliary_draw"], auxiliary=True)
+    plus = '<span class="draw-plus">+</span>' if auxiliary else ""
+    return f"""
+    <section class="raster-panel crowd-panel" style="--profile:{PROFILE_STYLE[profile.key]['accent']}">
+      <div class="panel-heading"><div><span>CROWD ESCAPE PRE-DRAW SLATE</span><h2>Forecasted crowd-avoidance draws, sealed before the draw</h2></div><p>These tickets forecast which combinations may be less popular with other players using a static human-choice prior. They do not forecast the lottery machine: every legal ticket retains identical fair-draw odds.</p></div>
+      <div class="raster-kpis">
+        <div><span>SEALED TICKETS</span><strong>{int(summary['ticket_count']):,}</strong><small>target {html.escape(str(summary['target_draw_date']))}</small></div>
+        <div><span>FAIR COVERAGE</span><strong>{float(summary['mechanical_jackpot_coverage_pct']):.8f}%</strong><small>1 in {int(summary['mechanical_jackpot_odds_per_ticket_one_in']):,} per ticket</small></div>
+        <div><span>MEAN CROWD SHARE</span><strong>{float(summary['mean_crowd_popularity_share_vs_average']):.3f}×</strong><small>1.000× is an average-popularity ticket</small></div>
+        <div><span>FULL-SLATE STAKE</span><strong>€{float(summary['full_purchase_stake']):,.0f}</strong><small>modeled jackpot tier only; status PENDING</small></div>
+      </div>
+      <div class="raster-leader"><span>TOP CROWD-ESCAPE SET / TARGET {html.escape(str(summary['target_draw_date']))}</span><div>{_number_balls(leader['main_draw'])}{plus}{auxiliary}</div><strong>{float(leader['crowd_escape_lift_vs_average']):.2f}× crowd-escape lift / commitment {html.escape(str(leader['commitment_sha256'])[:12])}</strong></div>
+      <div class="economics-warning"><strong>Less shared does not mean more likely.</strong> The model may improve expected payout conditional on an otherwise identical jackpot hit. It does not increase hit probability, prove positive ROI, or use live player-selection data.</div>
+    </section>
+    """
+
+
+def _crowd_escape_display(profile: Profile) -> pd.DataFrame:
+    if profile.crowd_escape_draws.empty:
+        return pd.DataFrame()
+    frame = profile.crowd_escape_draws.sort_values("rank")
+    return pd.DataFrame(
+        {
+            "Rank": frame["rank"].astype(int),
+            "Main numbers": frame["main_draw"],
+            "Lucky stars / Aux": frame["auxiliary_draw"].fillna(""),
+            "Crowd share vs average": frame["crowd_popularity_share_vs_average"].map(
+                lambda value: f"{value:.3f}×"
+            ),
+            "Crowd-escape lift": frame["crowd_escape_lift_vs_average"].map(
+                lambda value: f"{value:.2f}×"
+            ),
+            "Modeled payout if jackpot match": frame[
+                "modeled_payout_if_jackpot_match"
+            ].map(lambda value: f"€{value:,.0f}"),
+            "Target draw": frame["target_draw_date"],
+            "Status": frame["score_status"],
+            "Commitment": frame["commitment_sha256"].str[:12],
+        }
+    )
+
+
 def render_candidates(
     key: str, house_balance: int, top_n: int
 ) -> tuple[str, str, pd.DataFrame, str]:
@@ -930,6 +989,22 @@ def _build_profile_tab(profile: Profile) -> None:
             gr.HTML(CLAIMS_NOTE)
 
         with gr.Tab("SCREEN B / PENDING SET LAB"):
+            gr.HTML(_crowd_escape_panel(profile))
+            if not profile.crowd_escape_draws.empty:
+                gr.Dataframe(
+                    _crowd_escape_display(profile),
+                    interactive=False,
+                    label="Crowd Escape forecasted draws (crowding forecast, not draw odds)",
+                )
+                with gr.Row():
+                    gr.File(
+                        value=str(profile.directory / "crowd_escape_forecasted_draws.csv"),
+                        label="Download sealed Crowd Escape draws",
+                    )
+                    gr.File(
+                        value=str(profile.directory / "crowd_escape_summary.json"),
+                        label="Download Crowd Escape method manifest",
+                    )
             gr.HTML(_temporal_candidate_panel(profile))
             if not profile.temporal_candidates.empty:
                 gr.Dataframe(

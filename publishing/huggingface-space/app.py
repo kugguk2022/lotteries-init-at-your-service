@@ -116,6 +116,9 @@ class Profile:
     pair_raster: pd.DataFrame
     pair_raster_distribution: pd.DataFrame
     pair_raster_summary: dict
+    temporal_candidates: pd.DataFrame
+    temporal_backtest: pd.DataFrame
+    temporal_summary: dict
     summary: dict
     directory: Path
 
@@ -145,6 +148,9 @@ def _load_profile(key: str) -> Profile:
             directory / "pair_raster_distribution.csv"
         ),
         pair_raster_summary=_read_json_or_empty(directory / "pair_raster_summary.json"),
+        temporal_candidates=_read_csv_or_empty(directory / "temporal_hybrid_preview.csv"),
+        temporal_backtest=_read_csv_or_empty(directory / "temporal_hybrid_backtest.csv"),
+        temporal_summary=_read_json_or_empty(directory / "temporal_hybrid_summary.json"),
         summary=_read_json_or_empty(directory / "summary.json"),
         directory=directory,
     )
@@ -763,6 +769,57 @@ def _pair_raster_display(profile: Profile) -> pd.DataFrame:
     )
 
 
+def _temporal_candidate_panel(profile: Profile) -> str:
+    summary = profile.temporal_summary
+    if not summary or profile.temporal_candidates.empty:
+        return f"""
+        <section class="raster-panel pending" style="--profile:{PROFILE_STYLE[profile.key]['accent']}">
+          <span>TRANSFORMER + GARCH BRANCH SET</span>
+          <h2>Queued for the next verified refresh.</h2>
+          <p>The next post-draw build will fit both temporal branches on the locked history, rank the complete legal universe, and publish the exact million-ticket candidate artifact with a matched-null forward gate.</p>
+        </section>
+        """
+    gate = summary["forward_only_gate"]
+    leader = profile.temporal_candidates.iloc[0]
+    auxiliary = _number_balls(leader["auxiliary_draw"], auxiliary=True)
+    plus = '<span class="draw-plus">+</span>' if auxiliary else ""
+    gate_label = "PASSED" if gate["passed"] else "RESEARCH ONLY"
+    return f"""
+    <section class="raster-panel temporal-panel" style="--profile:{PROFILE_STYLE[profile.key]['accent']}">
+      <div class="panel-heading"><div><span>TRANSFORMER + GARCH BRANCH SET</span><h2>Exact million-ticket search-space artifact</h2></div><p>Both models forecast the next historical pair-score level. Every legal ticket is ranked by distance to either branch using only draws through {html.escape(str(summary['history_cutoff']))}. This is an inference ranking, not a change to fair-draw odds.</p></div>
+      <div class="raster-kpis temporal-kpis">
+        <div><span>CANDIDATE SET</span><strong>{int(summary['candidate_size']):,}</strong><small>of {int(summary['universe_size']):,} exact tickets</small></div>
+        <div><span>FAIR COVERAGE</span><strong>{float(summary['mechanical_jackpot_coverage_pct']):.4f}%</strong><small>1 in {float(summary['mechanical_jackpot_odds_one_in']):.2f} per draw</small></div>
+        <div><span>FULL-PURCHASE STAKE</span><strong>€{float(summary['full_purchase_stake']):,.0f}</strong><small>break-even gross payout €{float(summary['break_even_gross_payout']):,.0f}</small></div>
+        <div><span>FORWARD GATE</span><strong>{gate_label}</strong><small>{int(gate['hybrid_jackpot_containment_hits'])}/{int(gate['holdout_draws'])} hybrid vs {int(gate['matched_uniform_containment_hits'])}/{int(gate['holdout_draws'])} matched null</small></div>
+      </div>
+      <div class="raster-leader"><span>TOP BRANCH-RANKED SET / TARGET {html.escape(str(summary['target_draw_date']))}</span><div>{_number_balls(leader['main_draw'])}{plus}{auxiliary}</div><strong>G {int(leader['g_score'])} / nearest {html.escape(str(leader['nearest_branch']))} branch</strong></div>
+      <div class="economics-warning"><strong>Coverage is not profitability.</strong> Containing the first-prize combination does not by itself prove a profit: the realized payout must exceed the full stake after jackpot sharing and applicable deductions. This artifact is not treated as one million purchased tickets.</div>
+    </section>
+    """
+
+
+def _temporal_candidate_display(profile: Profile) -> pd.DataFrame:
+    if profile.temporal_candidates.empty:
+        return pd.DataFrame()
+    frame = profile.temporal_candidates.head(50)
+    return pd.DataFrame(
+        {
+            "Rank": frame["rank"].astype(int),
+            "Main numbers": frame["main_draw"],
+            "Lucky stars / Aux": frame["auxiliary_draw"].fillna(""),
+            "G score": frame["g_score"].astype(int),
+            "Nearest branch": frame["nearest_branch"],
+            "Distance to GARCH": frame["distance_to_garch"].map(lambda value: f"{value:.3f}"),
+            "Distance to transformer": frame["distance_to_transformer"].map(
+                lambda value: f"{value:.3f}"
+            ),
+            "Target draw": frame["target_draw_date"],
+            "Status": frame["score_status"],
+        }
+    )
+
+
 def render_candidates(
     key: str, house_balance: int, top_n: int
 ) -> tuple[str, str, pd.DataFrame, str]:
@@ -873,6 +930,26 @@ def _build_profile_tab(profile: Profile) -> None:
             gr.HTML(CLAIMS_NOTE)
 
         with gr.Tab("SCREEN B / PENDING SET LAB"):
+            gr.HTML(_temporal_candidate_panel(profile))
+            if not profile.temporal_candidates.empty:
+                gr.Dataframe(
+                    _temporal_candidate_display(profile),
+                    interactive=False,
+                    label="Top 50 transformer + GARCH branch candidates",
+                )
+                with gr.Row():
+                    gr.File(
+                        value=str(profile.directory / "temporal_hybrid_candidates_1m.csv.gz"),
+                        label="Download exact million-ticket candidate set",
+                    )
+                    gr.File(
+                        value=str(profile.directory / "temporal_hybrid_backtest.csv"),
+                        label="Download forward-only containment evidence",
+                    )
+                    gr.File(
+                        value=str(profile.directory / "temporal_hybrid_summary.json"),
+                        label="Download inference and economics manifest",
+                    )
             gr.HTML(_pair_raster_panel(profile))
             if not profile.pair_raster.empty:
                 gr.Dataframe(
@@ -1056,6 +1133,7 @@ body,.gradio-container { color:var(--ink); font-family:'Space Grotesk',sans-seri
 .lab-intro { border:1px solid var(--line); border-left:4px solid var(--profile); border-radius:22px; padding:25px; margin:17px 0; background:linear-gradient(135deg,rgba(14,42,49,.97),rgba(9,20,27,.97)); }
 .lab-intro>span { color:var(--profile); }.lab-intro h2 { font-size:31px; margin:9px 0; }.lab-intro p { max-width:820px; color:#b4c5c8; line-height:1.6; }
 .raster-panel { border-top:3px solid var(--profile); }.raster-panel.pending { border-style:dashed; }.raster-panel>span { color:var(--profile); font:500 10px 'DM Mono',monospace; letter-spacing:.16em; }.raster-panel.pending h2 { margin:9px 0; }.raster-panel.pending p { color:var(--muted); max-width:820px; line-height:1.6; }
+.temporal-panel { background:linear-gradient(145deg,rgba(14,42,49,.98),rgba(9,20,27,.97)); }.economics-warning { margin-top:15px; border:1px solid rgba(255,184,77,.35); border-radius:14px; padding:14px; color:#bcc9ca; background:rgba(255,184,77,.07); font-size:12px; line-height:1.55; }.economics-warning strong { color:#ffca70; }
 .raster-kpis { display:grid; grid-template-columns:repeat(4,1fr); gap:9px; margin:9px 0 16px; }.raster-kpis div { border:1px solid var(--line); border-radius:14px; padding:14px; background:rgba(0,0,0,.13); }.raster-kpis span,.raster-leader>span { display:block; color:var(--muted); font:9px 'DM Mono',monospace; letter-spacing:.09em; }.raster-kpis strong { display:block; margin:8px 0 4px; font-size:18px; color:var(--profile); }.raster-kpis small { color:var(--muted); }.raster-leader { border-left:3px solid var(--profile); padding:13px 16px; background:rgba(255,255,255,.025); }.raster-leader>div { display:flex; flex-wrap:wrap; align-items:center; gap:6px; margin:11px 0; }.raster-leader strong { color:var(--profile); font:11px 'DM Mono',monospace; }
 .candidate-summary { display:grid; grid-template-columns:1.35fr 1fr 1fr 1fr; gap:10px; border:1px solid var(--line); border-top:3px solid var(--profile); border-radius:22px; padding:19px; margin:16px 0; background:rgba(11,28,35,.95); }
 .candidate-summary>div { border-left:1px solid var(--line); padding:7px 13px; }.candidate-summary>div:first-child { border:0; }

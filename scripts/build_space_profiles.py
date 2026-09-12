@@ -22,6 +22,7 @@ from lotteries_core.evaluation import evaluate_forward
 from lotteries_core.pair_raster import build_pair_raster
 from lotteries_core.protocol import GameSpec
 from lotteries_core.roi import JackpotModel, default_jackpot_model
+from lotteries_core.temporal_candidate_set import build_temporal_candidate_set
 from lottobench.games import GAMES
 from scripts.agent_ledgers import build_agent_ledgers
 
@@ -280,7 +281,10 @@ def _build_profile(key: str, database: Path, output: Path) -> dict:
     )
 
     target_draw_date = _next_draw_date(key, str(metadata["last_draw"]))
+    profile_dir = output / key
+    profile_dir.mkdir(parents=True, exist_ok=True)
     pair_raster = None
+    temporal_candidates = None
     if key != "synthetic":
         pair_raster = build_pair_raster(
             history,
@@ -289,9 +293,16 @@ def _build_profile(key: str, database: Path, output: Path) -> dict:
             history_cutoff=str(metadata["last_draw"]),
             target_draw_date=target_draw_date,
         )
-
-    profile_dir = output / key
-    profile_dir.mkdir(parents=True, exist_ok=True)
+        temporal_candidates = build_temporal_candidate_set(
+            history,
+            spec,
+            output_directory=profile_dir,
+            history_cutoff=str(metadata["last_draw"]),
+            target_draw_date=target_draw_date,
+            snapshot_sha256=snapshot_sha256,
+            jackpot=jackpot,
+            seed=profile_seed + 200_000,
+        )
     contests.to_csv(profile_dir / "contests.csv", index=False, lineterminator="\n")
     tickets.to_csv(profile_dir / "tickets.csv", index=False, lineterminator="\n")
     leaderboard.to_csv(profile_dir / "leaderboard.csv", index=False, lineterminator="\n")
@@ -347,6 +358,9 @@ def _build_profile(key: str, database: Path, output: Path) -> dict:
             "target_draw_date": target_draw_date,
             "status": "PENDING",
             "pair_raster": pair_raster.summary if pair_raster is not None else None,
+            "temporal_candidate_set": (
+                temporal_candidates.summary if temporal_candidates is not None else None
+            ),
         },
         "claims_boundary": (
             "ROI alpha is modeled expected-ROI difference from the equal-budget uniform null. "
@@ -396,6 +410,9 @@ def _build_profile(key: str, database: Path, output: Path) -> dict:
             for row in contests.itertuples(index=False)
         ],
         "pair_raster": pair_raster.summary if pair_raster is not None else None,
+        "temporal_candidate_set": (
+            temporal_candidates.summary if temporal_candidates is not None else None
+        ),
         "claims_boundary": manifest["claims_boundary"],
     }
     (profile_dir / "summary.json").write_text(

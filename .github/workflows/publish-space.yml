@@ -13,6 +13,7 @@ on:
       - "publishing/huggingface-space/**"
       - "scripts/build_space_profiles.py"
       - "lotteries_core/pair_raster.py"
+      - "lotteries_core/temporal_candidate_set.py"
   schedule:
     - cron: "15 8 * * 3"
     - cron: "15 23 * * 5"
@@ -57,6 +58,7 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -e ".[dev]"
+          pip install "torch>=2.10.0" --index-url https://download.pytorch.org/whl/cpu
           pip install "huggingface_hub>=1.0,<2"
 
       - name: Resolve scheduled lottery
@@ -232,11 +234,13 @@ jobs:
         run: |
           set -euo pipefail
           bundle="$RUNNER_TEMP/space-bundle"
-          ruff check "$bundle/app.py" scripts/build_space_profiles.py lotteries_core/pair_raster.py
+          ruff check "$bundle/app.py" scripts/build_space_profiles.py lotteries_core/pair_raster.py lotteries_core/temporal_candidate_set.py
           python -m py_compile "$bundle/app.py"
           pytest -q tests/test_space_profiles.py tests/test_pair_raster.py tests/test_benchmark_output_contract.py
+          pytest -q tests/test_temporal_candidate_set.py
 
           BUNDLE="$bundle" GAME="$GAME" python - <<'PY'
+          import hashlib
           import json
           import os
           from pathlib import Path
@@ -263,6 +267,10 @@ jobs:
               "pair_raster_top.csv",
               "pair_raster_distribution.csv",
               "pair_raster_summary.json",
+              "temporal_hybrid_candidates_1m.csv.gz",
+              "temporal_hybrid_preview.csv",
+              "temporal_hybrid_backtest.csv",
+              "temporal_hybrid_summary.json",
           ):
               assert (selected / name).is_file(), f"{selected_game}/{name} is missing"
           raster = json.loads(
@@ -272,6 +280,15 @@ jobs:
           assert raster["history_cutoff"] == index["profiles"][
               [item["key"] for item in index["profiles"]].index(selected_game)
           ]["last_draw"]
+          hybrid = json.loads(
+              (selected / "temporal_hybrid_summary.json").read_text(encoding="utf-8")
+          )
+          assert hybrid["candidate_size"] == min(1_000_000, hybrid["universe_size"])
+          assert hybrid["history_cutoff"] == raster["history_cutoff"]
+          assert hybrid["profitability_status"] == "UNASSESSED_NO_PURCHASE_OR_SETTLED_PAYOUT"
+          for name, expected_hash in hybrid["artifacts"].items():
+              artifact = selected / name
+              assert hashlib.sha256(artifact.read_bytes()).hexdigest() == expected_hash
           status = json.loads(
               (root / "data" / "refresh_status.json").read_text(encoding="utf-8")
           )

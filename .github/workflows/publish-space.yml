@@ -235,11 +235,12 @@ jobs:
         run: |
           set -euo pipefail
           bundle="$RUNNER_TEMP/space-bundle"
-          ruff check "$bundle/app.py" scripts/build_space_profiles.py lotteries_core/pair_raster.py lotteries_core/temporal_candidate_set.py lotteries_core/crowd_escape_forecast.py
-          python -m py_compile "$bundle/app.py"
+          ruff check "$bundle/app.py" "$bundle/publication_audit.py" scripts/build_space_profiles.py lotteries_core/pair_raster.py lotteries_core/temporal_candidate_set.py lotteries_core/crowd_escape_forecast.py
+          python -m py_compile "$bundle/app.py" "$bundle/publication_audit.py"
           pytest -q tests/test_space_profiles.py tests/test_pair_raster.py tests/test_benchmark_output_contract.py
           pytest -q tests/test_temporal_candidate_set.py
           pytest -q tests/test_crowd_escape_forecast.py
+          pytest -q tests/test_space_publication_audit.py
 
           BUNDLE="$bundle" GAME="$GAME" python - <<'PY'
           import hashlib
@@ -405,8 +406,9 @@ jobs:
         run: |
           set -euo pipefail
           bundle="$RUNNER_TEMP/space-bundle"
-          ruff check "$bundle/app.py" scripts/build_space_profiles.py lotteries_core/pair_raster.py lotteries_core/crowd_escape_forecast.py
-          python -m py_compile "$bundle/app.py"
+          ruff check "$bundle/app.py" "$bundle/publication_audit.py" scripts/build_space_profiles.py lotteries_core/pair_raster.py lotteries_core/crowd_escape_forecast.py
+          python -m py_compile "$bundle/app.py" "$bundle/publication_audit.py"
+          pytest -q tests/test_space_publication_audit.py
           BUNDLE="$bundle" python - <<'PY'
           import json
           import os

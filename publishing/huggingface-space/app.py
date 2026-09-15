@@ -9,12 +9,14 @@ from pathlib import Path
 
 import gradio as gr
 import pandas as pd
+from publication_audit import audit_publication, public_links
 
 ROOT = Path(__file__).resolve().parent
 PROFILE_ROOT = ROOT / "data" / "profiles"
 REFRESH_STATUS_PATH = ROOT / "data" / "refresh_status.json"
 PROFILE_ORDER = ("synthetic", "euromillions", "nl-lotto")
 HOUSE_AGENT = "uniform_random"
+PUBLICATION_RECEIPTS = []
 
 # Keep both navigation levels explicit: lottery profile first, then analysis screen.
 
@@ -727,16 +729,81 @@ def _candidate_display(frame: pd.DataFrame) -> pd.DataFrame:
     )
 
 
+def _missing_publication_panel(profile: Profile, title: str) -> str:
+    if profile.key == "synthetic":
+        heading = "Demonstration profile — no real draw is scheduled."
+        explanation = (
+            "This fixed synthetic control has no automatic pre-draw publication. "
+            "Choose LOTTERY 02 / EUROMILLIONS or LOTTERY 03 / NL LOTTO for the "
+            "published selections, target dates, downloads, and publication history. "
+            "The control's original example commitments remain downloadable below."
+        )
+    else:
+        heading = "This build is missing the publication data."
+        links = public_links(profile.key)
+        explanation = (
+            "This is an availability gap, not a countdown to the draw. "
+            f'<a href="{links["history"]}" target="_blank" rel="noopener">'
+            "Open the public revision history</a> to inspect previously published files."
+        )
+    return f"""
+    <section class="raster-panel pending" style="--profile:{PROFILE_STYLE[profile.key]['accent']}">
+      <span>{html.escape(title)}</span><h2>{heading}</h2><p>{explanation}</p>
+    </section>
+    """
+
+
+def _publication_panel(profile: Profile) -> str:
+    links = public_links(profile.key)
+    target = profile.crowd_escape_summary.get(
+        "target_draw_date", profile.manifest.get("prospective", {}).get("target_draw_date", "unknown")
+    )
+    cadence = {
+        "euromillions": "Wednesday 08:15 UTC and Friday 23:15 UTC",
+        "nl-lotto": "Sunday 08:15 UTC",
+    }[profile.key]
+    return f"""
+    <section class="raster-panel publication-panel" style="--profile:{PROFILE_STYLE[profile.key]['accent']}">
+      <span>PUBLICATION &amp; VERIFICATION</span>
+      <h2>Available throughout the draw cycle</h2>
+      <p>Target draw: <strong>{html.escape(str(target))}</strong> · Verified history through <strong>{html.escape(str(profile.manifest['history']['last_draw']))}</strong>.</p>
+      <p>The next slate is published after the previous verified result. Scheduled refresh: {cadence}. It stays downloadable before and after the draw; earlier versions remain in the public file history. A source outage preserves the last verified files with their original target date.</p>
+      <p><a href="{links['slate']}">Crowd Escape CSV</a> · <a href="{links['manifest']}">Method &amp; SHA-256</a> · <a href="{links['million_set']}">Full million-ticket set</a> · <a href="{links['million_manifest']}">Million-set SHA-256</a> · <a href="{links['history']}" target="_blank" rel="noopener">Dated publication history</a></p>
+      <p>For an honest pre-draw check, use a dated revision and keep its exact files. The check below compares this displayed Crowd Escape slate with the public revision, its file hash, and every ticket commitment. A hash alone does not prove when a prediction was published. Historical forward replays are separate from these public pre-draw records.</p>
+    </section>
+    """
+
+
+def _verify_publication(profile: Profile) -> str:
+    try:
+        receipt = audit_publication(profile.directory, profile.key)
+    except (OSError, ValueError, KeyError, TypeError) as error:
+        links = public_links(profile.key)
+        return (
+            "**Publication verification unavailable.** "
+            f"{html.escape(str(error))}. Existing downloads remain available. "
+            f"[Inspect the public history]({links['history']}) or retry this check. "
+            "No pre-draw publication claim has been verified by this check."
+        )
+    links = receipt["links"]
+    return (
+        f"**{receipt['ticket_count']} tickets match the public record.** "
+        f"{receipt['timing']}.\n\n"
+        f"Hugging Face publication record (UTC): **{receipt['published_utc']}** · "
+        f"[Commit {receipt['revision']}]({links['commit']})\n\n"
+        f"[Download this exact CSV]({links['slate']}) · "
+        f"[Manifest at the same revision]({links['manifest']}) · "
+        f"[All files at this revision]({links['files']})\n\n"
+        f"CSV SHA-256: `{receipt['slate_sha256']}`\n\n"
+        "Keep the revision link and a downloaded copy to compare after the draw. "
+        "The date is Hugging Face's publication record, not an independent timestamp authority."
+    )
+
+
 def _pair_raster_panel(profile: Profile) -> str:
     summary = profile.pair_raster_summary
     if not summary or profile.pair_raster.empty:
-        return f"""
-        <section class="raster-panel pending" style="--profile:{PROFILE_STYLE[profile.key]['accent']}">
-          <span>EXHAUSTIVE PRE-DRAW RASTER</span>
-          <h2>Queued for the next verified refresh.</h2>
-          <p>This profile predates the raster artifact. Its next automatic post-draw build will score every legal ticket before the following draw and publish the compact top table plus the exact distribution.</p>
-        </section>
-        """
+        return _missing_publication_panel(profile, "EXHAUSTIVE PRE-DRAW RASTER")
     distribution = summary["score_distribution"]
     leader = profile.pair_raster.iloc[0]
     auxiliary = _number_balls(leader["auxiliary_draw"], auxiliary=True)
@@ -778,13 +845,7 @@ def _pair_raster_display(profile: Profile) -> pd.DataFrame:
 def _temporal_candidate_panel(profile: Profile) -> str:
     summary = profile.temporal_summary
     if not summary or profile.temporal_candidates.empty:
-        return f"""
-        <section class="raster-panel pending" style="--profile:{PROFILE_STYLE[profile.key]['accent']}">
-          <span>TRANSFORMER + GARCH BRANCH SET</span>
-          <h2>Queued for the next verified refresh.</h2>
-          <p>The next post-draw build will fit both temporal branches on the locked history, rank the complete legal universe, and publish the exact million-ticket candidate artifact with a matched-null forward gate.</p>
-        </section>
-        """
+        return _missing_publication_panel(profile, "TRANSFORMER + GARCH BRANCH SET")
     gate = summary["forward_only_gate"]
     leader = profile.temporal_candidates.iloc[0]
     auxiliary = _number_balls(leader["auxiliary_draw"], auxiliary=True)
@@ -829,19 +890,13 @@ def _temporal_candidate_display(profile: Profile) -> pd.DataFrame:
 def _crowd_escape_panel(profile: Profile) -> str:
     summary = profile.crowd_escape_summary
     if not summary or profile.crowd_escape_draws.empty:
-        return f"""
-        <section class="raster-panel pending" style="--profile:{PROFILE_STYLE[profile.key]['accent']}">
-          <span>CROWD ESCAPE PRE-DRAW SLATE</span>
-          <h2>Queued for the next verified refresh.</h2>
-          <p>The next build will publish the provider's 12 sealed, low-crowding ticket selections for the following draw, with modeled jackpot-sharing diagnostics and immutable commitments.</p>
-        </section>
-        """
+        return _missing_publication_panel(profile, "CROWD ESCAPE PRE-DRAW SLATE")
     leader = profile.crowd_escape_draws.iloc[0]
     auxiliary = _number_balls(leader["auxiliary_draw"], auxiliary=True)
     plus = '<span class="draw-plus">+</span>' if auxiliary else ""
     return f"""
     <section class="raster-panel crowd-panel" style="--profile:{PROFILE_STYLE[profile.key]['accent']}">
-      <div class="panel-heading"><div><span>CROWD ESCAPE PRE-DRAW SLATE</span><h2>Forecasted crowd-avoidance draws, sealed before the draw</h2></div><p>These tickets forecast which combinations may be less popular with other players using a static human-choice prior. They do not forecast the lottery machine: every legal ticket retains identical fair-draw odds.</p></div>
+      <div class="panel-heading"><div><span>CROWD ESCAPE PRE-DRAW SLATE</span><h2>Published Crowd Escape selections</h2></div><p>These tickets forecast which combinations may be less popular with other players using a static human-choice prior. They do not forecast the lottery machine: every legal ticket retains identical fair-draw odds.</p></div>
       <div class="raster-kpis">
         <div><span>SEALED TICKETS</span><strong>{int(summary['ticket_count']):,}</strong><small>target {html.escape(str(summary['target_draw_date']))}</small></div>
         <div><span>FAIR COVERAGE</span><strong>{float(summary['mechanical_jackpot_coverage_pct']):.8f}%</strong><small>1 in {int(summary['mechanical_jackpot_odds_per_ticket_one_in']):,} per ticket</small></div>
@@ -989,6 +1044,19 @@ def _build_profile_tab(profile: Profile) -> None:
             gr.HTML(CLAIMS_NOTE)
 
         with gr.Tab("SCREEN B / PENDING SET LAB"):
+            if profile.key != "synthetic":
+                gr.HTML(_publication_panel(profile))
+                publication_receipt = gr.Markdown(
+                    "Publication timestamp check runs when this page opens. "
+                    "The downloads and dated history above are available immediately."
+                )
+                PUBLICATION_RECEIPTS.append((profile, publication_receipt))
+                verify_button = gr.Button("Check publication record", variant="secondary")
+                verify_button.click(
+                    fn=partial(_verify_publication, profile),
+                    outputs=publication_receipt,
+                    api_name=False,
+                )
             gr.HTML(_crowd_escape_panel(profile))
             if not profile.crowd_escape_draws.empty:
                 gr.Dataframe(
@@ -1208,6 +1276,7 @@ body,.gradio-container { color:var(--ink); font-family:'Space Grotesk',sans-seri
 .lab-intro { border:1px solid var(--line); border-left:4px solid var(--profile); border-radius:22px; padding:25px; margin:17px 0; background:linear-gradient(135deg,rgba(14,42,49,.97),rgba(9,20,27,.97)); }
 .lab-intro>span { color:var(--profile); }.lab-intro h2 { font-size:31px; margin:9px 0; }.lab-intro p { max-width:820px; color:#b4c5c8; line-height:1.6; }
 .raster-panel { border-top:3px solid var(--profile); }.raster-panel.pending { border-style:dashed; }.raster-panel>span { color:var(--profile); font:500 10px 'DM Mono',monospace; letter-spacing:.16em; }.raster-panel.pending h2 { margin:9px 0; }.raster-panel.pending p { color:var(--muted); max-width:820px; line-height:1.6; }
+.publication-panel p { color:var(--muted); line-height:1.6; max-width:1000px; }.publication-panel a { color:var(--profile); text-decoration:underline; }.publication-panel strong { color:var(--ink); }
 .temporal-panel { background:linear-gradient(145deg,rgba(14,42,49,.98),rgba(9,20,27,.97)); }.economics-warning { margin-top:15px; border:1px solid rgba(255,184,77,.35); border-radius:14px; padding:14px; color:#bcc9ca; background:rgba(255,184,77,.07); font-size:12px; line-height:1.55; }.economics-warning strong { color:#ffca70; }
 .raster-kpis { display:grid; grid-template-columns:repeat(4,1fr); gap:9px; margin:9px 0 16px; }.raster-kpis div { border:1px solid var(--line); border-radius:14px; padding:14px; background:rgba(0,0,0,.13); }.raster-kpis span,.raster-leader>span { display:block; color:var(--muted); font:9px 'DM Mono',monospace; letter-spacing:.09em; }.raster-kpis strong { display:block; margin:8px 0 4px; font-size:18px; color:var(--profile); }.raster-kpis small { color:var(--muted); }.raster-leader { border-left:3px solid var(--profile); padding:13px 16px; background:rgba(255,255,255,.025); }.raster-leader>div { display:flex; flex-wrap:wrap; align-items:center; gap:6px; margin:11px 0; }.raster-leader strong { color:var(--profile); font:11px 'DM Mono',monospace; }
 .candidate-summary { display:grid; grid-template-columns:1.35fr 1fr 1fr 1fr; gap:10px; border:1px solid var(--line); border-top:3px solid var(--profile); border-radius:22px; padding:19px; margin:16px 0; background:rgba(11,28,35,.95); }
@@ -1229,13 +1298,15 @@ with gr.Blocks(title="LottoBench Lottery Agent Arena", css=CSS) as demo:
     gr.HTML(_availability_notice())
     gr.HTML(PROTOCOL)
     gr.HTML(NAVIGATION_GUIDE)
-    with gr.Tabs(elem_classes="profile-switcher"):
-        with gr.Tab("LOTTERY 01 / EUROMILLIONS LAB"):
+    with gr.Tabs(selected="euromillions", elem_classes="profile-switcher"):
+        with gr.Tab("LOTTERY 01 / EUROMILLIONS LAB", id="synthetic"):
             _build_profile_tab(PROFILES["synthetic"])
-        with gr.Tab("LOTTERY 02 / EUROMILLIONS"):
+        with gr.Tab("LOTTERY 02 / EUROMILLIONS", id="euromillions"):
             _build_profile_tab(PROFILES["euromillions"])
-        with gr.Tab("LOTTERY 03 / NL LOTTO"):
+        with gr.Tab("LOTTERY 03 / NL LOTTO", id="nl-lotto"):
             _build_profile_tab(PROFILES["nl-lotto"])
+    for profile, receipt in PUBLICATION_RECEIPTS:
+        demo.load(fn=partial(_verify_publication, profile), outputs=receipt, api_name=False)
 
 
 if __name__ == "__main__":

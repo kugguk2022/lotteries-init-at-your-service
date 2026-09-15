@@ -46,6 +46,38 @@ artifacts use history only through the displayed cutoff and target the next expe
 Crowd Escape forecasts human ticket popularity rather than lottery results: its selections have
 the same fair-draw probability as every other legal ticket.
 
+## Publication timing and independent checks
+
+The Space opens on the observed EuroMillions profile. The synthetic lab is a fixed demonstration
+and has no scheduled pre-draw publication.
+
+New selections are published **after the previous verified result**, ahead of the following draw:
+
+| Profile | Scheduled refresh (UTC) | Following target |
+| --- | --- | --- |
+| EuroMillions | Wednesday 08:15 | Friday draw |
+| EuroMillions | Friday 23:15 | Tuesday draw |
+| NL Lotto | Sunday 08:15 | Following Saturday draw |
+
+GitHub can delay scheduled runs. A source failure preserves the last verified files and their
+original target date; it does not make old selections new or establish a pre-draw publication.
+Downloads stay public through the Space repository even during an application restart.
+
+In **Pending Set Lab**, the publication panel links directly to the files and their dated history.
+Its automatic check compares the displayed Crowd Escape CSV and manifest with an exact public
+Space revision, validates the complete file SHA-256, and reconstructs each ticket commitment.
+Keep the resulting revision URL and a downloaded copy, then compare that same set after the draw.
+Previous files are reachable from each profile's **Dated publication history** link after the
+latest files advance. The million-ticket download has its own artifact hashes in
+`temporal_hybrid_summary.json`; the Crowd Escape check does not verify that separate archive.
+
+The publication date is Hugging Face's commit record, not the history cutoff, a newly generated
+local timestamp, or independent timestamp notarization. A same-day publication explicitly needs
+comparison with the official draw time; a later publication is not pre-draw evidence. A hash by
+itself only detects changed content. If the public record cannot be checked, the UI says so and
+keeps downloads and history links available. Historical forward replays do not substitute for
+dated public pre-draw evidence, and neither establishes realized profit without settled payouts.
+
 ROI alpha is modeled expected-ROI percentage-point difference from an equal-budget uniform null.
 It is not realized profit, increased draw probability, evidence of operator manipulation, or
 betting advice. The pending allocation score is a research ranking lens, not a forecast

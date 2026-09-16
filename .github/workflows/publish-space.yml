@@ -12,6 +12,7 @@ on:
       - ".github/workflows/publish-space.yml"
       - "publishing/huggingface-space/**"
       - "scripts/build_space_profiles.py"
+      - "scripts/publish_space_bundle.sh"
       - "lotteries_core/pair_raster.py"
       - "lotteries_core/temporal_candidate_set.py"
       - "lotteries_core/crowd_escape_forecast.py"
@@ -349,11 +350,10 @@ jobs:
             echo "Repository secret HF_TOKEN is required and must have write access to $SPACE_ID" >&2
             exit 1
           }
-          hf upload "$SPACE_ID" \
+          scripts/publish_space_bundle.sh \
             "$RUNNER_TEMP/space-bundle" \
-            . \
-            --repo-type space \
-            --commit-message "Post-draw $GAME refresh (source available: $REFRESH_OK) run $GITHUB_RUN_ID"
+            "$SPACE_ID" \
+            "Post-draw $GAME refresh (source available: $REFRESH_OK) run $GITHUB_RUN_ID"
 
       - name: Wait for Space and verify public health
         env:
@@ -361,7 +361,9 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          hf spaces wait "$SPACE_ID" --timeout 15m
+          if ! hf spaces wait "$SPACE_ID" --timeout 15m; then
+            echo "::warning::Hugging Face status API unavailable; relying on public health check"
+          fi
           curl --fail --silent --show-error \
             --retry 8 \
             --retry-delay 15 \
@@ -488,11 +490,10 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          hf upload "$SPACE_ID" \
+          scripts/publish_space_bundle.sh \
             "$RUNNER_TEMP/space-bundle" \
-            . \
-            --repo-type space \
-            --commit-message "Deploy Space code from $GITHUB_SHA run $GITHUB_RUN_ID"
+            "$SPACE_ID" \
+            "Deploy Space code from $GITHUB_SHA run $GITHUB_RUN_ID"
 
       - name: Wait for Space and verify public health
         env:
@@ -500,7 +501,9 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          hf spaces wait "$SPACE_ID" --timeout 15m
+          if ! hf spaces wait "$SPACE_ID" --timeout 15m; then
+            echo "::warning::Hugging Face status API unavailable; relying on public health check"
+          fi
           curl --fail --silent --show-error \
             --retry 8 \
             --retry-delay 15 \

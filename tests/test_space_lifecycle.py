@@ -69,3 +69,13 @@ def test_app_exposes_guide_and_uses_predraw_not_pending_as_navigation_label():
     assert "START HERE / COMPLETE SPACE WIKI" in app
     assert "SCREEN B / PRE-DRAW SET LAB" in app
     assert "SCREEN B / PENDING SET LAB" not in app
+
+
+def test_space_hydration_retries_api_then_fails_closed_after_git_fallback():
+    workflow = (
+        MODULE_PATH.parents[2] / ".github" / "workflows" / "publish-space.yml"
+    ).read_text(encoding="utf-8")
+    assert workflow.count("for attempt in 1 2 3; do") == 2
+    assert workflow.count("git clone --depth 1") == 2
+    assert workflow.count("refusing to replace current profile data") == 2
+    assert "using repository fallback profiles" not in workflow

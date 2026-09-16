@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Space hydration now retries transient Hugging Face API failures with bounded backoff, then falls
+  back to the public Space Git repository. Both code and scheduled profile deployments fail closed
+  if neither path can preserve the current observed profiles.
 - A draw settled without `--payout-table` no longer records a EUR 0 prize. Prize, net return
   and ROI are written as NaN, the row carries `payout_table_present` and `payout_source`, and
   `report` sums money only over draws that have a table and says how many that is. Recording

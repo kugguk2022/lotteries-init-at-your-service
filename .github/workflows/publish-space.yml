@@ -139,16 +139,38 @@ jobs:
           rm -rf "$bundle" "$current"
           cp -a publishing/huggingface-space "$bundle"
 
-          if hf download "$SPACE_ID" --repo-type space --local-dir "$current"; then
-            if [[ -d "$current/data/profiles" ]]; then
-              mkdir -p "$bundle/data/profiles"
-              cp -a "$current/data/profiles/." "$bundle/data/profiles/"
+          downloaded=false
+          for attempt in 1 2 3; do
+            if hf download "$SPACE_ID" --repo-type space --local-dir "$current"; then
+              downloaded=true
+              break
             fi
-            if [[ -f "$current/data/refresh_status.json" ]]; then
-              cp "$current/data/refresh_status.json" "$bundle/data/refresh_status.json"
+            echo "::warning::Space API hydration attempt $attempt/3 failed"
+            if [[ "$attempt" -lt 3 ]]; then
+              sleep "$((attempt * 10))"
             fi
-          else
-            echo "::warning::Could not hydrate the deployed Space; using repository fallback profiles"
+          done
+
+          if [[ "$downloaded" != true ]]; then
+            echo "::warning::Space API remained unavailable; trying the public Git repository"
+            rm -rf "$current"
+            if git clone --depth 1 "https://huggingface.co/spaces/$SPACE_ID" "$current"; then
+              downloaded=true
+            fi
+          fi
+
+          if [[ "$downloaded" != true ]]; then
+            echo "Space hydration failed through both API and Git; refusing to replace current profile data" >&2
+            exit 1
+          fi
+          test -d "$current/data/profiles" || {
+            echo "The deployed Space has no profile data to preserve" >&2
+            exit 1
+          }
+          mkdir -p "$bundle/data/profiles"
+          cp -a "$current/data/profiles/." "$bundle/data/profiles/"
+          if [[ -f "$current/data/refresh_status.json" ]]; then
+            cp "$current/data/refresh_status.json" "$bundle/data/refresh_status.json"
           fi
           if [[ -f "$bundle/data/profiles/synthetic/prospective.csv" ]]; then
             sed -i 's/,PENDING,/,DEMO_ONLY,/g' \
@@ -395,7 +417,28 @@ jobs:
           bundle="$RUNNER_TEMP/space-bundle"
           current="$RUNNER_TEMP/current-space"
           cp -a publishing/huggingface-space "$bundle"
-          hf download "$SPACE_ID" --repo-type space --local-dir "$current"
+          downloaded=false
+          for attempt in 1 2 3; do
+            if hf download "$SPACE_ID" --repo-type space --local-dir "$current"; then
+              downloaded=true
+              break
+            fi
+            echo "::warning::Space API hydration attempt $attempt/3 failed"
+            if [[ "$attempt" -lt 3 ]]; then
+              sleep "$((attempt * 10))"
+            fi
+          done
+          if [[ "$downloaded" != true ]]; then
+            echo "::warning::Space API remained unavailable; trying the public Git repository"
+            rm -rf "$current"
+            if git clone --depth 1 "https://huggingface.co/spaces/$SPACE_ID" "$current"; then
+              downloaded=true
+            fi
+          fi
+          if [[ "$downloaded" != true ]]; then
+            echo "Space hydration failed through both API and Git; refusing to replace current profile data" >&2
+            exit 1
+          fi
           test -d "$current/data/profiles" || {
             echo "The deployed Space has no profile data to preserve" >&2
             exit 1

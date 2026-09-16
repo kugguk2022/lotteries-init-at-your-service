@@ -28,6 +28,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- The public Space now has a versioned, in-app operational guide, explicit profile lifecycle
+  states, and exact post-draw advancement conditions. Synthetic outputs are labelled `DEMO_ONLY`
+  instead of `PENDING`, while observed profiles distinguish pre-draw, draw-day, stale-awaiting-
+  refresh, and missing-publication states.
 - `lottobench poi-export` publishes an integrity-hashed extensive POI-G candidate set separately
   from the fixed-budget inference envelope eligible for ROI. `poi-settle` validates that envelope,
   scores only the selected budget against a matched equal-budget random control, and leaves money

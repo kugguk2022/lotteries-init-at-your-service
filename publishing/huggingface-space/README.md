@@ -32,10 +32,14 @@ Each profile provides two screens:
 - **Agent Arena** replays twelve contests, ranks seven agents against the uniform null, charts
   cumulative ROI-alpha movement, animates every committed ticket walk, and exposes the exact
   scored ledgers.
-- **Pending Set Lab** publishes the 12 sealed Crowd Escape draws with crowding and conditional
+- **Pre-draw Set Lab** publishes the 12 sealed Crowd Escape draws with crowding and conditional
   jackpot-sharing estimates, the transformer + GARCH million-ticket branch set, an exhaustive
   pre-draw historical pair-density raster, and a transparent allocation across frozen agent
   submissions.
+
+Open the in-Space **START HERE / COMPLETE SPACE WIKI** or read
+[`SPACE_GUIDE.md`](SPACE_GUIDE.md) for the complete profile lifecycle, exact meaning of `PENDING`,
+publication conditions, artifact map, verification procedure, and evidence boundaries.
 
 Raw observed histories are not redistributed. The public Space contains source provenance,
 snapshot hashes, derived benchmark results, scored commitments, and pending commitments.
@@ -63,7 +67,18 @@ GitHub can delay scheduled runs. A source failure preserves the last verified fi
 original target date; it does not make old selections new or establish a pre-draw publication.
 Downloads stay public through the Space repository even during an application restart.
 
-In **Pending Set Lab**, the publication panel links directly to the files and their dated history.
+In **Pre-draw Set Lab**, the lifecycle and publication panels link directly to the files and their
+dated history. `PENDING` means that the artifact was generated for the displayed target draw and has
+not been advanced by a successful post-draw result refresh. It is not an approval, confidence,
+purchase, profitability, or settlement claim. The synthetic profile is labelled `DEMO_ONLY` and is
+never scheduled against a real draw.
+
+The current Space is a current-publication view: a successful refresh advances the displayed target
+and preserves the previous files in Hugging Face revision history. Space-specific artifacts are not
+currently rewritten as first-class `SETTLED` rows; the repository's prospective outcome tracker is
+the canonical settlement mechanism.
+
+The publication panel links directly to the files and their dated history.
 Its automatic check compares the displayed Crowd Escape CSV and manifest with an exact public
 Space revision, validates the complete file SHA-256, and reconstructs each ticket commitment.
 Keep the resulting revision URL and a downloaded copy, then compare that same set after the draw.

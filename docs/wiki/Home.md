@@ -17,6 +17,7 @@ the diff showing up.
 | [Repository Map](Repository-Map.md) | Which directories are maintained, which are labs, which are legacy. |
 | [Methods and Findings](Methods-and-Findings.md) | Every method in the repo, what it does, and how it has scored so far. |
 | [Outcome Tracking](Outcome-Tracking.md) | The prospective ledger and the live competition. |
+| [Live Space Guide](../../publishing/huggingface-space/SPACE_GUIDE.md) | Profiles, lifecycle states, schedules, artifacts, verification, and the exact meaning of `PENDING`. |
 | [HTTP API](HTTP-API.md) | REST layer: pick a provider, get a portfolio, inspect provenance. |
 | [Contributing a Provider](Contributing-a-Provider.md) | How to enter a new strategy — one file plus two registry lines. |
 | [Graduation Criteria](Graduation-Criteria.md) | The machine-checked gates for a stable release, and for claiming a provider beat random. |
@@ -44,11 +45,11 @@ The full argument, including which techniques are mathematically incapable of he
 
 ## Current state in one line
 
-`ruff check .` and `pytest` both pass across the whole repository, CI blocks on both, the draw history
-is current through 2026-08-14, and six methods are entered in the live prospective competition for the
-next draw. See [Current State](Current-State.md), which also keeps a record of what was broken and
-what was done about it — a status page that only ever shows green teaches a reader nothing about
-whether to trust it.
+`ruff check .` and `pytest` are the repository gates, and observed Space profiles refresh on their
+documented post-draw schedules. Exact current history cutoffs and target dates belong in the live
+profile manifests rather than this versioned overview. See [Current State](Current-State.md) for
+verified repository status and the [Live Space Guide](../../publishing/huggingface-space/SPACE_GUIDE.md)
+for publication-state semantics.
 
 ## Sibling repositories
 

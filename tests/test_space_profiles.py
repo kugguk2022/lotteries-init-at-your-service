@@ -77,7 +77,8 @@ def test_every_profile_uses_the_same_complete_scoring_contract():
         assert contests.groupby("contest_number")["agent"].nunique().eq(7).all()
         assert tickets.groupby(["contest_number", "agent"]).size().eq(12).all()
         assert prospective.groupby("agent").size().eq(12).all()
-        assert prospective["score_status"].eq("PENDING").all()
+        expected_status = "DEMO_ONLY" if key == "synthetic" else "PENDING"
+        assert prospective["score_status"].eq(expected_status).all()
         assert prospective["commitment_sha256"].str.fullmatch(r"[0-9a-f]{64}").all()
     assert len(set(contracts)) == 1
 
@@ -97,4 +98,3 @@ def test_space_refresh_status_has_fail_soft_contract():
     for game in status["games"].values():
         assert isinstance(game["available"], bool)
         assert set(game) == {"available", "checked_utc", "message"}
-

@@ -187,6 +187,8 @@ def _prospective_submissions(
     last_draw: str,
     seed: int,
     jackpot: JackpotModel,
+    *,
+    score_status: str = "PENDING",
 ) -> pd.DataFrame:
     providers = [registry.create(name) for name in PROVIDER_NAMES]
     envelopes = []
@@ -232,7 +234,7 @@ def _prospective_submissions(
                     "backtest_consistency_pct": evidence[agent]["consistency_pct"],
                     "backtest_mean_roi_alpha_pp": evidence[agent]["mean_roi_alpha_pp"],
                     "history_cutoff": last_draw,
-                    "score_status": "PENDING",
+                    "score_status": score_status,
                     "commitment_sha256": hashlib.sha256(
                         commitment_source.encode("utf-8")
                     ).hexdigest(),
@@ -279,6 +281,7 @@ def _build_profile(key: str, database: Path, output: Path) -> dict:
         str(metadata["last_draw"]),
         profile_seed + 100_000,
         jackpot,
+        score_status="DEMO_ONLY" if key == "synthetic" else "PENDING",
     )
 
     target_draw_date = _next_draw_date(key, str(metadata["last_draw"]))
@@ -367,7 +370,7 @@ def _build_profile(key: str, database: Path, output: Path) -> dict:
         "prospective": {
             "history_cutoff": str(metadata["last_draw"]),
             "target_draw_date": target_draw_date,
-            "status": "PENDING",
+            "status": "DEMO_ONLY" if key == "synthetic" else "PENDING",
             "pair_raster": pair_raster.summary if pair_raster is not None else None,
             "temporal_candidate_set": (
                 temporal_candidates.summary if temporal_candidates is not None else None

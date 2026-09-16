@@ -9,14 +9,21 @@ from pathlib import Path
 
 import gradio as gr
 import pandas as pd
+from lifecycle import classify_profile_state
 from publication_audit import audit_publication, public_links
 
 ROOT = Path(__file__).resolve().parent
 PROFILE_ROOT = ROOT / "data" / "profiles"
 REFRESH_STATUS_PATH = ROOT / "data" / "refresh_status.json"
+SPACE_GUIDE_PATH = ROOT / "SPACE_GUIDE.md"
 PROFILE_ORDER = ("synthetic", "euromillions", "nl-lotto")
 HOUSE_AGENT = "uniform_random"
 PUBLICATION_RECEIPTS = []
+SPACE_GUIDE = SPACE_GUIDE_PATH.read_text(encoding="utf-8")
+SPACE_GUIDE_URL = (
+    "https://huggingface.co/spaces/kugguk/lottobench-community-leaderboard/"
+    "blob/main/SPACE_GUIDE.md"
+)
 
 # Keep both navigation levels explicit: lottery profile first, then analysis screen.
 
@@ -176,6 +183,81 @@ def _load_refresh_status() -> dict:
 
 
 REFRESH_STATUS = _load_refresh_status()
+
+
+def _profile_target_date(profile: Profile) -> str | None:
+    """Return one shared target date without inventing one for the lab control."""
+    if profile.key == "synthetic":
+        return None
+    for payload in (
+        profile.crowd_escape_summary,
+        profile.temporal_summary,
+        profile.pair_raster_summary,
+        profile.manifest.get("prospective", {}),
+    ):
+        if isinstance(payload, dict) and payload.get("target_draw_date"):
+            return str(payload["target_draw_date"])
+    return None
+
+
+def _profile_lifecycle_panel(profile: Profile) -> str:
+    target = _profile_target_date(profile)
+    publication_available = bool(
+        profile.crowd_escape_summary
+        and profile.temporal_summary
+        and profile.pair_raster_summary
+    )
+    state = classify_profile_state(
+        data_kind=str(profile.manifest.get("data_kind", "")),
+        target_draw_date=target,
+        publication_available=publication_available,
+    )
+    cutoff = str(profile.manifest["history"]["last_draw"])
+    cadence = {
+        "synthetic": "No schedule — fixed repository control",
+        "euromillions": "Wednesday 08:15 UTC and Friday 23:15 UTC",
+        "nl-lotto": "Sunday 08:15 UTC",
+    }[profile.key]
+    target_label = target or "None — synthetic control"
+    refresh = REFRESH_STATUS.get("games", {}).get(profile.key, {})
+    source_warning = ""
+    if isinstance(refresh, dict) and refresh.get("available") is False:
+        source_warning = (
+            '<div class="lifecycle-warning"><strong>SOURCE REFRESH DEGRADED</strong> '
+            + html.escape(str(refresh.get("message") or "Official source unavailable."))
+            + " The current dated files are preserved unchanged.</div>"
+        )
+    return f"""
+    <section class="lifecycle-panel" style="--profile:{PROFILE_STYLE[profile.key]['accent']}">
+      <div class="lifecycle-head">
+        <div><span>PROFILE LIFECYCLE / {html.escape(state.code)}</span><h2>{html.escape(state.label)}</h2></div>
+        <a href="{SPACE_GUIDE_URL}" target="_blank" rel="noopener">OPEN COMPLETE SPACE GUIDE</a>
+      </div>
+      <p>{html.escape(state.explanation)}</p>
+      <div class="lifecycle-grid">
+        <div><span>HISTORY CUTOFF</span><strong>{html.escape(cutoff)}</strong></div>
+        <div><span>TARGET DRAW</span><strong>{html.escape(target_label)}</strong></div>
+        <div><span>AUTOMATIC REFRESH</span><strong>{html.escape(cadence)}</strong></div>
+      </div>
+      <div class="lifecycle-exit"><span>WHAT CHANGES THIS STATE</span><p>{html.escape(state.exit_condition)}</p></div>
+      {source_warning}
+    </section>
+    """
+
+
+def _synthetic_control_panel(profile: Profile) -> str:
+    return f"""
+    <section class="raster-panel demo-panel" style="--profile:{PROFILE_STYLE[profile.key]['accent']}">
+      <span>FIXED SYNTHETIC CONTROL</span>
+      <h2>Example sets only — no operator draw, countdown, or settlement</h2>
+      <p>The lab reuses the real game format to test deterministic generation, commitments, tables,
+      downloads, and allocation controls. Its example rows are labelled <strong>DEMO_ONLY</strong>.
+      They are not waiting for a condition and will never be evaluated as a real EuroMillions draw.</p>
+      <p>For dated candidates, choose <strong>LOTTERY 02 / EUROMILLIONS</strong> or
+      <strong>LOTTERY 03 / NL LOTTO</strong>. Their lifecycle panel states the exact target and
+      the result-refresh conditions.</p>
+    </section>
+    """
 
 
 def _availability_notice() -> str:
@@ -674,7 +756,11 @@ def _candidate_dataset(profile: Profile, house_balance: int, top_n: int) -> pd.D
         ascending=[False, False, True],
     ).head(int(top_n)).reset_index(drop=True)
     frame.insert(0, "allocation_rank", range(1, len(frame) + 1))
-    frame["ranking_scope"] = "pending strategy allocation; not draw probability"
+    if profile.key == "synthetic":
+        frame["score_status"] = "DEMO_ONLY"
+        frame["ranking_scope"] = "synthetic demonstration allocation; not a real draw"
+    else:
+        frame["ranking_scope"] = "pre-draw strategy allocation; not draw probability"
     return frame
 
 
@@ -695,10 +781,13 @@ def _candidate_map(frame: pd.DataFrame) -> str:
         points.append(
             f'<circle cx="{x:.1f}" cy="{y:.1f}" r="{radius}" fill="{meta["color"]}" class="candidate-dot" style="animation-delay:{int(row.allocation_rank) * 0.035:.3f}s"><title>{title}</title></circle>'
         )
+    is_demo = str(frame.iloc[0]["score_status"]) == "DEMO_ONLY"
+    surface_label = "DEMONSTRATION STRATEGY SURFACE" if is_demo else "PRE-DRAW STRATEGY SURFACE"
+    surface_aria = "Demonstration set allocation map" if is_demo else "Pre-draw set allocation map"
     return f"""
     <section class="candidate-map">
-      <div class="panel-heading"><div><span>PENDING STRATEGY SURFACE</span><h2>Where the frozen sets concentrate</h2></div><p>Position reflects strategy-family allocation, not a claim that one number is more likely to be drawn. The first three larger points lead the current allocation.</p></div>
-      <svg viewBox="0 0 {width} {height}" role="img" aria-label="Pending set allocation map">
+      <div class="panel-heading"><div><span>{surface_label}</span><h2>Where the frozen sets concentrate</h2></div><p>Position reflects strategy-family allocation, not a claim that one number is more likely to be drawn. The first three larger points lead the current allocation.</p></div>
+      <svg viewBox="0 0 {width} {height}" role="img" aria-label="{surface_aria}">
         <rect x="{left}" y="{top}" width="{right-left}" height="{bottom-top}" rx="20" class="map-bg" />
         <line x1="{left}" y1="{bottom}" x2="{right}" y2="{bottom}" class="map-axis" />
         <line x1="{left}" y1="{bottom}" x2="{left}" y2="{top}" class="map-axis" />
@@ -731,13 +820,7 @@ def _candidate_display(frame: pd.DataFrame) -> pd.DataFrame:
 
 def _missing_publication_panel(profile: Profile, title: str) -> str:
     if profile.key == "synthetic":
-        heading = "Demonstration profile — no real draw is scheduled."
-        explanation = (
-            "This fixed synthetic control has no automatic pre-draw publication. "
-            "Choose LOTTERY 02 / EUROMILLIONS or LOTTERY 03 / NL LOTTO for the "
-            "published selections, target dates, downloads, and publication history. "
-            "The control's original example commitments remain downloadable below."
-        )
+        return _synthetic_control_panel(profile)
     else:
         heading = "This build is missing the publication data."
         links = public_links(profile.key)
@@ -943,15 +1026,17 @@ def render_candidates(
     meta = _agent_meta(str(leader["agent"]))
     auxiliary = _number_balls(leader["auxiliary_draw"], auxiliary=True)
     plus = '<span class="draw-plus">+</span>' if auxiliary else ""
+    state_label = "DEMO ONLY" if key == "synthetic" else "PENDING"
     summary = f"""
     <section class="candidate-summary" style="--profile:{PROFILE_STYLE[key]['accent']}">
-      <div class="candidate-pick"><span>TOP FROZEN SET / PENDING</span><div>{_number_balls(leader['main_draw'])}{plus}{auxiliary}</div></div>
+      <div class="candidate-pick"><span>TOP FROZEN SET / {state_label}</span><div>{_number_balls(leader['main_draw'])}{plus}{auxiliary}</div></div>
       <div><span>SUPPORTING AGENT</span><strong>{meta['name']}</strong><small>{meta['role']}</small></div>
       <div><span>ALLOCATION</span><strong>{100-int(house_balance)}% bet / {int(house_balance)}% house</strong><small>Priority {leader['allocation_priority_score']:.1f} / 100</small></div>
       <div><span>HISTORICAL EVIDENCE</span><strong>{leader['backtest_mean_roi_alpha_pp']:+.3f} pp</strong><small>{leader['backtest_consistency_pct']:.0f}% above null</small></div>
     </section>
     """
-    output = Path(tempfile.gettempdir()) / f"lottobench_{key}_pending_b{int(house_balance)}_n{int(top_n)}.csv"
+    state_slug = "demo" if key == "synthetic" else "predraw"
+    output = Path(tempfile.gettempdir()) / f"lottobench_{key}_{state_slug}_b{int(house_balance)}_n{int(top_n)}.csv"
     frame.to_csv(output, index=False, lineterminator="\n")
     return summary, _candidate_map(frame), _candidate_display(frame), str(output)
 
@@ -959,7 +1044,7 @@ def render_candidates(
 CLAIMS_NOTE = """
 <section class="claims-note">
   <strong>Exact interpretation of “against the house”</strong>
-  <p>ROI alpha is modeled expected-ROI displacement from the seeded uniform, equal-budget null. It is not realized profit and does not change the mechanical probability of a fair lottery draw. Pending sets are committed research outputs, not official forecasts or betting advice.</p>
+  <p>ROI alpha is modeled expected-ROI displacement from the seeded uniform, equal-budget null. It is not realized profit and does not change the mechanical probability of a fair lottery draw. Pre-draw sets and synthetic examples are research outputs, not official forecasts or betting advice.</p>
 </section>
 """
 
@@ -968,12 +1053,19 @@ NAVIGATION_GUIDE = """
   <span>NAVIGATION</span>
   <div><b>1</b><strong>Choose a lottery profile</strong><small>Lab control, EuroMillions, or NL Lotto</small></div>
   <i></i>
-  <div><b>2</b><strong>Choose a screen</strong><small>Agent Arena or Pending Set Lab</small></div>
+  <div><b>2</b><strong>Choose a screen</strong><small>Agent Arena or Pre-draw Set Lab</small></div>
 </section>
 """
 
 SCREEN_GUIDE = """
-<div class="screen-guide"><span>SCREEN SWITCH</span><strong>Use the highlighted buttons below to move between scored agent performance and pending sets.</strong></div>
+<div class="screen-guide"><span>SCREEN SWITCH</span><strong>Use the highlighted buttons below to move between scored historical performance and current pre-draw artifacts.</strong></div>
+"""
+
+WIKI_CALLOUT = f"""
+<section class="wiki-callout">
+  <div><span>START HERE</span><strong>What does PENDING mean?</strong><p>It names an artifact lifecycle, not approval, confidence, purchase, or profit. Open the guide for states, schedules, files, verification, and evidence boundaries.</p></div>
+  <a href="{SPACE_GUIDE_URL}" target="_blank" rel="noopener">OPEN COMPLETE SPACE GUIDE</a>
+</section>
 """
 
 
@@ -1043,7 +1135,8 @@ def _build_profile_tab(profile: Profile) -> None:
                 gr.File(value=str(profile.directory / "contests.csv"), label="Download contest results")
             gr.HTML(CLAIMS_NOTE)
 
-        with gr.Tab("SCREEN B / PENDING SET LAB"):
+        with gr.Tab("SCREEN B / PRE-DRAW SET LAB"):
+            gr.HTML(_profile_lifecycle_panel(profile))
             if profile.key != "synthetic":
                 gr.HTML(_publication_panel(profile))
                 publication_receipt = gr.Markdown(
@@ -1057,7 +1150,10 @@ def _build_profile_tab(profile: Profile) -> None:
                     outputs=publication_receipt,
                     api_name=False,
                 )
-            gr.HTML(_crowd_escape_panel(profile))
+            else:
+                gr.HTML(_synthetic_control_panel(profile))
+            if profile.key != "synthetic":
+                gr.HTML(_crowd_escape_panel(profile))
             if not profile.crowd_escape_draws.empty:
                 gr.Dataframe(
                     _crowd_escape_display(profile),
@@ -1073,7 +1169,8 @@ def _build_profile_tab(profile: Profile) -> None:
                         value=str(profile.directory / "crowd_escape_summary.json"),
                         label="Download Crowd Escape method manifest",
                     )
-            gr.HTML(_temporal_candidate_panel(profile))
+            if profile.key != "synthetic":
+                gr.HTML(_temporal_candidate_panel(profile))
             if not profile.temporal_candidates.empty:
                 gr.Dataframe(
                     _temporal_candidate_display(profile),
@@ -1093,7 +1190,8 @@ def _build_profile_tab(profile: Profile) -> None:
                         value=str(profile.directory / "temporal_hybrid_summary.json"),
                         label="Download inference and economics manifest",
                     )
-            gr.HTML(_pair_raster_panel(profile))
+            if profile.key != "synthetic":
+                gr.HTML(_pair_raster_panel(profile))
             if not profile.pair_raster.empty:
                 gr.Dataframe(
                     _pair_raster_display(profile),
@@ -1113,12 +1211,27 @@ def _build_profile_tab(profile: Profile) -> None:
                         value=str(profile.directory / "summary.json"),
                         label="Download machine-readable profile summary",
                     )
+            lab_kicker = (
+                "SYNTHETIC CONTROL / DEMO ONLY"
+                if profile.key == "synthetic"
+                else f"AFTER HISTORY CUTOFF {profile.manifest['history']['last_draw']} / UNSCORED"
+            )
+            lab_heading = (
+                "Explore allocation with fixed demonstration commitments."
+                if profile.key == "synthetic"
+                else "Shift allocation between two strategy surfaces."
+            )
+            lab_copy = (
+                "These controls re-rank synthetic example submissions only. They do not create a real target draw or pending publication."
+                if profile.key == "synthetic"
+                else "Bet engineering favors momentum and pair structure. House/draw engineering favors crowd escape, dispersion, and contrarian structure. The control changes priority across already frozen agent submissions; it never edits the committed numbers."
+            )
             gr.HTML(
                 f"""
                 <section class="lab-intro" style="--profile:{PROFILE_STYLE[profile.key]['accent']}">
-                  <span>AFTER HISTORY CUTOFF {profile.manifest['history']['last_draw']} / UNSCORED</span>
-                  <h2>Shift allocation between two strategy surfaces.</h2>
-                  <p>Bet engineering favors momentum and pair structure. House/draw engineering favors crowd escape, dispersion, and contrarian structure. The control changes priority across already frozen agent submissions; it never edits the committed numbers.</p>
+                  <span>{lab_kicker}</span>
+                  <h2>{lab_heading}</h2>
+                  <p>{lab_copy}</p>
                 </section>
                 """
             )
@@ -1145,7 +1258,13 @@ def _build_profile_tab(profile: Profile) -> None:
             candidate_summary = gr.HTML(initial_candidates[0])
             candidate_map = gr.HTML(initial_candidates[1])
             candidate_table = gr.Dataframe(
-                initial_candidates[2], interactive=False, label="Ranked pending lottery sets"
+                initial_candidates[2],
+                interactive=False,
+                label=(
+                    "Ranked demonstration sets"
+                    if profile.key == "synthetic"
+                    else "Ranked pre-draw lottery sets"
+                ),
             )
             with gr.Row():
                 candidate_download = gr.File(
@@ -1153,7 +1272,11 @@ def _build_profile_tab(profile: Profile) -> None:
                 )
                 gr.File(
                     value=str(profile.directory / "prospective.csv"),
-                    label="Download original frozen commitments",
+                    label=(
+                        "Download original demonstration commitments"
+                        if profile.key == "synthetic"
+                        else "Download original frozen commitments"
+                    ),
                 )
             rebuild.click(
                 fn=partial(render_candidates, profile.key),
@@ -1208,6 +1331,8 @@ body,.gradio-container { color:var(--ink); font-family:'Space Grotesk',sans-seri
 .navigation-guide b { grid-row:1/3; width:27px; height:27px; display:grid; place-items:center; border-radius:50%; background:var(--gold); color:#071116; font:700 10px 'DM Mono',monospace; }
 .navigation-guide strong { font-size:13px; }.navigation-guide small { color:var(--muted); font-size:10px; }
 .navigation-guide>i { height:1px; background:rgba(255,216,77,.38); }
+.wiki-callout { display:flex; justify-content:space-between; gap:24px; align-items:center; margin:12px 0 18px; padding:18px 21px; border:1px solid rgba(32,213,207,.34); border-radius:18px; background:linear-gradient(100deg,rgba(32,213,207,.09),rgba(10,29,36,.94)); }
+.wiki-callout span { display:block; color:var(--teal); font:600 9px 'DM Mono',monospace; letter-spacing:.14em; }.wiki-callout strong { display:block; margin:4px 0; font-size:17px; }.wiki-callout p { color:var(--muted); font-size:11px; line-height:1.45; margin:0; max-width:790px; }.wiki-callout a,.lifecycle-head a { flex:none; color:#071116; background:var(--acid); border-radius:99px; padding:10px 14px; text-decoration:none; font:700 9px 'DM Mono',monospace; letter-spacing:.08em; }
 .screen-guide { display:flex; align-items:center; gap:14px; padding:11px 15px; border-left:3px solid var(--acid); color:var(--muted); background:rgba(216,243,92,.06); }
 .screen-guide span { color:var(--acid); font:600 9px 'DM Mono',monospace; letter-spacing:.12em; white-space:nowrap; }.screen-guide strong { color:#c5d3d5; font-size:11px; }
 .contest-nav { margin:4px 0 12px; }
@@ -1275,7 +1400,9 @@ body,.gradio-container { color:var(--ink); font-family:'Space Grotesk',sans-seri
 .walk-path { stroke-dasharray:1200; stroke-dashoffset:1200; animation:trace 3s ease forwards; opacity:.78; }.walk-node,.candidate-dot { opacity:0; animation:nodeIn .35s ease forwards; }.signal-ring { transform-box:fill-box; transform-origin:center; animation:ring 1.8s ease-out infinite; }
 .lab-intro { border:1px solid var(--line); border-left:4px solid var(--profile); border-radius:22px; padding:25px; margin:17px 0; background:linear-gradient(135deg,rgba(14,42,49,.97),rgba(9,20,27,.97)); }
 .lab-intro>span { color:var(--profile); }.lab-intro h2 { font-size:31px; margin:9px 0; }.lab-intro p { max-width:820px; color:#b4c5c8; line-height:1.6; }
+.lifecycle-panel { border:1px solid var(--line); border-top:4px solid var(--profile); border-radius:24px; padding:23px; margin:16px 0; background:linear-gradient(145deg,rgba(15,39,47,.98),rgba(8,20,27,.97)); }.lifecycle-head { display:flex; justify-content:space-between; gap:24px; align-items:start; }.lifecycle-head span,.lifecycle-grid span,.lifecycle-exit span { color:var(--profile); font:600 9px 'DM Mono',monospace; letter-spacing:.12em; }.lifecycle-head h2 { margin:7px 0 10px; font-size:27px; }.lifecycle-panel>p { color:#b5c6c9; line-height:1.55; max-width:950px; }.lifecycle-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:9px; margin:17px 0; }.lifecycle-grid div { border:1px solid var(--line); border-radius:13px; padding:13px; background:rgba(0,0,0,.13); }.lifecycle-grid strong { display:block; margin-top:7px; font-size:12px; line-height:1.45; }.lifecycle-exit { border-left:3px solid var(--profile); padding:11px 14px; background:rgba(255,255,255,.025); }.lifecycle-exit p { margin:6px 0 0; color:var(--muted); font-size:12px; line-height:1.55; }.lifecycle-warning { margin-top:12px; border:1px solid rgba(255,184,77,.35); border-radius:12px; padding:12px; color:var(--muted); font-size:12px; background:rgba(255,184,77,.07); }.lifecycle-warning strong { color:#ffca70; }
 .raster-panel { border-top:3px solid var(--profile); }.raster-panel.pending { border-style:dashed; }.raster-panel>span { color:var(--profile); font:500 10px 'DM Mono',monospace; letter-spacing:.16em; }.raster-panel.pending h2 { margin:9px 0; }.raster-panel.pending p { color:var(--muted); max-width:820px; line-height:1.6; }
+.demo-panel h2 { margin:9px 0; }.demo-panel p { color:var(--muted); max-width:920px; line-height:1.6; }.demo-panel strong { color:var(--ink); }
 .publication-panel p { color:var(--muted); line-height:1.6; max-width:1000px; }.publication-panel a { color:var(--profile); text-decoration:underline; }.publication-panel strong { color:var(--ink); }
 .temporal-panel { background:linear-gradient(145deg,rgba(14,42,49,.98),rgba(9,20,27,.97)); }.economics-warning { margin-top:15px; border:1px solid rgba(255,184,77,.35); border-radius:14px; padding:14px; color:#bcc9ca; background:rgba(255,184,77,.07); font-size:12px; line-height:1.55; }.economics-warning strong { color:#ffca70; }
 .raster-kpis { display:grid; grid-template-columns:repeat(4,1fr); gap:9px; margin:9px 0 16px; }.raster-kpis div { border:1px solid var(--line); border-radius:14px; padding:14px; background:rgba(0,0,0,.13); }.raster-kpis span,.raster-leader>span { display:block; color:var(--muted); font:9px 'DM Mono',monospace; letter-spacing:.09em; }.raster-kpis strong { display:block; margin:8px 0 4px; font-size:18px; color:var(--profile); }.raster-kpis small { color:var(--muted); }.raster-leader { border-left:3px solid var(--profile); padding:13px 16px; background:rgba(255,255,255,.025); }.raster-leader>div { display:flex; flex-wrap:wrap; align-items:center; gap:6px; margin:11px 0; }.raster-leader strong { color:var(--profile); font:11px 'DM Mono',monospace; }
@@ -1288,8 +1415,8 @@ body,.gradio-container { color:var(--ink); font-family:'Space Grotesk',sans-seri
 .claims-note strong { color:#ffca70; }.claims-note p { color:#b7c4c4; font-size:12px; line-height:1.6; margin:6px 0 0; }
 @keyframes pulse { 70% { box-shadow:0 0 0 9px rgba(216,243,92,0); } 100% { box-shadow:0 0 0 0 rgba(216,243,92,0); } }
 @keyframes trace { to { stroke-dashoffset:0; } } @keyframes nodeIn { from { opacity:0; transform:scale(.35); transform-origin:center; } to { opacity:1; transform:scale(1); } } @keyframes ring { 0% { opacity:.8; transform:scale(.6); } 80%,100% { opacity:0; transform:scale(1.45); } }
-@media(max-width:900px) { .gradio-container{padding:12px!important}.profile-deck,.overall-ladder,.agent-ladder,.round-head,.candidate-summary,.raster-kpis{grid-template-columns:1fr}.protocol-strip{grid-template-columns:1fr 1fr}.protocol-strip>i{display:none}.navigation-guide{grid-template-columns:1fr 1fr}.navigation-guide>span{grid-column:1/-1}.navigation-guide>i{display:none}.lottery-identity{grid-template-columns:1fr}.identity-ledger{grid-template-columns:1fr 1fr}.identity-ledger div{border-right:0;border-bottom:1px solid var(--line);padding:10px 0}.panel-heading{display:block}.global-hero h1{font-size:46px}.profile-card p{min-height:0} }
-@media(max-width:560px) { .profile-deck,.protocol-strip,.identity-ledger,.round-kpis{grid-template-columns:1fr}.global-hero{padding:27px 22px}.global-hero h1{font-size:39px}.lottery-identity,.leader-section,.walk-panel,.candidate-map,.roi-panel,.raster-panel{padding:17px}.overall-agent{padding-left:64px}.lottery-ball{width:34px;height:34px;font-size:11px}.agent-rank{grid-template-columns:1fr}.rank-orbit{width:36px;height:36px}.agent-line{display:block}.edge-badge{display:inline-block;margin-top:8px} }
+@media(max-width:900px) { .gradio-container{padding:12px!important}.profile-deck,.overall-ladder,.agent-ladder,.round-head,.candidate-summary,.raster-kpis,.lifecycle-grid{grid-template-columns:1fr}.protocol-strip{grid-template-columns:1fr 1fr}.protocol-strip>i{display:none}.navigation-guide{grid-template-columns:1fr 1fr}.navigation-guide>span{grid-column:1/-1}.navigation-guide>i{display:none}.lottery-identity{grid-template-columns:1fr}.identity-ledger{grid-template-columns:1fr 1fr}.identity-ledger div{border-right:0;border-bottom:1px solid var(--line);padding:10px 0}.panel-heading{display:block}.global-hero h1{font-size:46px}.profile-card p{min-height:0}.wiki-callout,.lifecycle-head{align-items:flex-start;flex-direction:column} }
+@media(max-width:560px) { .profile-deck,.protocol-strip,.identity-ledger,.round-kpis{grid-template-columns:1fr}.global-hero{padding:27px 22px}.global-hero h1{font-size:39px}.lottery-identity,.leader-section,.walk-panel,.candidate-map,.roi-panel,.raster-panel,.lifecycle-panel{padding:17px}.overall-agent{padding-left:64px}.lottery-ball{width:34px;height:34px;font-size:11px}.agent-rank{grid-template-columns:1fr}.rank-orbit{width:36px;height:36px}.agent-line{display:block}.edge-badge{display:inline-block;margin-top:8px} }
 """
 
 
@@ -1298,6 +1425,9 @@ with gr.Blocks(title="LottoBench Lottery Agent Arena", css=CSS) as demo:
     gr.HTML(_availability_notice())
     gr.HTML(PROTOCOL)
     gr.HTML(NAVIGATION_GUIDE)
+    gr.HTML(WIKI_CALLOUT)
+    with gr.Accordion("START HERE / COMPLETE SPACE WIKI", open=False):
+        gr.Markdown(SPACE_GUIDE)
     with gr.Tabs(selected="euromillions", elem_classes="profile-switcher"):
         with gr.Tab("LOTTERY 01 / EUROMILLIONS LAB", id="synthetic"):
             _build_profile_tab(PROFILES["synthetic"])

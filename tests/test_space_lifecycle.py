@@ -79,3 +79,16 @@ def test_space_hydration_retries_api_then_fails_closed_after_git_fallback():
     assert workflow.count("git clone --depth 1") == 2
     assert workflow.count("refusing to replace current profile data") == 2
     assert "using repository fallback profiles" not in workflow
+
+
+def test_space_publication_retries_api_then_verifies_git_fallback():
+    root = MODULE_PATH.parents[2]
+    workflow = (root / ".github" / "workflows" / "publish-space.yml").read_text(
+        encoding="utf-8"
+    )
+    helper = (root / "scripts" / "publish_space_bundle.sh").read_text(encoding="utf-8")
+    assert workflow.count("scripts/publish_space_bundle.sh") == 3
+    assert "for attempt in 1 2 3; do" in helper
+    assert "Space upload API remained unavailable; publishing through Git" in helper
+    assert "http.extraheader" in helper
+    assert "test \"$local_sha\" = \"$remote_sha\"" in helper

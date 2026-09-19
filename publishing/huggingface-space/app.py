@@ -1437,6 +1437,11 @@ THEME = gr.themes.Base().set(
     block_label_text_color="#f4f8f8", block_label_text_color_dark="#f4f8f8",
     block_title_text_color="#f4f8f8", block_title_text_color_dark="#f4f8f8",
     input_background_fill="#112832", input_background_fill_dark="#112832",
+    table_text_color="#f4f8f8", table_text_color_dark="#f4f8f8",
+    table_even_background_fill="#0c1d24", table_even_background_fill_dark="#0c1d24",
+    table_odd_background_fill="#112832", table_odd_background_fill_dark="#112832",
+    table_border_color="#38505a", table_border_color_dark="#38505a",
+    table_row_focus="#234552", table_row_focus_dark="#234552",
 )
 
 

@@ -12,12 +12,67 @@ sharing-cost question. Neither a simulated sharing score nor a shortlist rank is
 
 1. Choose **EuroMillions** or **NL Lotto** for a real, dated profile. **EuroMillions Lab** is a
    fixed synthetic control and is never attached to a real draw.
-2. Use **Agent Arena** to inspect twelve already-scored, forward-only historical contests.
+2. Use **Agent Arena → Did the forecast ranges contain the winner?** for full-ticket and
+   second-prize containment, set-size baselines, and the prospective publication ledger.
 3. Use **Pre-draw Set Lab** to inspect the current dated candidate artifacts.
 4. Read the lifecycle panel first. It names the history cutoff, target draw, current state, scheduled
    refresh, and exact condition required for the live profile to advance.
 5. For an independent pre-draw check, keep the dated Hugging Face revision URL and download the
    exact files before the draw. A hash proves content identity, not publication time by itself.
+
+## Winning-ticket range benchmark
+
+This directly tests the question: **did the observed winning ticket belong to the set defined
+by a forecast made without that draw?** It starts with the current GARCH/transformer method;
+it does not relabel the April 2026 experiment or the original main-pair-only R method as the
+same experiment. The current G score includes main pairs, star pairs and main–star pairs.
+
+For a fixed training history H and a declared union of score intervals R, define
+`S = {every legal ticket t: G_H(t) lies in R}`. A full-ticket hit is exactly `winning_ticket ∈ S`.
+All ties are included. There is no top-million truncation in this test, so a score-range hit
+is mathematically equivalent to full winning-ticket membership in this particular set.
+
+Four ranges are declared before evaluation: GARCH 80%, GARCH 95%, hybrid union 80%, and hybrid
+union 95%. Bounds are `target ± NormalQuantile((1 + level)/2) × sqrt(GARCH variance_next)`.
+The hybrid unions a band around each point forecast with that same scale; overlap is counted
+once. These are **normal-approximation assumptions**, not calibrated win probabilities.
+The nominal percentage labels each component band; it does not label the hybrid union's coverage.
+If the provider has insufficient history to supply variance, no interval result is invented.
+
+Each row reports the winning numbers, their score under the training-only counts, range membership,
+the exact number K of tickets in the range, universe N, and hypothetical cost `K × ticket price`.
+The equal-size random full-winner expectation is exactly `K/N` for that draw. Across draws,
+expected hits are `sum(K_i/N_i)`, and containment lift is observed hits divided by expected hits.
+A range covering most tickets can contain many winners without forecasting better than chance.
+The dashboard keeps all four ranges and all misses visible; the twelve-draw replay is exploratory.
+
+Second prize is [5 mains + 1 star for EuroMillions](https://www.lottery.ie/game-information/euromillions)
+and [5 mains + reserve for NL Lotto](https://lotto.nederlandseloterij.nl/nieuw).
+The benchmark enumerates all 20 EuroMillions or six NL Lotto second-prize tickets and scores each
+against the same frozen ranges. Missing NL reserve metadata remains unknown, never zero.
+The random chance of at least one first-or-second-prize ticket is
+`1 - choose(N-W, K)/choose(N, K)`, with W=21 or W=7 respectively. A hit is match-class containment,
+not an asserted cash payout; operator rules, sharing and taxes can affect the amount received.
+
+**Historical forward replay** fits each prefix and excludes its target draw. It is explicitly
+retrospective and cannot prove the forecast was publicly issued then. **Published before the draw**
+uses an append-only ledger of frozen forecasts, with their pair-count matrices and SHA-256
+commitments. On a subsequent refresh, the old forecast is checked against its dated public
+Hugging Face commit and settled using the exact official target draw. Rerunning for the same
+target preserves the first forecast. A failed publication check remains visibly unverified.
+Same-day publication is conservatively excluded from verified results until an exact draw-time
+check is implemented. The initial publication has no settled prospective result; new draws build
+that record automatically. Local generation time is never accepted as proof of public timing.
+
+**Cash ROI** is `(all actual prize payouts - all purchased-ticket stakes) / all stakes`.
+No purchase is assumed. Full-range cost is shown, but cash ROI stays unassessed until dated
+purchase and all-prize payout evidence exists. A first- or second-prize combination inside a
+large, unpurchased range is not booked as income.
+
+Downloads: `forecast_range_replay.csv`, `forecast_range_summary.json`,
+`forecast_range_pending.json`, and `forecast_range_ledger.json`. All four hashes are included
+in `temporal_hybrid_summary.json`. The JSON commitment includes the complete scoring state, so
+membership can be checked without refitting or adding the target draw to historical counts.
 
 ## The three profiles
 
@@ -74,7 +129,8 @@ verified files and their original target date. It does not rename stale files as
 
 ## What happens after the target draw
 
-The current Space bundle is a **current-publication view**, not the canonical settlement ledger.
+The legacy candidate panels are a **current-publication view**. The range benchmark additionally
+preserves its own frozen forecast and settlement ledger across refreshes.
 After a successful post-draw refresh, the live page advances to the next target and the previous
 files remain accessible in Hugging Face's dated revision history.
 
@@ -234,7 +290,9 @@ at-least-three containment is 82/120 versus approximately 109.06 expected. The e
 an exploratory positive result, without adjustment for multiple tested sizes or methods, not proof
 of profitable jackpot prediction.
 
-The inspected prospective ledger contains pending predictions but no settled outcome files.
+The earlier inspected prospective ledger contained pending predictions but no settled outcome files.
+The new range ledger starts at its first public release and accumulates verified settlements;
+it does not backfill earlier live claims from retrospective forecasts.
 Scheduled publication of a refreshed twelve-draw replay does not itself build the three-year
 settlement ledger. Evidence status should advance only with verified new records.
 

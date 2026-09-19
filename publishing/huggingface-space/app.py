@@ -1086,18 +1086,23 @@ def _range_benchmark_panel(profile: Profile) -> None:
         "An 80% or 95% label is a nominal normal-approximation band, not measured accuracy. "
         "The hybrid takes the union of bands around both forecasts using the GARCH scale."
     )
+    gr.Markdown("**Full hits:** draws whose full winner is inside the range. **Random hits:** "
+                "expected hits for equally sized random sets. **≥2nd hits:** draws containing "
+                "at least one first- or second-prize ticket. **Lift:** full hits divided by "
+                "random expected hits; above 1 favours the forecast. See Next draw ranges "
+                "for the number of tickets and their full purchase cost.")
     with gr.Tabs():
         with gr.Tab("Historical forward replay"):
             gr.Markdown("Each target draw is excluded from fitting. These are reconstructed forecasts; "
                         "they were not published before those historical draws. All four predeclared "
                         "ranges and all misses remain visible; a short replay does not establish an edge.")
-            gr.Dataframe(range_summary_table(summary["replay"]), interactive=False,
+            gr.Dataframe(range_summary_table(summary["replay"]), interactive=False, wrap=True,
                          label="Full winner and second prize or better / matched set-size baseline")
             frame = _read_csv_or_empty(profile.directory / "forecast_range_replay.csv")
-            gr.Dataframe(range_replay_table(frame), interactive=False, label="Draw-by-draw range results")
+            gr.Dataframe(range_replay_table(frame), interactive=False, wrap=True, label="Draw-by-draw range results")
         with gr.Tab("Published before the draw"):
             if summary["prospective"]:
-                gr.Dataframe(range_summary_table(summary["prospective"]), interactive=False,
+                gr.Dataframe(range_summary_table(summary["prospective"]), interactive=False, wrap=True,
                              label="Results from verified public pre-draw commitments")
             else:
                 gr.Markdown("**No eligible settled pre-draw range forecasts yet.** The ledger starts "
@@ -1111,13 +1116,13 @@ def _range_benchmark_panel(profile: Profile) -> None:
                 "Published UTC": (entry.get("publication") or {}).get("published_utc", "Unverified"),
                 "Evidence": entry["evidence_scope"],
                 "Official result": "Available" if entry["settlement"] else "Pending",
-            } for entry in ledger.get("entries", [])]), interactive=False, label="Publication and settlement ledger")
+            } for entry in ledger.get("entries", [])]), interactive=False, wrap=True, label="Publication and settlement ledger")
             gr.Markdown("Publication time comes from the public Hugging Face commit. Same-day uploads "
                         "are excluded from verified results until exact draw-time evidence is available.")
         with gr.Tab("Next draw ranges"):
             gr.Markdown(f"**Target: {summary['target_draw_date']}**. These are complete score-range "
                         "sets, distinct from the separately ranked one-million-ticket download.")
-            gr.Dataframe(range_pending_table(summary["pending"]), interactive=False,
+            gr.Dataframe(range_pending_table(summary["pending"]), interactive=False, wrap=True,
                          label="Frozen range bounds, set sizes and full purchase cost")
     gr.Markdown("**ROI:** containment records which prize combinations are present. Cash ROI needs "
                 "all actual payouts minus the cost of all purchased tickets, divided by that cost. "

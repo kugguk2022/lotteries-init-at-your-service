@@ -366,6 +366,15 @@ def _build_profile(key: str, database: Path, output: Path) -> dict:
             "house_reference": "uniform_random",
             "providers": list(PROVIDER_NAMES),
             "coordinator": "coordinated_aggregation",
+            "ranking_metric": "jackpot_tier_only_modeled_expected_roi_alpha",
+            "all_prize_realized_roi_status": "UNASSESSED_NO_SETTLED_PAYOUT_LEDGER",
+            "jackpot_model_assumptions": {
+                "jackpot": jackpot.jackpot,
+                "ticket_price": jackpot.ticket_price,
+                "n_other_tickets": jackpot.n_other_tickets,
+                "lower_prize_tiers_included": False,
+                "live_jackpot": False,
+            },
         },
         "prospective": {
             "history_cutoff": str(metadata["last_draw"]),
@@ -380,8 +389,10 @@ def _build_profile(key: str, database: Path, output: Path) -> dict:
             ),
         },
         "claims_boundary": (
-            "ROI alpha is modeled expected-ROI difference from the equal-budget uniform null. "
-            "It is not realized profit, improved draw probability, or betting advice."
+            "ROI alpha is JACKPOT-TIER-ONLY modeled expected-ROI difference from the "
+            "equal-budget uniform null, under fixed assumptions, excluding every lower prize. "
+            "It is not total expected return, annual cash ROI, improved draw probability, "
+            "or betting advice. Consistency means above modeled null, not prize-win rate."
         ),
     }
     (profile_dir / "manifest.json").write_text(
@@ -400,6 +411,7 @@ def _build_profile(key: str, database: Path, output: Path) -> dict:
         "profile_key": key,
         "display_name": display_name,
         "history": manifest["history"],
+        "metric_contract": manifest["evaluation"],
         "refresh": {
             "automatic": key != "synthetic",
             "cadence": PROFILE_REFRESH_CADENCE[key],

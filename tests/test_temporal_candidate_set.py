@@ -10,6 +10,9 @@ from lotteries_core.protocol import GameSpec
 from lotteries_core.roi import JackpotModel
 from lotteries_core.temporal_candidate_set import (
     ARCHIVE_FILE,
+    _model_history,
+    _rank_actual_ticket,
+    _tie_keys,
     build_temporal_candidate_set,
     ticket_global_index,
 )
@@ -90,6 +93,25 @@ def test_exact_hybrid_archive_keeps_coverage_and_profitability_separate(
     assert len(archived) == 17
     assert archived[["main_draw", "auxiliary_draw"]].drop_duplicates().shape[0] == 17
     assert summary["artifacts"][ARCHIVE_FILE]
+    assert summary["method_version"] == "v2_loo_modern_era_neutral_ties"
+    for row in archived.itertuples(index=False):
+        ticket = (tuple(map(int, row.main_draw.split())),
+                  tuple(map(int, row.auxiliary_draw.split())))
+        rank, score, first, last = _rank_actual_ticket(history, spec, ticket, 11.25, 14.75, 3)
+        assert rank == row.rank
+        assert score == row.g_score
+        assert first == row.score_band_rank_first
+        assert last == row.score_band_rank_last
+        assert first <= rank <= last
+
+    second = build_temporal_candidate_set(
+        history, spec, output_directory=tmp_path / "other-batch",
+        history_cutoff="2026-01-08", target_draw_date="2026-01-09",
+        snapshot_sha256="a" * 64,
+        jackpot=JackpotModel(jackpot=100.0, ticket_price=2.0, n_other_tickets=100.0),
+        candidate_size=17, holdout=2, transformer_epochs=1, batch_size=1,
+    )
+    pd.testing.assert_frame_equal(result.preview, second.preview)
 
 
 def test_candidate_size_is_bounded_by_the_exact_universe(tmp_path, monkeypatch):
@@ -114,3 +136,22 @@ def test_candidate_size_is_bounded_by_the_exact_universe(tmp_path, monkeypatch):
     )
     assert result.summary["candidate_size"] == spec.n_tickets() == 20
     assert result.summary["mechanical_jackpot_coverage_pct"] == 100.0
+
+
+def test_tie_keys_are_unique_deterministic_and_not_lexical():
+    import numpy as np
+
+    indexes = np.arange(10000)
+    keys = _tie_keys(indexes, 20260829)
+    assert len(np.unique(keys)) == len(indexes)
+    np.testing.assert_array_equal(keys, _tie_keys(indexes, 20260829))
+    assert not np.array_equal(np.argsort(keys), indexes)
+    assert not np.array_equal(keys, _tie_keys(indexes, 20260830))
+
+
+def test_euromillions_era_is_declared_not_selected_from_winning_outcomes():
+    history = pd.DataFrame({"draw_date": ["2016-09-23", "2016-09-27", "2026-09-18"]})
+    result = _model_history(history, GameSpec.euromillions())
+    assert result["draw_date"].tolist() == ["2016-09-27", "2026-09-18"]
+    with pytest.raises(ValueError, match="requires dated"):
+        _model_history(pd.DataFrame({"ball_1": [1]}), GameSpec.euromillions())

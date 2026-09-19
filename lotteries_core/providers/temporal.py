@@ -7,6 +7,8 @@ for a fair lottery draw.
 
 from __future__ import annotations
 
+from math import comb, log
+
 import numpy as np
 import pandas as pd
 
@@ -19,15 +21,70 @@ from ..likely_set_generator import (
 )
 from ..protocol import GameSpec, InferenceProvider, ProviderResult
 
+TEMPORAL_METHOD_VERSION = "2.0.0"
+SCORE_SERIES_SEMANTICS = "leave_one_out_at_training_cutoff"
+
 
 def _score_series(history: pd.DataFrame, spec: GameSpec):
+    """Return candidate matrices and self-excluded historical training labels.
+
+    Version 2 removes each row's own pair contribution from its label: unseen candidates do
+    not yet contribute to the count matrices either. Matrices still use the supplied training
+    cutoff; this is leave-one-out alignment, NOT an expanding-prefix/prequential G sequence.
+    The caller must exclude the future target before supplying history. Historical descriptive
+    scores and observed-mode level sets keep their original semantics in likely_set_generator.
+    """
     cfg = GameConfig(spec.name, spec.main_n, spec.main_k, spec.star_n, spec.star_k)
     main_cols, star_cols = detect_columns(history, cfg)
     if len(main_cols) < spec.main_k or len(star_cols) < spec.star_k:
         raise ValueError("history does not contain enough main/star columns")
+    values = history[main_cols + star_cols].apply(pd.to_numeric, errors="raise").to_numpy(
+        dtype=float
+    )
+    if not np.isfinite(values).all() or not np.equal(values, np.floor(values)).all():
+        raise ValueError("history draw numbers must be finite integers")
+    for row in values:
+        spec.validate_ticket(
+            (
+                tuple(sorted(int(v) for v in row[: spec.main_k])),
+                tuple(sorted(int(v) for v in row[spec.main_k :])),
+            )
+        )
     matrices = build_comatrices(history, cfg, main_cols, star_cols)
     poi = observed_poi_series(history, cfg, matrices, main_cols, star_cols, "cross").astype(float)
-    return matrices, poi
+    self_pairs = comb(spec.main_k, 2) + spec.main_k * spec.star_k + comb(spec.star_k, 2)
+    return matrices, poi - self_pairs
+
+
+def _build_sequence_model(sequence_length: int):
+    """Build the optional PyTorch model with explicit, deterministic lag positions."""
+    import torch
+    from torch import nn
+
+    class Model(nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.embed = nn.Linear(1, 8)
+            positions = torch.arange(sequence_length, dtype=torch.float32)[:, None]
+            frequencies = torch.exp(torch.arange(0, 8, 2, dtype=torch.float32) * (-log(10_000) / 8))
+            encoding = torch.zeros(sequence_length, 8, dtype=torch.float32)
+            encoding[:, 0::2] = torch.sin(positions * frequencies)
+            encoding[:, 1::2] = torch.cos(positions * frequencies)
+            self.register_buffer("position_encoding", encoding[None, :, :])
+            layer = nn.TransformerEncoderLayer(
+                d_model=8, nhead=2, dim_feedforward=16, dropout=0.0, batch_first=True
+            )
+            self.encoder = nn.TransformerEncoder(layer, num_layers=1)
+            self.head = nn.Linear(8, 1)
+
+        def forward(self, batch):
+            # All tokens are known at the forecast cutoff. Positions distinguish their lags;
+            # attention within this past-only window does not expose the forecast target.
+            embedded = self.embed(batch) + self.position_encoding[:, : batch.shape[1]]
+            encoded = self.encoder(embedded)
+            return self.head(encoded[:, -1]).squeeze(-1)
+
+    return Model()
 
 
 def _rank_candidate_pool(
@@ -118,7 +175,15 @@ class GarchMarkovBranchProvider(InferenceProvider):
         matrices, poi = _score_series(self._history, spec)
         target, diagnostics = self._forecast(poi, self.window)
         result = _rank_candidate_pool(self, spec, matrices, target, budget, rng)
-        result.diagnostics.update({"target": target, "window": self.window, **diagnostics})
+        result.diagnostics.update(
+            {
+                "target": target,
+                "window": self.window,
+                "method_version": TEMPORAL_METHOD_VERSION,
+                "score_series_semantics": SCORE_SERIES_SEMANTICS,
+                **diagnostics,
+            }
+        )
         return result
 
 
@@ -127,7 +192,7 @@ class SequenceTransformerProvider(InferenceProvider):
 
     name = "sequence_transformer"
     description = (
-        "Tiny causal Transformer over the historical co-occurrence-score sequence; its next-score "
+        "Tiny position-aware Transformer over training-only co-occurrence scores; its next-score "
         "forecast ranks a seeded legal-ticket pool. Requires PyTorch."
     )
 
@@ -168,21 +233,7 @@ class SequenceTransformerProvider(InferenceProvider):
         xt = torch.tensor(x[:, :, None], dtype=torch.float32)
         yt = torch.tensor(target, dtype=torch.float32)
 
-        class Model(nn.Module):
-            def __init__(self):
-                super().__init__()
-                self.embed = nn.Linear(1, 8)
-                layer = nn.TransformerEncoderLayer(
-                    d_model=8, nhead=2, dim_feedforward=16, dropout=0.0, batch_first=True
-                )
-                self.encoder = nn.TransformerEncoder(layer, num_layers=1)
-                self.head = nn.Linear(8, 1)
-
-            def forward(self, batch):
-                encoded = self.encoder(self.embed(batch))
-                return self.head(encoded[:, -1]).squeeze(-1)
-
-        model = Model()
+        model = _build_sequence_model(seq_len)
         optimizer = torch.optim.AdamW(model.parameters(), lr=3e-3, weight_decay=1e-4)
         loss_fn = nn.MSELoss()
         final_loss = float("nan")
@@ -204,6 +255,7 @@ class SequenceTransformerProvider(InferenceProvider):
             "epochs": self.epochs,
             "training_loss": final_loss,
             "history_points": len(y),
+            "positional_encoding": "sinusoidal_v1",
         }
 
     def propose(self, spec: GameSpec, budget: int, rng: np.random.Generator) -> ProviderResult:
@@ -212,5 +264,12 @@ class SequenceTransformerProvider(InferenceProvider):
         matrices, poi = _score_series(self._history, spec)
         target, diagnostics = self._forecast(poi)
         result = _rank_candidate_pool(self, spec, matrices, target, budget, rng)
-        result.diagnostics.update({"target": target, **diagnostics})
+        result.diagnostics.update(
+            {
+                "target": target,
+                "method_version": TEMPORAL_METHOD_VERSION,
+                "score_series_semantics": SCORE_SERIES_SEMANTICS,
+                **diagnostics,
+            }
+        )
         return result

@@ -3,7 +3,8 @@
 The two existing temporal providers forecast the next value of the historical pair-co-occurrence
 (``G``) sequence.  This module turns their two forecasts into a transparent branch ranking over
 the *entire* legal ticket universe: a ticket is preferred when its historical ``G`` score is close
-to either forecast branch.  Ties are deterministic and lexicographic.
+to either forecast branch. Ties use a seeded, number-neutral permutation, not a
+claim that lower-numbered tickets are more probable.
 
 This is a research search-space reducer, not a probability model.  A candidate set covering
 ``m`` of ``N`` legal tickets has fair-draw jackpot coverage ``m / N`` regardless of its ranking.
@@ -40,6 +41,29 @@ ARCHIVE_FILE = "temporal_hybrid_candidates_1m.csv.gz"
 PREVIEW_FILE = "temporal_hybrid_preview.csv"
 BACKTEST_FILE = "temporal_hybrid_backtest.csv"
 SUMMARY_FILE = "temporal_hybrid_summary.json"
+METHOD_VERSION = "v2_loo_modern_era_neutral_ties"
+
+
+def _tie_keys(indexes: np.ndarray, seed: int) -> np.ndarray:
+    """Bijective SplitMix64 keys: stable ties without lexical number preference."""
+    values = np.asarray(indexes, dtype=np.uint64) ^ np.uint64(seed)
+    with np.errstate(over="ignore"):
+        values = values + np.uint64(0x9E3779B97F4A7C15)
+        values = (values ^ (values >> 30)) * np.uint64(0xBF58476D1CE4E5B9)
+        values = (values ^ (values >> 27)) * np.uint64(0x94D049BB133111EB)
+    return values ^ (values >> 31)
+
+
+def _model_history(history: pd.DataFrame, spec: GameSpec) -> pd.DataFrame:
+    """Use the declared current 12-star rules, never infer a cutoff from outcomes."""
+    if (spec.main_n, spec.main_k, spec.star_n, spec.star_k) == (50, 5, 12, 2):
+        if "draw_date" not in history:
+            raise ValueError("EuroMillions temporal history requires dated rule-era evidence")
+        dates = pd.to_datetime(history["draw_date"], errors="raise")
+        history = history.loc[dates >= pd.Timestamp("2016-09-27")].copy()
+        if history.empty:
+            raise ValueError("no history in the current EuroMillions 12-star era")
+    return history
 
 
 @dataclass(frozen=True)
@@ -172,20 +196,25 @@ def _rank_actual_ticket(
     first_target: float,
     second_target: float,
     batch_size: int,
-) -> tuple[int, int]:
+    seed: int = 20260829,
+) -> tuple[int, int, int, int]:
     histogram: Counter[int] = Counter()
     actual_index = ticket_global_index(actual, spec)
     actual_score = _ticket_score(history, spec, actual)
+    actual_key = _tie_keys(np.array([actual_index]), seed)[0]
     same_score_through_actual = 0
     for indexes, _main, _auxiliary, scores in _score_batches(history, spec, batch_size):
         counts = np.bincount(scores)
         histogram.update({index: int(count) for index, count in enumerate(counts) if count})
-        before = indexes <= actual_index
+        before = _tie_keys(indexes, seed) <= actual_key
         same_score_through_actual += int(np.count_nonzero((scores == actual_score) & before))
     ordered = _score_order(histogram, first_target, second_target)
     # Stop at the actual score band; later bands are not better.
     better = sum(histogram[score] for score in ordered[: ordered.index(actual_score)])
-    return int(better + same_score_through_actual), actual_score
+    return (
+        int(better + same_score_through_actual), actual_score,
+        int(better + 1), int(better + histogram[actual_score]),
+    )
 
 
 def _control_contains(index: int, universe: int, size: int, seed: int) -> bool:
@@ -245,8 +274,8 @@ def _walk_forward_backtest(
         first, second, _garch, _transformer = _forecasts(
             training, spec, transformer_epochs
         )
-        rank, actual_score = _rank_actual_ticket(
-            training, spec, actual, first, second, batch_size
+        rank, actual_score, band_first, band_last = _rank_actual_ticket(
+            training, spec, actual, first, second, batch_size, seed
         )
         global_index = ticket_global_index(actual, spec)
         rows.append(
@@ -258,6 +287,9 @@ def _walk_forward_backtest(
                 "transformer_target_g": second,
                 "actual_g_score": actual_score,
                 "actual_rank": rank,
+                "score_band_rank_first": band_first,
+                "score_band_rank_last": band_last,
+                "method_version": METHOD_VERSION,
                 "hybrid_contains_winner": rank <= candidate_size,
                 "matched_uniform_contains_winner": _control_contains(
                     global_index, spec.n_tickets(), candidate_size, seed + fold
@@ -278,6 +310,7 @@ def _write_archive(
     second_target: float,
     history_cutoff: str,
     target_draw_date: str,
+    score_bands: dict[int, tuple[int, int]],
 ) -> tuple[str, list[dict]]:
     path.parent.mkdir(parents=True, exist_ok=True)
     preview: list[dict] = []
@@ -295,6 +328,8 @@ def _write_archive(
                 "history_cutoff",
                 "target_draw_date",
                 "score_status",
+                "score_band_rank_first",
+                "score_band_rank_last",
             ]
         )
         for rank, selected_index in enumerate(order, start=1):
@@ -320,6 +355,8 @@ def _write_archive(
                 "history_cutoff": history_cutoff,
                 "target_draw_date": target_draw_date,
                 "score_status": "PENDING",
+                "score_band_rank_first": score_bands[score][0],
+                "score_band_rank_last": score_bands[score][1],
             }
             writer.writerow(row.values())
             if rank <= 250:
@@ -346,6 +383,8 @@ def build_temporal_candidate_set(
     """Build, validate, and write an exact pre-draw hybrid candidate artifact."""
     if history.empty:
         raise ValueError("temporal candidate set requires known history")
+    source_history_rows = len(history)
+    history = _model_history(history, spec)
     universe = spec.n_tickets()
     candidate_size = min(int(candidate_size), universe)
     if candidate_size < 1 or batch_size < 1:
@@ -363,43 +402,45 @@ def build_temporal_candidate_set(
     ordered_scores = _score_order(histogram, first, second)
     take_by_score = _take_by_score(histogram, ordered_scores, candidate_size)
     score_level = {score: level for level, score in enumerate(ordered_scores)}
+    score_bands = {}
+    band_offset = 0
+    for score in ordered_scores:
+        score_bands[score] = (band_offset + 1, band_offset + histogram[score])
+        band_offset += histogram[score]
 
-    numbers = np.empty((candidate_size, spec.main_k + spec.star_k), dtype=np.int16)
-    selected_scores = np.empty(candidate_size, dtype=np.int32)
-    selected_levels = np.empty(candidate_size, dtype=np.int32)
-    selected_indexes = np.empty(candidate_size, dtype=np.int64)
-    used_by_score: Counter[int] = Counter()
-    write_offset = 0
+    # Streaming top-k per score band: memory is bounded by the requested set plus
+    # one batch. Selection and actual-ticket evaluation use the same tie keys.
+    pools: dict[int, tuple[np.ndarray, np.ndarray]] = {}
     auxiliary_count = spec.n_star_combinations()
     for indexes, main_array, auxiliary_array, scores in _score_batches(
         history, spec, batch_size
     ):
-        mask = np.zeros(len(scores), dtype=bool)
         for score, take in take_by_score.items():
-            remaining = take - used_by_score[score]
-            if remaining <= 0:
+            local = np.flatnonzero(scores == score)
+            if not len(local):
                 continue
-            positions = np.flatnonzero(scores == score)[:remaining]
-            mask[positions] = True
-            used_by_score[score] += len(positions)
-        local = np.flatnonzero(mask)
-        if not len(local):
-            continue
-        main_positions = local // auxiliary_count
-        auxiliary_positions = local % auxiliary_count
-        count = len(local)
-        target_slice = slice(write_offset, write_offset + count)
-        numbers[target_slice, : spec.main_k] = main_array[main_positions]
-        if spec.star_k:
-            numbers[target_slice, spec.main_k :] = auxiliary_array[auxiliary_positions]
-        selected_scores[target_slice] = scores[local]
-        selected_levels[target_slice] = [score_level[int(value)] for value in scores[local]]
-        selected_indexes[target_slice] = indexes[local]
-        write_offset += count
-    if write_offset != candidate_size:
-        raise RuntimeError(f"selected {write_offset} tickets; expected {candidate_size}")
-
-    order = np.lexsort((selected_indexes, selected_levels))
+            values = np.concatenate(
+                (main_array[local // auxiliary_count], auxiliary_array[local % auxiliary_count]),
+                axis=1,
+            )
+            keys = _tie_keys(indexes[local], seed)
+            if score in pools:
+                old_keys, old_values = pools[score]
+                keys = np.concatenate((old_keys, keys))
+                values = np.concatenate((old_values, values))
+            if len(keys) > take:
+                keep = np.argpartition(keys, take - 1)[:take]
+                keys, values = keys[keep], values[keep]
+            pools[score] = keys, values
+    selected_keys = np.concatenate([pools[score][0] for score in take_by_score])
+    numbers = np.concatenate([pools[score][1] for score in take_by_score])
+    selected_scores = np.concatenate([
+        np.full(len(pools[score][0]), score, dtype=np.int32) for score in take_by_score
+    ])
+    selected_levels = np.array([score_level[int(score)] for score in selected_scores])
+    if len(numbers) != candidate_size:
+        raise RuntimeError(f"selected {len(numbers)} tickets; expected {candidate_size}")
+    order = np.lexsort((selected_keys, selected_levels))
     output_directory = Path(output_directory)
     archive_path = output_directory / ARCHIVE_FILE
     archive_sha256, preview_rows = _write_archive(
@@ -412,6 +453,7 @@ def build_temporal_candidate_set(
         second_target=second,
         history_cutoff=history_cutoff,
         target_draw_date=target_draw_date,
+        score_bands=score_bands,
     )
     preview = pd.DataFrame(preview_rows)
 
@@ -433,8 +475,12 @@ def build_temporal_candidate_set(
     repeatable_gate = model_hits >= 2 and p_value <= 0.01 and model_hits > control_hits
     stake = candidate_size * jackpot.ticket_price
     summary: dict[str, Any] = {
-        "schema_version": "1.0.0",
+        "schema_version": "2.0.0",
         "method": "exact_transformer_garch_branch_raster",
+        "method_version": METHOD_VERSION,
+        "source_history_rows": source_history_rows,
+        "training_score_definition": "leave_one_out_typed_pair_count_at_training_cutoff",
+        "history_rule_era": "12_star_since_2016_09_27" if spec.star_n == 12 else "supplied_game_rules",
         "research_status": "EVIDENCE_GATE_PASSED" if repeatable_gate else "RESEARCH_ONLY",
         "profitability_status": "UNASSESSED_NO_PURCHASE_OR_SETTLED_PAYOUT",
         "interpretation": (
@@ -445,6 +491,7 @@ def build_temporal_candidate_set(
         "target_draw_date": target_draw_date,
         "snapshot_sha256": snapshot_sha256,
         "history_rows": int(len(history)),
+        "score_history_first_draw": str(history.iloc[0].get("draw_date", "unknown")),
         "universe_size": universe,
         "candidate_size": candidate_size,
         "mechanical_jackpot_coverage_pct": fair_fraction * 100.0,
@@ -457,7 +504,14 @@ def build_temporal_candidate_set(
         "transformer_target_g": second,
         "garch_diagnostics": garch_diagnostics,
         "transformer_diagnostics": transformer_diagnostics,
-        "ranking_tie_break": "nearest branch, mean branch distance, higher G, legal-ticket index",
+        "ranking_tie_break": "nearest branch, mean branch distance, higher G, seeded SplitMix64 key",
+        "tie_seed": seed,
+        "rank_interpretation": "1 is nearest score band; order within a band is not predictive confidence",
+        "selected_score_bands": [
+            {"g_score": score, "universe_count": histogram[score], "selected_count": take,
+             "rank_first": score_bands[score][0], "rank_last": score_bands[score][1]}
+            for score, take in take_by_score.items()
+        ],
         "forward_only_gate": {
             "holdout_draws": int(len(backtest)),
             "hybrid_jackpot_containment_hits": model_hits,

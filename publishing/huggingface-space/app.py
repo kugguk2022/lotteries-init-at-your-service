@@ -11,6 +11,7 @@ import gradio as gr
 import pandas as pd
 from lifecycle import classify_profile_state
 from publication_audit import audit_publication, public_links
+from results_evidence import containment_table, hybrid_replay_table
 
 ROOT = Path(__file__).resolve().parent
 PROFILE_ROOT = ROOT / "data" / "profiles"
@@ -33,56 +34,42 @@ AGENTS = {
         "short": "HOUSE",
         "role": "Equal-budget fair-draw reference",
         "color": "#8194a3",
-        "bet": 50,
-        "house": 50,
     },
     "frequency": {
         "name": "Momentum Scout",
         "short": "MOMENTUM",
         "role": "Frequency-led bet engineering",
         "color": "#20d5cf",
-        "bet": 94,
-        "house": 30,
     },
     "unpopularity": {
         "name": "Crowd Escape",
         "short": "ESCAPE",
         "role": "Low-popularity payout-pressure lane",
         "color": "#ffb84d",
-        "bet": 36,
-        "house": 96,
     },
     "gingerm": {
         "name": "Co-occurrence",
         "short": "PAIR GRAPH",
         "role": "Recurring pair-structure search",
         "color": "#4ea8ff",
-        "bet": 78,
-        "house": 57,
     },
     "spectral_contrarian": {
         "name": "Spectral Contrarian",
         "short": "SPECTRAL",
         "role": "Graph structure with contrarian pressure",
         "color": "#ef84c5",
-        "bet": 58,
-        "house": 88,
     },
     "parallax": {
         "name": "Parallax Guard",
         "short": "PARALLAX",
         "role": "Residual and regime-shift guard",
         "color": "#ff7168",
-        "bet": 69,
-        "house": 73,
     },
     "coordinated_aggregation": {
         "name": "Market Coordinator",
         "short": "COORDINATOR",
         "role": "Equal-budget multi-agent portfolio",
         "color": "#d8f35c",
-        "bet": 84,
-        "house": 84,
     },
 }
 
@@ -297,8 +284,6 @@ def _agent_meta(agent: str) -> dict:
             "short": "AGENT",
             "role": "Benchmark strategy",
             "color": "#8194a3",
-            "bet": 50,
-            "house": 50,
         },
     )
 
@@ -353,8 +338,8 @@ def _global_hero() -> str:
     return f"""
     <header class="global-hero">
       <div class="live-line"><i></i> FORWARD-ONLY LOTTERY AGENT BENCHMARK</div>
-      <h1>Model the ticket.<br><em>Model the house.</em></h1>
-      <p>Replay ranked agents on a lottery draw stage, compare ROI allocation against an equal-budget null, and freeze the next candidate sets before the following contest.</p>
+      <h1>Test the forecast.<br><em>Show the evidence.</em></h1>
+      <p>Compare held-out ticket matches with equal-budget controls, inspect committed next-draw candidates, and keep payout-sharing assumptions separate from cash returns.</p>
       <div class="hero-facts">
         <span><b>3</b> separated profiles</span>
         <span><b>7</b> agents per market</span>
@@ -368,7 +353,7 @@ def _global_hero() -> str:
 
 PROTOCOL = """
 <section class="protocol-strip">
-  <div><b>01</b><span>LOCK</span><p>Commit every candidate hash before the draw.</p></div>
+  <div><b>01</b><span>LOCK</span><p>For live claims, verify the dated pre-draw publication.</p></div>
   <i></i>
   <div><b>02</b><span>DRAW</span><p>Close the round on the published result.</p></div>
   <i></i>
@@ -399,12 +384,12 @@ def _profile_identity(profile: Profile) -> str:
         <span class="identity-kicker">{style['kicker']}</span>
         <h2>{html.escape(manifest['display_name'])}</h2>
         <p class="game-format">{style['format']}</p>
-        <p>{style['cadence']}. The arena evaluates {history['rows']:,} historical draws through <strong>{history['last_draw']}</strong> under one locked forward-only contract.</p>
+        <p>{style['cadence']}. Training history: {history['rows']:,} draws through <strong>{history['last_draw']}</strong>. Evaluation: the latest {evaluation['holdout_contests']} held-out draws, not the whole history or a three-year trial.</p>
       </div>
       <div class="identity-score">
-        <span>HOLDOUT LEADER</span>
+        <span>JACKPOT-SHARING MODEL LEADER</span>
         <strong>{_agent_name(str(leader['agent']))}</strong>
-        <b>{leader['mean_roi_alpha_pp']:+.3f} pp ROI alpha</b>
+        <b>{leader['mean_roi_alpha_pp']:+.3f} pp modeled jackpot-only alpha</b>
         <small>{int(leader['contests_above_null'])}/{int(leader['contests'])} contests above null / latest movement {leader_delta:+.3f} pp</small>
       </div>
       <div class="identity-ledger">
@@ -451,7 +436,7 @@ def _overall_agent_ladder(profile: Profile) -> str:
         )
     return f"""
     <section class="leader-section">
-      <div class="panel-heading"><div><span>TWELVE-CONTEST TABLE</span><h2>Agents ranked against the house</h2></div><p>The principal result is ROI alpha, not absolute return. Consistency shows how often an agent remained above the equal-budget uniform reference.</p></div>
+      <div class="panel-heading"><div><span>SEPARATE SHARING DIAGNOSTIC</span><h2>Modeled jackpot-sharing comparison</h2></div><p>This ranks the static crowd-popularity model, not predictive hit rate. Alpha excludes every lower prize. “Above null” means higher modeled jackpot return, not winning a prize. The model rewards its own assumed crowd prior; this is not independent evidence of forecasting skill.</p></div>
       <div class="overall-ladder">{''.join(cards)}</div>
     </section>
     """
@@ -513,14 +498,14 @@ def _roi_evolution_chart(profile: Profile) -> str:
 
     return f"""
     <section class="roi-panel">
-      <div class="panel-heading"><div><span>ROI EVOLUTION / FORWARD ONLY</span><h2>How the twelve-contest mean actually moved</h2></div><p>Each point is the cumulative mean ROI alpha available after that contest. A new draw replaces only one observation in the twelve-contest holdout, so small endpoint movement is expected.</p></div>
+      <div class="panel-heading"><div><span>JACKPOT-MODEL DIAGNOSTIC / NOT CASH ROI</span><h2>Sharing-model alpha within this replay</h2></div><p>Each point is the cumulative mean modeled jackpot-only alpha inside the current holdout. It is not a bankroll, annual return, or history of earlier model releases. Lower prizes and actual payouts are absent.</p></div>
       <div class="roi-legend">{''.join(legend)}</div>
       <svg viewBox="0 0 {width} {height}" role="img" aria-label="Cumulative mean ROI alpha by contest and agent">
         {''.join(grid)}
         <line x1="{left}" y1="{y_position(0):.1f}" x2="{right}" y2="{y_position(0):.1f}" class="roi-zero" />
         {''.join(paths)}
         <text x="{(left + right) / 2}" y="445" class="axis-label">FORWARD CONTEST NUMBER</text>
-        <text x="19" y="{(top + bottom) / 2}" transform="rotate(-90 19 {(top + bottom) / 2})" class="axis-label">CUMULATIVE MEAN ROI ALPHA (PP)</text>
+        <text x="19" y="{(top + bottom) / 2}" transform="rotate(-90 19 {(top + bottom) / 2})" class="axis-label">JACKPOT-ONLY MODEL ALPHA (PP)</text>
       </svg>
     </section>
     """
@@ -545,10 +530,10 @@ def _round_summary(profile: Profile, contest_number: int) -> str:
         {_draw_line(winner['actual_main'], winner['actual_auxiliary'], PROFILE_STYLE[profile.key]['draw_label'])}
       </div>
       <div class="round-kpis">
-        <div><span>ROUND WINNER</span><strong>{_agent_name(str(winner['agent']))}</strong></div>
-        <div><span>ROI ALPHA</span><strong class="positive">{winner['roi_alpha_vs_house_pp']:+.3f} pp</strong></div>
+        <div><span>SHARING-MODEL LEADER</span><strong>{_agent_name(str(winner['agent']))}</strong></div>
+        <div><span>JACKPOT-ONLY ALPHA</span><strong class="positive">{winner['roi_alpha_vs_house_pp']:+.3f} pp</strong></div>
         <div><span>AGENTS OVER NULL</span><strong>{edge_count}/{len(frame) - 1}</strong></div>
-        <div><span>NULL EXPECTED ROI</span><strong>{house['expected_roi_pct']:.2f}%</strong></div>
+        <div><span>NULL JACKPOT-ONLY MODEL ROI</span><strong>{house['expected_roi_pct']:.2f}%</strong></div>
       </div>
     </section>
     """
@@ -570,7 +555,7 @@ def _round_agent_ladder(profile: Profile, contest_number: int) -> str:
                   <div><span class="agent-code">{meta['short']}</span><h3>{meta['name']}</h3></div>
                   <span class="edge-badge {'null' if is_house else 'positive' if row.roi_alpha_vs_house_pp > 0 else 'negative'}">{badge} {row.roi_alpha_vs_house_pp:+.3f} pp</span>
                 </div>
-                <p>{meta['role']} / best result match {int(row.best_main_hits)} main + {int(row.best_auxiliary_hits)} auxiliary</p>
+                <p>{meta['role']} / best same-ticket match {_best_ticket_match(profile, contest_number, str(row.agent))}</p>
                 <div class="consistency-track"><i style="width:{width:.1f}%"></i></div>
                 <div class="rank-metrics"><span>Consistency <b>{row.win_rate_vs_house_pct:.0f}%</b></span><span>Anomaly <b>{row.anomaly_index:.0f}</b></span><span>Pair reach <b>{row.pair_coverage_pct:.2f}%</b></span></div>
               </div>
@@ -642,6 +627,17 @@ def _agent_walk(profile: Profile, contest_number: int) -> str:
     """
 
 
+def _best_ticket_match(profile: Profile, contest_number: int, agent: str) -> str:
+    tickets = profile.tickets[
+        (profile.tickets["contest_number"].astype(int) == int(contest_number))
+        & (profile.tickets["agent"] == agent)
+    ].sort_values(["main_hits", "auxiliary_hits"], ascending=False)
+    if tickets.empty:
+        return "unavailable"
+    row = tickets.iloc[0]
+    return f"{int(row['main_hits'])}+{int(row['auxiliary_hits'])}"
+
+
 def _contest_table(profile: Profile, contest_number: int) -> pd.DataFrame:
     frame = _contest_frame(profile, contest_number)
     return pd.DataFrame(
@@ -651,8 +647,8 @@ def _contest_table(profile: Profile, contest_number: int) -> pd.DataFrame:
             "ROI alpha vs null": frame["roi_alpha_vs_house_pp"].map(lambda value: f"{value:+.3f} pp"),
             "Consistency to date": frame["win_rate_vs_house_pct"].map(lambda value: f"{value:.0f}%"),
             "Pair coverage": frame["pair_coverage_pct"].map(lambda value: f"{value:.2f}%"),
-            "Best match": frame.apply(lambda row: f"{int(row['best_main_hits'])}+{int(row['best_auxiliary_hits'])}", axis=1),
-            "Expected ROI": frame["expected_roi_pct"].map(lambda value: f"{value:.2f}%"),
+            "Best same-ticket match": frame["agent"].map(lambda agent: _best_ticket_match(profile, contest_number, agent)),
+            "Jackpot-only modeled ROI (not cash)": frame["expected_roi_pct"].map(lambda value: f"{value:.2f}%"),
         }
     ).reset_index(drop=True)
 
@@ -712,34 +708,23 @@ def set_timer(playing: bool) -> gr.Timer:
     return gr.Timer(active=bool(playing))
 
 
-def _normalized_evidence(profile: Profile) -> dict[str, float]:
-    board = profile.leaderboard.copy()
-    minimum = float(board["mean_roi_alpha_pp"].min())
-    span = float(board["mean_roi_alpha_pp"].max()) - minimum or 1.0
-    return {
-        str(row.agent): 0.70 * float(row.consistency_pct)
-        + 0.30 * ((float(row.mean_roi_alpha_pp) - minimum) / span * 100)
-        for row in board.itertuples(index=False)
-    }
-
-
 def _candidate_dataset(profile: Profile, house_balance: int, top_n: int) -> pd.DataFrame:
     frame = profile.prospective.copy()
-    evidence = _normalized_evidence(profile)
     house_ratio = int(house_balance) / 100
-    budget = int(profile.manifest["evaluation"]["budget_per_agent"])
+    main_k = int(profile.manifest["game"]["main_k"])
+    main_match = profile.tickets.groupby("agent")["main_hits"].mean() / main_k * 100
+    model_alpha = profile.leaderboard.set_index("agent")["mean_roi_alpha_pp"]
+    model_percentile = model_alpha.rank(method="average", pct=True) * 100
     bet_scores = []
     house_scores = []
     evidence_scores = []
     allocation_scores = []
     for row in frame.itertuples(index=False):
-        meta = _agent_meta(str(row.agent))
-        rank_strength = 100 - (int(row.rank_within_agent) - 1) / max(1, budget - 1) * 24
-        bet_score = 0.78 * float(meta["bet"]) + 0.22 * rank_strength
-        house_score = 0.78 * float(meta["house"]) + 0.22 * rank_strength
-        evidence_score = evidence[str(row.agent)]
+        bet_score = float(main_match[str(row.agent)])
+        house_score = float(model_percentile[str(row.agent)])
+        evidence_score = bet_score
         strategy_blend = (1 - house_ratio) * bet_score + house_ratio * house_score
-        allocation_score = 0.60 * strategy_blend + 0.40 * evidence_score
+        allocation_score = strategy_blend
         bet_scores.append(bet_score)
         house_scores.append(house_score)
         evidence_scores.append(evidence_score)
@@ -760,7 +745,7 @@ def _candidate_dataset(profile: Profile, house_balance: int, top_n: int) -> pd.D
         frame["score_status"] = "DEMO_ONLY"
         frame["ranking_scope"] = "synthetic demonstration allocation; not a real draw"
     else:
-        frame["ranking_scope"] = "pre-draw strategy allocation; not draw probability"
+        frame["ranking_scope"] = "user-weighted historical diagnostics; not forecast probability"
     return frame
 
 
@@ -786,7 +771,7 @@ def _candidate_map(frame: pd.DataFrame) -> str:
     surface_aria = "Demonstration set allocation map" if is_demo else "Pre-draw set allocation map"
     return f"""
     <section class="candidate-map">
-      <div class="panel-heading"><div><span>{surface_label}</span><h2>Where the frozen sets concentrate</h2></div><p>Position reflects strategy-family allocation, not a claim that one number is more likely to be drawn. The first three larger points lead the current allocation.</p></div>
+      <div class="panel-heading"><div><span>{surface_label}</span><h2>Two different historical diagnostics</h2></div><p>Y is observed mean main-number match per ticket. X is the agent's percentile within the static jackpot-sharing model. Neither is a forecast confidence score; all tickets from one agent share its historical diagnostics. The slider is a user preference, not a learned policy.</p></div>
       <svg viewBox="0 0 {width} {height}" role="img" aria-label="{surface_aria}">
         <rect x="{left}" y="{top}" width="{right-left}" height="{bottom-top}" rx="20" class="map-bg" />
         <line x1="{left}" y1="{bottom}" x2="{right}" y2="{bottom}" class="map-axis" />
@@ -794,8 +779,8 @@ def _candidate_map(frame: pd.DataFrame) -> str:
         <line x1="{left}" y1="{(top + bottom) / 2}" x2="{right}" y2="{(top + bottom) / 2}" class="map-mid" />
         <line x1="{(left + right) / 2}" y1="{top}" x2="{(left + right) / 2}" y2="{bottom}" class="map-mid" />
         {''.join(points)}
-        <text x="{(left + right) / 2}" y="383" class="axis-label">HOUSE / DRAW ENGINEERING</text>
-        <text x="23" y="{(top + bottom) / 2}" transform="rotate(-90 23 {(top + bottom) / 2})" class="axis-label">BET ENGINEERING</text>
+        <text x="{(left + right) / 2}" y="383" class="axis-label">JACKPOT-MODEL AGENT PERCENTILE</text>
+        <text x="23" y="{(top + bottom) / 2}" transform="rotate(-90 23 {(top + bottom) / 2})" class="axis-label">OBSERVED MAIN MATCH (%)</text>
       </svg>
     </section>
     """
@@ -808,10 +793,10 @@ def _candidate_display(frame: pd.DataFrame) -> pd.DataFrame:
             "Agent": frame["agent"].map(_agent_name),
             "Main numbers": frame["main_draw"],
             "Lucky stars / Aux": frame["auxiliary_draw"].fillna(""),
-            "Priority": frame["allocation_priority_score"].map(lambda value: f"{value:.1f}"),
-            "Bet engineering": frame["bet_engineering_score"].map(lambda value: f"{value:.1f}"),
-            "House / draw": frame["house_draw_engineering_score"].map(lambda value: f"{value:.1f}"),
-            "Historical alpha": frame["backtest_mean_roi_alpha_pp"].map(lambda value: f"{value:+.3f} pp"),
+            "User-weighted diagnostic": frame["allocation_priority_score"].map(lambda value: f"{value:.1f}"),
+            "Observed main match %": frame["bet_engineering_score"].map(lambda value: f"{value:.1f}"),
+            "Jackpot-model percentile": frame["house_draw_engineering_score"].map(lambda value: f"{value:.1f}"),
+            "Jackpot-only model alpha": frame["backtest_mean_roi_alpha_pp"].map(lambda value: f"{value:+.3f} pp"),
             "Status": frame["score_status"],
             "Commitment": frame["commitment_sha256"].str[:12],
         }
@@ -934,16 +919,26 @@ def _temporal_candidate_panel(profile: Profile) -> str:
     auxiliary = _number_balls(leader["auxiliary_draw"], auxiliary=True)
     plus = '<span class="draw-plus">+</span>' if auxiliary else ""
     gate_label = "PASSED" if gate["passed"] else "RESEARCH ONLY"
+    version = summary.get("method_version", "legacy_v1")
+    version_notice = (
+        "Legacy v1 artifact: self-inclusion, lag-order and lexical-tie defects were found. "
+        "Retained for audit; do not treat this preview as validated recommendations. "
+        "A v2 refresh is required."
+        if version == "legacy_v1" else
+        "v2: leave-one-out labels, positional encoding, rule-era alignment and neutral ties. "
+        "These are correctness repairs, not proof of predictive improvement."
+    )
     return f"""
     <section class="raster-panel temporal-panel" style="--profile:{PROFILE_STYLE[profile.key]['accent']}">
-      <div class="panel-heading"><div><span>TRANSFORMER + GARCH BRANCH SET</span><h2>Exact million-ticket search-space artifact</h2></div><p>Both models forecast the next historical pair-score level. Every legal ticket is ranked by distance to either branch using only draws through {html.escape(str(summary['history_cutoff']))}. This is an inference ranking, not a change to fair-draw odds.</p></div>
+      <div class="panel-heading"><div><span>TRANSFORMER + FIXED-PARAMETER GARCH FILTER</span><h2>Exact million-ticket search-space artifact</h2></div><p>Both models forecast a pair-score level. Tickets are ordered by distance to either branch through {html.escape(str(summary['history_cutoff']))}. Equal-G tickets are indistinguishable to the model; row order within that band is not confidence.</p></div>
+      <div class="economics-warning"><strong>{html.escape(version)}</strong> {version_notice}</div>
       <div class="raster-kpis temporal-kpis">
         <div><span>CANDIDATE SET</span><strong>{int(summary['candidate_size']):,}</strong><small>of {int(summary['universe_size']):,} exact tickets</small></div>
         <div><span>FAIR COVERAGE</span><strong>{float(summary['mechanical_jackpot_coverage_pct']):.4f}%</strong><small>1 in {float(summary['mechanical_jackpot_odds_one_in']):.2f} per draw</small></div>
         <div><span>FULL-PURCHASE STAKE</span><strong>€{float(summary['full_purchase_stake']):,.0f}</strong><small>break-even gross payout €{float(summary['break_even_gross_payout']):,.0f}</small></div>
         <div><span>FORWARD GATE</span><strong>{gate_label}</strong><small>{int(gate['hybrid_jackpot_containment_hits'])}/{int(gate['holdout_draws'])} hybrid vs {int(gate['matched_uniform_containment_hits'])}/{int(gate['holdout_draws'])} matched null</small></div>
       </div>
-      <div class="raster-leader"><span>TOP BRANCH-RANKED SET / TARGET {html.escape(str(summary['target_draw_date']))}</span><div>{_number_balls(leader['main_draw'])}{plus}{auxiliary}</div><strong>G {int(leader['g_score'])} / nearest {html.escape(str(leader['nearest_branch']))} branch</strong></div>
+      <div class="raster-leader"><span>EXAMPLE IN NEAREST SCORE BAND / TARGET {html.escape(str(summary['target_draw_date']))}</span><div>{_number_balls(leader['main_draw'])}{plus}{auxiliary}</div><strong>G {int(leader['g_score'])} / nearest {html.escape(str(leader['nearest_branch']))} branch / not uniquely most likely</strong></div>
       <div class="economics-warning"><strong>Coverage is not profitability.</strong> Containing the first-prize combination does not by itself prove a profit: the realized payout must exceed the full stake after jackpot sharing and applicable deductions. This artifact is not treated as one million purchased tickets.</div>
     </section>
     """
@@ -955,7 +950,7 @@ def _temporal_candidate_display(profile: Profile) -> pd.DataFrame:
     frame = profile.temporal_candidates.head(50)
     return pd.DataFrame(
         {
-            "Rank": frame["rank"].astype(int),
+            "Artifact position, not confidence": frame["rank"].astype(int),
             "Main numbers": frame["main_draw"],
             "Lucky stars / Aux": frame["auxiliary_draw"].fillna(""),
             "G score": frame["g_score"].astype(int),
@@ -1031,8 +1026,8 @@ def render_candidates(
     <section class="candidate-summary" style="--profile:{PROFILE_STYLE[key]['accent']}">
       <div class="candidate-pick"><span>TOP FROZEN SET / {state_label}</span><div>{_number_balls(leader['main_draw'])}{plus}{auxiliary}</div></div>
       <div><span>SUPPORTING AGENT</span><strong>{meta['name']}</strong><small>{meta['role']}</small></div>
-      <div><span>ALLOCATION</span><strong>{100-int(house_balance)}% bet / {int(house_balance)}% house</strong><small>Priority {leader['allocation_priority_score']:.1f} / 100</small></div>
-      <div><span>HISTORICAL EVIDENCE</span><strong>{leader['backtest_mean_roi_alpha_pp']:+.3f} pp</strong><small>{leader['backtest_consistency_pct']:.0f}% above null</small></div>
+      <div><span>USER PREFERENCE</span><strong>{100-int(house_balance)}% match / {int(house_balance)}% sharing model</strong><small>Diagnostic blend {leader['allocation_priority_score']:.1f}; not confidence</small></div>
+      <div><span>JACKPOT-MODEL ALPHA</span><strong>{leader['backtest_mean_roi_alpha_pp']:+.3f} pp</strong><small>{leader['backtest_consistency_pct']:.0f}% above modeled null; not prize-win rate</small></div>
     </section>
     """
     state_slug = "demo" if key == "synthetic" else "predraw"
@@ -1043,8 +1038,8 @@ def render_candidates(
 
 CLAIMS_NOTE = """
 <section class="claims-note">
-  <strong>Exact interpretation of “against the house”</strong>
-  <p>ROI alpha is modeled expected-ROI displacement from the seeded uniform, equal-budget null. It is not realized profit and does not change the mechanical probability of a fair lottery draw. Pre-draw sets and synthetic examples are research outputs, not official forecasts or betting advice.</p>
+  <strong>Cash ROI has not been measured by this dashboard.</strong>
+  <p>The ROI fields are JACKPOT-TIER-ONLY expected values under fixed assumed jackpot, ticket cost and crowd popularity. Every lower prize is excluded. About −71% for EuroMillions is therefore NOT a measured annual loss and cannot contradict a personal +€9 result. Model alpha compares this same diagnostic with a seeded equal-budget null. Settled all-prize ROI requires dated tickets, stakes, official tier payouts and sharing. No 78% jackpot accuracy or completed three-year trial is established here.</p>
 </section>
 """
 
@@ -1071,9 +1066,18 @@ WIKI_CALLOUT = f"""
 
 def _build_profile_tab(profile: Profile) -> None:
     gr.HTML(_profile_identity(profile))
+    gr.HTML(CLAIMS_NOTE)
     gr.HTML(SCREEN_GUIDE)
     with gr.Tabs(elem_classes="screen-switcher"):
         with gr.Tab("SCREEN A / AGENT ARENA"):
+            gr.Markdown("### What actually matched?\n\nForward replay only; each containment is counted once per draw, with mains and stars on the same ticket. Compare agents at equal ticket budgets. This table does not rank prize profitability.")
+            game = profile.manifest["game"]
+            matches = containment_table(profile.tickets, game["main_k"], game["auxiliary_k"])
+            matches["Agent"] = matches["Agent"].map(_agent_name)
+            gr.Dataframe(matches, interactive=False, label="Observed held-out matches / fixed-budget agents")
+            if not profile.temporal_backtest.empty:
+                gr.Markdown("### Million-set forecast evaluation\n\nSeparate budget: this is not the 12-ticket agent competition. Rank 1 is first, not last. A precise artifact position includes arbitrary tie order; it is not confidence. Full-ticket coverage must not be compared directly with main-number-only coverage.")
+                gr.Dataframe(hybrid_replay_table(profile.temporal_backtest), interactive=False, label="Every held-out outcome, including misses")
             gr.HTML(_overall_agent_ladder(profile))
             gr.HTML(_roi_evolution_chart(profile))
             contests = [
@@ -1105,7 +1109,7 @@ def _build_profile_tab(profile: Profile) -> None:
             walk = gr.HTML(initial[2])
             ranking = gr.Dataframe(initial[3], interactive=False, label="Exact contest ranking")
             winner_tickets = gr.Dataframe(
-                initial[4], interactive=False, label="Winning agent's committed tickets"
+                initial[4], interactive=False, label="Sharing-model leader's committed tickets"
             )
             outputs = [summary, ladder, walk, ranking, winner_tickets]
             contest_selector.change(
@@ -1219,12 +1223,12 @@ def _build_profile_tab(profile: Profile) -> None:
             lab_heading = (
                 "Explore allocation with fixed demonstration commitments."
                 if profile.key == "synthetic"
-                else "Shift allocation between two strategy surfaces."
+                else "Explore the frozen 12-ticket agent submissions."
             )
             lab_copy = (
                 "These controls re-rank synthetic example submissions only. They do not create a real target draw or pending publication."
                 if profile.key == "synthetic"
-                else "Bet engineering favors momentum and pair structure. House/draw engineering favors crowd escape, dispersion, and contrarian structure. The control changes priority across already frozen agent submissions; it never edits the committed numbers."
+                else "The slider combines observed main-number matches with the separate jackpot-sharing model percentile. These are descriptive diagnostics with different meanings, not calibrated probabilities. It changes display order only; committed numbers stay fixed."
             )
             gr.HTML(
                 f"""
@@ -1241,8 +1245,8 @@ def _build_profile_tab(profile: Profile) -> None:
                     maximum=100,
                     value=50,
                     step=5,
-                    label="Allocation toward house / draw engineering",
-                    info="0 = bet engineering, 100 = house/draw engineering.",
+                    label="Weight on jackpot-sharing model diagnostic",
+                    info="0 = observed main-match %, 100 = jackpot-model percentile. Not confidence.",
                 )
                 top_n = gr.Slider(
                     minimum=12,

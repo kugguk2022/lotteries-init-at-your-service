@@ -171,12 +171,24 @@ dates are 2026-08-11 through 2026-09-18; each forecast uses only preceding rows.
 | Full-ticket containment | 0/12 versus 1/12 matched uniform control | No demonstrated improvement or predictive advantage. The old 1/12 is not retained as v2 evidence. |
 | Evidence gate | Not passed; one-sided p=1 | Research only. A correctness repair need not increase retrospective hits. |
 | Next-draw score band | One million selections from 2,392,633 tied tickets at G=275 | No single row is uniquely most likely. Tie keys choose an exact-size subset reproducibly. |
+| First 3,000 artifact rows | 2,998 distinct main sets; 20 tickets contain both 1 and 2 | The old all-3,000 lexical concentration is removed; this is diversification of ties, not proof of better prediction. |
 | Target / branches | 2026-09-22; GARCH 278.606335, transformer 275.115680 | Targets are on the modern-era, self-excluded score scale; do not compare raw G with v1. |
 | Local regression suite | 181 passed, 1 skipped | Includes brute-force archive/rank consistency, batch-independent ties and same-ticket match accounting. |
 
 Backtest CSV SHA-256: `e3ceca1a3e50ffd2fdf96d2ee9e76d3fd22fa353f7cfec08fdaba0f196e035d5`.
 This records local acceptance, not a claim that the live Space has already refreshed. Required
 hosted CI and both observed-profile publication checks still govern deployment.
+
+Live visual verification also exposed dark headings on dark custom panels when the host selected
+its light/system theme. The presentation follow-up pins compatible Gradio light/dark color tokens
+and explicit heading/background contrast, without changing any metrics or candidate artifacts.
+
+Production EuroMillions refresh #28 uses the pre-existing profile seed **20461829**, while the
+standalone local acceptance above used default seed **20260829**. Published v2 gives **0/12 versus
+0/12** matched-control hits; its first 3,000 rows contain **2,996** distinct main sets and **18**
+tickets with both 1 and 2. The score band and branch targets agree. Different neutral tie/control
+seeds must not be confused with model improvement. Published backtest SHA-256:
+`7a4e83287e26496571ad5ef0ecfc469396e4ec6f49aa513b65c5f73526376618`.
 
 ### Remaining experimental work
 

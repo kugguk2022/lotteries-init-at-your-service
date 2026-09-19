@@ -1294,8 +1294,11 @@ CSS = """
 @import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Space+Grotesk:wght@400;500;600;700&display=swap');
 :root { --ink:#f4f8f8; --muted:#9bafb6; --bg:#071116; --panel:#0c1d24; --panel-2:#112832; --line:rgba(220,240,244,.14); --acid:#d8f35c; --teal:#20d5cf; --gold:#ffd84d; --orange:#ff6b42; }
 body,.gradio-container { color:var(--ink); font-family:'Space Grotesk',sans-serif; background:radial-gradient(circle at 8% 0,rgba(32,213,207,.13),transparent 27rem),radial-gradient(circle at 90% 13%,rgba(255,216,77,.09),transparent 25rem),linear-gradient(rgba(255,255,255,.023) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.023) 1px,transparent 1px),var(--bg); background-size:auto,auto,36px 36px,36px 36px,auto; }
-.gradio-container { max-width:1320px!important; padding:26px!important; }
+.gradio-container { max-width:1320px!important; padding:26px!important; background-color:var(--bg)!important; color:var(--ink)!important; }
 .gradio-container .prose { color:var(--ink); }
+.gradio-container .html-container,.gradio-container .html-container :is(h1,h2,h3,h4) { color:var(--ink); }
+.gradio-container .prose :is(h1,h2,h3,h4),.gradio-container .markdown :is(h1,h2,h3,h4) { color:var(--ink)!important; }
+.gradio-container .global-hero h1,.gradio-container .profile-card h3,.gradio-container .identity-copy h2,.gradio-container .panel-heading h2 { color:var(--ink)!important; }
 .gradio-container .tabs .tab-container[role="tablist"] { display:flex!important; gap:9px!important; margin:14px 0 20px!important; padding:8px!important; border:1px solid rgba(216,243,92,.24)!important; border-radius:16px!important; background:#091a21!important; box-shadow:0 12px 34px rgba(0,0,0,.22); }
 .gradio-container .tabs .tab-container[role="tablist"]>button[role="tab"] { min-height:48px!important; color:#dce9eb!important; background:#132d37!important; border:1px solid rgba(220,240,244,.22)!important; border-radius:10px!important; padding:12px 18px!important; font:600 11px 'DM Mono',monospace!important; letter-spacing:.075em!important; box-shadow:inset 0 0 0 1px rgba(255,255,255,.025); transition:background .18s ease,border-color .18s ease,color .18s ease,transform .18s ease!important; }
 .gradio-container .tabs .tab-container[role="tablist"]>button[role="tab"]:hover { color:#071116!important; background:var(--gold)!important; border-color:var(--gold)!important; transform:translateY(-1px); }
@@ -1424,7 +1427,25 @@ body,.gradio-container { color:var(--ink); font-family:'Space Grotesk',sans-seri
 """
 
 
-with gr.Blocks(title="LottoBench Lottery Agent Arena", css=CSS) as demo:
+THEME = gr.themes.Base().set(
+    body_background_fill="#071116", body_background_fill_dark="#071116",
+    body_text_color="#f4f8f8", body_text_color_dark="#f4f8f8",
+    body_text_color_subdued="#9bafb6", body_text_color_subdued_dark="#9bafb6",
+    background_fill_primary="#0c1d24", background_fill_primary_dark="#0c1d24",
+    background_fill_secondary="#112832", background_fill_secondary_dark="#112832",
+    block_background_fill="#0c1d24", block_background_fill_dark="#0c1d24",
+    block_label_text_color="#f4f8f8", block_label_text_color_dark="#f4f8f8",
+    block_title_text_color="#f4f8f8", block_title_text_color_dark="#f4f8f8",
+    input_background_fill="#112832", input_background_fill_dark="#112832",
+    table_text_color="#f4f8f8", table_text_color_dark="#f4f8f8",
+    table_even_background_fill="#0c1d24", table_even_background_fill_dark="#0c1d24",
+    table_odd_background_fill="#112832", table_odd_background_fill_dark="#112832",
+    table_border_color="#38505a", table_border_color_dark="#38505a",
+    table_row_focus="#234552", table_row_focus_dark="#234552",
+)
+
+
+with gr.Blocks(title="LottoBench Lottery Agent Arena", css=CSS, theme=THEME) as demo:
     gr.HTML(_global_hero())
     gr.HTML(_availability_notice())
     gr.HTML(PROTOCOL)

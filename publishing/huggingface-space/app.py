@@ -11,7 +11,13 @@ import gradio as gr
 import pandas as pd
 from lifecycle import classify_profile_state
 from publication_audit import audit_publication, public_links
-from results_evidence import containment_table, hybrid_replay_table
+from results_evidence import (
+    containment_table,
+    hybrid_replay_table,
+    range_pending_table,
+    range_replay_table,
+    range_summary_table,
+)
 
 ROOT = Path(__file__).resolve().parent
 PROFILE_ROOT = ROOT / "data" / "profiles"
@@ -1064,12 +1070,72 @@ WIKI_CALLOUT = f"""
 """
 
 
+def _range_benchmark_panel(profile: Profile) -> None:
+    if profile.key == "synthetic":
+        return
+    gr.Markdown("### Did the forecast ranges contain the winner?")
+    summary = _read_json_or_empty(profile.directory / "forecast_range_summary.json")
+    if not summary:
+        gr.Markdown("The range benchmark will populate after this profile's next verified refresh.")
+        return
+    gr.Markdown(
+        "Each hit means the **whole winning ticket** belongs to the complete set defined by "
+        "the forecast G ranges. Every ticket and tie inside is included. The equal-size random "
+        "baseline shows how much containment that set size achieves by chance. "
+        "Second-prize matches are 5 + 1 star for EuroMillions and 5 + reserve for NL Lotto. "
+        "An 80% or 95% label is a nominal normal-approximation band, not measured accuracy. "
+        "The hybrid takes the union of bands around both forecasts using the GARCH scale."
+    )
+    with gr.Tabs():
+        with gr.Tab("Historical forward replay"):
+            gr.Markdown("Each target draw is excluded from fitting. These are reconstructed forecasts; "
+                        "they were not published before those historical draws. All four predeclared "
+                        "ranges and all misses remain visible; a short replay does not establish an edge.")
+            gr.Dataframe(range_summary_table(summary["replay"]), interactive=False,
+                         label="Full winner and second prize or better / matched set-size baseline")
+            frame = _read_csv_or_empty(profile.directory / "forecast_range_replay.csv")
+            gr.Dataframe(range_replay_table(frame), interactive=False, label="Draw-by-draw range results")
+        with gr.Tab("Published before the draw"):
+            if summary["prospective"]:
+                gr.Dataframe(range_summary_table(summary["prospective"]), interactive=False,
+                             label="Results from verified public pre-draw commitments")
+            else:
+                gr.Markdown("**No eligible settled pre-draw range forecasts yet.** The ledger starts "
+                            "with this publication. A later refresh checks the official result against "
+                            "the frozen ranges and scoring counts. Historical replay is not counted here.")
+            ledger = _read_json_or_empty(profile.directory / "forecast_range_ledger.json")
+            gr.Dataframe(pd.DataFrame([{
+                "Target": entry["pending"]["forecast"]["target_draw_date"],
+                "Commitment": entry["pending"]["commitment_sha256"][:16],
+                "Public commit": (entry.get("publication") or {}).get("revision", "Awaiting verification"),
+                "Published UTC": (entry.get("publication") or {}).get("published_utc", "Unverified"),
+                "Evidence": entry["evidence_scope"],
+                "Official result": "Available" if entry["settlement"] else "Pending",
+            } for entry in ledger.get("entries", [])]), interactive=False, label="Publication and settlement ledger")
+            gr.Markdown("Publication time comes from the public Hugging Face commit. Same-day uploads "
+                        "are excluded from verified results until exact draw-time evidence is available.")
+        with gr.Tab("Next draw ranges"):
+            gr.Markdown(f"**Target: {summary['target_draw_date']}**. These are complete score-range "
+                        "sets, distinct from the separately ranked one-million-ticket download.")
+            gr.Dataframe(range_pending_table(summary["pending"]), interactive=False,
+                         label="Frozen range bounds, set sizes and full purchase cost")
+    gr.Markdown("**ROI:** containment records which prize combinations are present. Cash ROI needs "
+                "all actual payouts minus the cost of all purchased tickets, divided by that cost. "
+                "The displayed full-range stake is hypothetical; no purchase is assumed. "
+                "Cash ROI remains unmeasured until an all-prize payout and stake ledger exists.")
+    gr.File([str(profile.directory / name) for name in (
+        "forecast_range_replay.csv", "forecast_range_summary.json",
+        "forecast_range_pending.json", "forecast_range_ledger.json",
+    )], label="Download range results, frozen scoring state and publication evidence")
+
+
 def _build_profile_tab(profile: Profile) -> None:
     gr.HTML(_profile_identity(profile))
     gr.HTML(CLAIMS_NOTE)
     gr.HTML(SCREEN_GUIDE)
     with gr.Tabs(elem_classes="screen-switcher"):
         with gr.Tab("SCREEN A / AGENT ARENA"):
+            _range_benchmark_panel(profile)
             gr.Markdown("### What actually matched?\n\nForward replay only; each containment is counted once per draw, with mains and stars on the same ticket. Compare agents at equal ticket budgets. This table does not rank prize profitability.")
             game = profile.manifest["game"]
             matches = containment_table(profile.tickets, game["main_k"], game["auxiliary_k"])

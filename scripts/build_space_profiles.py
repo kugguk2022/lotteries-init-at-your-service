@@ -307,6 +307,7 @@ def _build_profile(key: str, database: Path, output: Path) -> dict:
             snapshot_sha256=snapshot_sha256,
             jackpot=jackpot,
             seed=profile_seed + 200_000,
+            profile_key=key,
         )
         crowd_escape_forecast = build_crowd_escape_forecast(
             prospective,

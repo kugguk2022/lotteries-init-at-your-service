@@ -28,6 +28,7 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
+from . import forecast_ranges as ranges
 from .pair_raster import _history_matrices
 from .protocol import GameSpec, Ticket
 from .providers.temporal import (
@@ -197,6 +198,8 @@ def _rank_actual_ticket(
     second_target: float,
     batch_size: int,
     seed: int = 20260829,
+    *,
+    histogram_out: Counter | None = None,
 ) -> tuple[int, int, int, int]:
     histogram: Counter[int] = Counter()
     actual_index = ticket_global_index(actual, spec)
@@ -209,6 +212,8 @@ def _rank_actual_ticket(
         before = _tie_keys(indexes, seed) <= actual_key
         same_score_through_actual += int(np.count_nonzero((scores == actual_score) & before))
     ordered = _score_order(histogram, first_target, second_target)
+    if histogram_out is not None:
+        histogram_out.update(histogram)
     # Stop at the actual score band; later bands are not better.
     better = sum(histogram[score] for score in ordered[: ordered.index(actual_score)])
     return (
@@ -258,6 +263,8 @@ def _walk_forward_backtest(
     transformer_epochs: int,
     batch_size: int,
     seed: int,
+    range_rows: list[dict] | None = None,
+    ticket_price: float = 1.0,
 ) -> pd.DataFrame:
     if holdout < 1 or len(history) <= holdout:
         return pd.DataFrame()
@@ -274,9 +281,26 @@ def _walk_forward_backtest(
         first, second, _garch, _transformer = _forecasts(
             training, spec, transformer_epochs
         )
+        histogram: Counter = Counter()
         rank, actual_score, band_first, band_last = _rank_actual_ticket(
-            training, spec, actual, first, second, batch_size, seed
+            training, spec, actual, first, second, batch_size, seed, histogram_out=histogram
         )
+        if range_rows is not None:
+            measured = ranges.measure_ranges(
+                ranges.forecast_ranges(first, second, _garch), histogram,
+                spec.n_tickets(), ticket_price, actual_score,
+            )
+            measured = ranges.prize_measures(measured, spec, actual,
+                                            _history_matrices(training, spec),
+                                            target_row.get("reserve_number"))
+            for measured_row in measured:
+                range_rows.append({
+                    **measured_row, "draw_date": str(target_row.get("draw_date", target_index)),
+                    "history_cutoff": str(training.iloc[-1].get("draw_date", target_index - 1)),
+                    "actual_main": " ".join(map(str, actual[0])),
+                    "actual_auxiliary": " ".join(map(str, actual[1])),
+                    "evidence_scope": "RETROSPECTIVE_FORWARD_ONLY",
+                })
         global_index = ticket_global_index(actual, spec)
         rows.append(
             {
@@ -379,6 +403,7 @@ def build_temporal_candidate_set(
     transformer_epochs: int = 8,
     batch_size: int = 50_000,
     seed: int = 20260829,
+    profile_key: str | None = None,
 ) -> TemporalCandidateResult:
     """Build, validate, and write an exact pre-draw hybrid candidate artifact."""
     if history.empty:
@@ -457,6 +482,7 @@ def build_temporal_candidate_set(
     )
     preview = pd.DataFrame(preview_rows)
 
+    range_rows: list[dict] = []
     backtest = _walk_forward_backtest(
         history,
         spec,
@@ -465,7 +491,19 @@ def build_temporal_candidate_set(
         transformer_epochs=transformer_epochs,
         batch_size=batch_size,
         seed=seed,
+        range_rows=range_rows,
+        ticket_price=jackpot.ticket_price,
     )
+    range_measures = ranges.measure_ranges(
+        ranges.forecast_ranges(first, second, garch_diagnostics), histogram,
+        universe, jackpot.ticket_price,
+    )
+    pending = ranges.pending_record(
+        history, spec, range_measures, history_cutoff=history_cutoff,
+        target_draw_date=target_draw_date, snapshot_sha256=snapshot_sha256,
+    )
+    range_summary = ranges.write_benchmark(output_directory, pending, range_rows, history, spec,
+                                           profile_key=profile_key)
     model_hits = int(backtest["hybrid_contains_winner"].sum()) if not backtest.empty else 0
     control_hits = (
         int(backtest["matched_uniform_contains_winner"].sum()) if not backtest.empty else 0
@@ -478,6 +516,7 @@ def build_temporal_candidate_set(
         "schema_version": "2.0.0",
         "method": "exact_transformer_garch_branch_raster",
         "method_version": METHOD_VERSION,
+        "forecast_range_benchmark": range_summary,
         "source_history_rows": source_history_rows,
         "training_score_definition": "leave_one_out_typed_pair_count_at_training_cutoff",
         "history_rule_era": "12_star_since_2016_09_27" if spec.star_n == 12 else "supplied_game_rules",
@@ -534,6 +573,8 @@ def build_temporal_candidate_set(
     backtest.to_csv(backtest_path, index=False, lineterminator="\n")
     summary["artifacts"][PREVIEW_FILE] = hashlib.sha256(preview_path.read_bytes()).hexdigest()
     summary["artifacts"][BACKTEST_FILE] = hashlib.sha256(backtest_path.read_bytes()).hexdigest()
+    for name in (ranges.PENDING_FILE, ranges.REPLAY_FILE, ranges.LEDGER_FILE, ranges.SUMMARY_FILE):
+        summary["artifacts"][name] = hashlib.sha256((output_directory / name).read_bytes()).hexdigest()
     (output_directory / SUMMARY_FILE).write_text(
         json.dumps(summary, indent=2, sort_keys=True) + "\n", encoding="utf-8"
     )

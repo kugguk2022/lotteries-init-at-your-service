@@ -15,6 +15,7 @@ on:
       - "scripts/publish_space_bundle.sh"
       - "lotteries_core/pair_raster.py"
       - "lotteries_core/temporal_candidate_set.py"
+      - "lotteries_core/forecast_ranges.py"
       - "lotteries_core/crowd_escape_forecast.py"
   schedule:
     - cron: "15 8 * * 3"
@@ -262,10 +263,11 @@ jobs:
         run: |
           set -euo pipefail
           bundle="$RUNNER_TEMP/space-bundle"
-          ruff check "$bundle/app.py" "$bundle/lifecycle.py" "$bundle/publication_audit.py" "$bundle/results_evidence.py" scripts/build_space_profiles.py lotteries_core/pair_raster.py lotteries_core/temporal_candidate_set.py lotteries_core/crowd_escape_forecast.py
+          ruff check "$bundle/app.py" "$bundle/lifecycle.py" "$bundle/publication_audit.py" "$bundle/results_evidence.py" scripts/build_space_profiles.py lotteries_core/pair_raster.py lotteries_core/temporal_candidate_set.py lotteries_core/forecast_ranges.py lotteries_core/crowd_escape_forecast.py
           python -m py_compile "$bundle/app.py" "$bundle/lifecycle.py" "$bundle/publication_audit.py" "$bundle/results_evidence.py"
           pytest -q tests/test_space_profiles.py tests/test_pair_raster.py tests/test_benchmark_output_contract.py
           pytest -q tests/test_temporal_candidate_set.py
+          pytest -q tests/test_forecast_ranges.py
           pytest -q tests/test_crowd_escape_forecast.py
           pytest -q tests/test_space_publication_audit.py
           pytest -q tests/test_space_lifecycle.py

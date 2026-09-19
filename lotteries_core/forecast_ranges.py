@@ -255,7 +255,11 @@ def write_benchmark(directory: Path, pending: dict, replay_rows: list[dict],
     live_rows = []
     for entry in ledger["entries"]:
         verified = bool((entry.get("publication") or {}).get("verified_before_draw_date"))
-        entry["settlement"] = settle(entry["pending"], history, spec)
+        latest_settlement = settle(entry["pending"], history, spec)
+        # Operator feeds can expose a rolling window. Preserve an already settled
+        # draw when it ages out; absence from today's feed is not a retraction.
+        if latest_settlement is not None:
+            entry["settlement"] = latest_settlement
         entry["evidence_scope"] = "VERIFIED_PRE_DRAW" if verified else "PUBLICATION_UNVERIFIED_OR_LATE"
         if verified and entry["settlement"]:
             live_rows.extend(entry["settlement"]["ranges"])

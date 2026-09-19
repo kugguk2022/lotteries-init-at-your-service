@@ -51,23 +51,27 @@ def hybrid_replay_table(frame: pd.DataFrame) -> pd.DataFrame:
     return result
 
 
+def _range_name(value: str) -> str:
+    return value.replace("hybrid_union", "Hybrid").replace("garch", "GARCH").replace("_", " ")
+
+
 def range_summary_table(rows: list[dict]) -> pd.DataFrame:
     return pd.DataFrame([{
-        "Range": row["range_id"].replace("_", " "),
-        "Full winner": f"{row['full_winner_hits']}/{row['draws']}",
+        "Range": _range_name(row["range_id"]),
+        "Full hits": f"{row['full_winner_hits']}/{row['draws']}",
         "Hit rate": f"{row['hit_rate']:.1%}",
-        "Equal-size random expected hits": round(row["fair_expected_hits"], 2),
-        "Containment lift": (f"{row['containment_lift']:.3f}×"
+        "Random hits": round(row["fair_expected_hits"], 2),
+        "Lift": (f"{row['containment_lift']:.3f}×"
                              if row["containment_lift"] is not None else "N/A"),
-        "Second prize or better": f"{row['second_or_better_hits']}/{row['second_or_better_draws']}",
-        "Random expected second or better": round(row["fair_second_or_better_expected_hits"], 2),
+        "≥2nd hits": f"{row['second_or_better_hits']}/{row['second_or_better_draws']}",
+        "Random ≥2nd": round(row["fair_second_or_better_expected_hits"], 2),
         "Cash ROI": "Not yet measured",
     } for row in rows])
 
 
 def range_pending_table(rows: list[dict]) -> pd.DataFrame:
     return pd.DataFrame([{
-        "Range": row["range_id"].replace("_", " "),
+        "Range": _range_name(row["range_id"]),
         "Inclusive G ranges": " ∪ ".join(f"[{a:.3f}, {b:.3f}]" for a, b in row["intervals"]),
         "All tickets in range": row["candidate_count"],
         "Legal universe included": f"{row['fair_containment_probability']:.2%}",
@@ -79,7 +83,7 @@ def range_replay_table(frame: pd.DataFrame) -> pd.DataFrame:
     if frame.empty:
         return pd.DataFrame()
     return pd.DataFrame({
-        "Draw": frame["draw_date"], "Range": frame["range_id"],
+        "Draw": frame["draw_date"], "Range": frame["range_id"].map(_range_name),
         "Winning mains": frame["actual_main"], "Winning stars": frame["actual_auxiliary"].fillna("—"),
         "Winner's G": frame["actual_g_score"], "Full winner inside": frame["full_winner_in_range"],
         "Second-prize tickets inside": frame["second_prize_winning_tickets_in_range"],

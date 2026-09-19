@@ -132,6 +132,10 @@ def test_ledger_is_idempotent_preserves_first_forecast_and_never_counts_unverifi
     assert verified["prospective"][0]["draws"] == 1
     assert verified["prospective"][0]["full_winner_hits"] == 0
     assert verified["prospective"][0]["fair_expected_hits"] == 0.5
+    aged_history = history().copy()
+    aged_history["draw_date"] = aged_history["draw_date"].str.replace("2026", "2027")
+    aged = ranges.write_benchmark(tmp_path, pending, [], aged_history, spec)
+    assert aged["prospective"] == verified["prospective"]
 
 
 def test_second_prize_is_exact_euromillions_5_plus_1_and_nl_5_plus_reserve():

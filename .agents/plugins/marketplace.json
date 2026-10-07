@@ -1,0 +1,12 @@
+{
+  "name": "kugguk-lottobench",
+  "interface": {"displayName": "Kugguk LottoBench"},
+  "plugins": [
+    {
+      "name": "lottobench-inspector",
+      "source": {"source": "local", "path": "./plugins/lottobench-inspector"},
+      "policy": {"installation": "AVAILABLE", "authentication": "ON_INSTALL"},
+      "category": "Productivity"
+    }
+  ]
+}

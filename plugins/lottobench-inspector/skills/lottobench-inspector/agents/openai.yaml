@@ -1,0 +1,4 @@
+interface:
+  display_name: "LottoBench Inspector"
+  short_description: "Inspect EuroMillions and NL Lotto benchmark evidence"
+  default_prompt: "Use $lottobench-inspector to compare the stored EuroMillions and NL Lotto benchmarks and explain their evidence."

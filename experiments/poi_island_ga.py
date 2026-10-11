@@ -128,7 +128,16 @@ def evolve(entries, pair_counts, budget, seed, max_shared=3, min_rare_share=0.0,
             for i,g in enumerate(groups):
                 g[-1]=champions[(i-1)%len(groups)].copy()
     best=max((member for group in groups for member in group),key=fitness)
-    return best, metrics(best,entries,score,rare,max_shared,min_rare_share)
+    diagnostics = metrics(best,entries,score,rare,max_shared,min_rare_share)
+    # A soft penalty is not a hard guarantee: make every breach explicit.
+    if diagnostics[1] > 0 or diagnostics[2] + 1e-12 < min_rare_share:
+        raise ValueError(
+            "Island search produced a shortlist violating the requested constraints: "
+            f"overlap_violations={diagnostics[1]}, rare_fraction={diagnostics[2]:.4f}, "
+            f"required_rare_fraction={min_rare_share:.4f}. "
+            "No invalid shortlist will be reported as feasible."
+        )
+    return best, diagnostics
 
 def settle(indices, entries, winning, payouts, price):
     counts=Counter()
@@ -139,10 +148,13 @@ def settle(indices, entries, winning, payouts, price):
         counts[key]+=1
         gross+=float(payouts.get(key,0.0))
     cost=len(indices)*price
+    paid_tiers = {tier: amount for tier, amount in payouts.items()
+                  if float(amount) > 0 and counts.get(tier, 0) > 0}
+    best_tier = max(paid_tiers, key=lambda tier: float(paid_tiers[tier]), default=None)
     return {"stake":cost,"payout":gross,"net":gross-cost,
             "roi":(gross-cost)/cost if cost else None,
-            "tier_counts":dict(counts),
-            "best_tier":max(counts,key=lambda x:(int(x.split("+")[0]),int(x.split("+")[1])))}
+            "tier_counts":dict(counts), "best_tier":best_tier,
+            "best_tier_payout":float(paid_tiers[best_tier]) if best_tier else 0.0}
 
 def evaluate(args):
     pools=read_pools(args.pools,args.pool_size)

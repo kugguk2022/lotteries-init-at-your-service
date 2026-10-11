@@ -4,7 +4,6 @@ import importlib.util
 import json
 import tempfile
 import unittest
-from itertools import combinations
 from pathlib import Path
 
 MODULE=Path(__file__).resolve().parents[1]/"experiments"/"poi_island_ga.py"
@@ -30,6 +29,20 @@ class IslandGATests(unittest.TestCase):
             ga,diag=mod.evolve(pool,{},2,seed=42,islands=2,population=4,generations=3)
             self.assertEqual(len(set(ga)),2)
             self.assertEqual(len(diag),4)
+    def test_prize_tier_uses_actual_prize_value(self):
+        entries = [(1, ((1, 2, 3, 4, 6), (1, 2)), 1.0),
+                   (2, ((1, 2, 3, 4, 5), (3, 4)), 0.5)]
+        outcome = mod.settle([0, 1], entries, ((1, 2, 3, 4, 5), (1, 2)),
+                             {"4+2": 500.0, "5+0": 50.0}, 2.5)
+        self.assertEqual(outcome["best_tier"], "4+2")
+        self.assertEqual(outcome["best_tier_payout"], 500.0)
+
+    def test_no_paid_tier_is_none(self):
+        entries = [(1, ((1, 2, 3, 4, 5), (1, 2)), 1.0)]
+        outcome = mod.settle([0], entries, ((20, 21, 22, 23, 24), (11, 12)),
+                             {"5+2": 100.0}, 2.5)
+        self.assertIsNone(outcome["best_tier"])
+
     def test_late_pool_rejected(self):
         with tempfile.TemporaryDirectory() as tmp:
             p=Path(tmp)/"p.csv"

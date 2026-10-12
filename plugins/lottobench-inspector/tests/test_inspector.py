@@ -12,8 +12,8 @@ from pathlib import Path
 PLUGIN = Path(__file__).resolve().parents[1]
 SCRIPTS = PLUGIN / 'skills' / 'lottobench-inspector' / 'scripts'
 sys.path.insert(0, str(SCRIPTS))
-import inspector
-from mcp_server import Server
+import inspector  # noqa: E402
+from mcp_server import Server  # noqa: E402
 
 
 class EvidenceTests(unittest.TestCase):

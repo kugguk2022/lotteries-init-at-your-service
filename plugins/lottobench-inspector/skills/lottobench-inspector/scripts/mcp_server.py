@@ -5,7 +5,15 @@ import json
 import sys
 
 sys.dont_write_bytecode = True
-from inspector import GAMES, METRICS, compare, dataset_status, leaderboard, load_snapshot, provider_catalog
+from inspector import (  # noqa: E402
+    GAMES,
+    METRICS,
+    compare,
+    dataset_status,
+    leaderboard,
+    load_snapshot,
+    provider_catalog,
+)
 
 VERSION = '0.1.0'
 PROTOCOL = '2025-06-18'

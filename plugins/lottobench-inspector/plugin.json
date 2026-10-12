@@ -1,0 +1,25 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "lottobench-inspector",
+  "version": "0.1.0",
+  "description": "Read-only EuroMillions and NL Lotto benchmark comparisons with pinned provenance and explicit modeled-ROI labels.",
+  "author": {"name": "kugguk2022"},
+  "repository": "https://github.com/kugguk2022/lotteries-init-at-your-service",
+  "keywords": ["benchmark", "provenance", "euromillions", "nl-lotto"],
+  "extensions": {
+    "com.openai": {
+      "interface": {
+        "displayName": "LottoBench Inspector",
+        "shortDescription": "Inspect EuroMillions and NL Lotto benchmark evidence",
+        "longDescription": "Compare the stored research cohorts, inspect all provider identities, and check source freshness. The local stdio tools report modeled metrics separately from unavailable settled returns.",
+        "developerName": "kugguk2022",
+        "category": "Productivity",
+        "capabilities": ["Read"],
+        "defaultPrompt": [
+          "Compare the stored EuroMillions and NL Lotto benchmark evidence.",
+          "Compare GINGERM with uniform_random in NL Lotto and show the dataset cutoff."
+        ]
+      }
+    }
+  }
+}

@@ -4,7 +4,6 @@ import importlib.util
 import json
 import tempfile
 import unittest
-from itertools import combinations
 from pathlib import Path
 
 MODULE=Path(__file__).resolve().parents[1]/"experiments"/"poi_island_ga.py"

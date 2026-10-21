@@ -65,7 +65,7 @@ def features(entries, pair_counts):
     scores = np.array([r[2] for r in entries], dtype=np.float64)
     lo, hi = np.quantile(scores, [0.05, 0.95])
     normalized = np.clip((scores-lo) / (hi-lo if hi>lo else 1), 0, 1)
-    counts = np.array([min(pair_counts[p] for p in combinations(r[1][0], 2)) for r in entries], dtype=float)
+    counts = np.array([min(pair_counts.get(p, 0) for p in combinations(r[1][0], 2)) for r in entries], dtype=float)
     cutoff = float(np.quantile(list(pair_counts.values()) or [0], 0.15))
     rare = (counts <= cutoff).astype(float)
     return normalized, rare

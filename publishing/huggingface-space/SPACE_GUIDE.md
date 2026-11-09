@@ -351,3 +351,40 @@ official result and, for realized economics, official payout and purchase eviden
 **Which profile should I use?**  
 Use the lab to understand mechanics, EuroMillions or NL Lotto for dated pre-draw research, Agent
 Arena for already-scored historical evidence, and Pre-draw Set Lab for current artifacts.
+
+## Screen C — Crowd Forecast Lab
+
+**What it answers.** Screens A and B ask whether any agent beats random at matching the draw (none
+does, by construction of a fair draw). Screen C asks a question that has a real answer: given the
+numbers that were drawn, how many tickets share each prize tier?
+
+**Why it matters.** Every EuroMillions tier is pari-mutuel, so the prize per winner is the tier fund
+divided by the number of winners. Forecasting winners is forecasting payouts.
+
+**How it is scored.** Each entrant sees only earlier draws, commits a crowd model, and is scored on
+the next draw's published winner counts. Skill is 1 minus the entrant's error divided by the error
+of a null where everyone picks uniformly at random. Zero is the null, negative is worse than the
+null. The interval is a paired bootstrap over evaluated draws.
+
+**What is on the screen.**
+
+| Panel | Meaning |
+| --- | --- |
+| Forecast leaderboard | Skill, interval, draws won against the null, typical miss, calibration slope |
+| Per-draw miss | How far each entrant's winner-count forecast was from reality on the large tiers |
+| What the crowd picks | Fitted popularity of each number and Lucky Star relative to average |
+| All-tier modeled return | Expected return per ticket for random, Crowd Escape and Calibrated Escape tickets |
+| Example tickets | Static illustration of the calibrated agent's output; not a dated pre-draw publication |
+
+**Evidence boundaries.**
+
+- It forecasts ticket choice, never the draw. Every ticket keeps the same probability of winning.
+- "Edge" means less negative than random tickets under a stated crowd model and prize-fund
+  assumption. Modeled ROI stays strongly negative. It is not cash ROI and not betting advice.
+- It is a historical forward replay. The source ledger is a non-contiguous sample transcribed from
+  public result pages; treat single figures as provisional until an operator adapter replaces it.
+- The artifact is `data/crowd/<profile>/crowd_forecast.json`, built by
+  `scripts/build_crowd_forecast.py --space-out`. It is not yet part of the scheduled refresh, so it
+  changes only when that script is re-run and committed.
+- Profiles without published winner counts wired in (NL Lotto, the lab control) show an explicit
+  "not published" state.

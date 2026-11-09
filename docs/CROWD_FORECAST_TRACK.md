@@ -72,14 +72,24 @@ The haircut multiplies alpha by the out-of-sample calibration slope (0.83).
 
 - A raw-HTML adapter for winner counts in `lotteries_core/sources/` and a scheduled refresh. The
   current ledger was transcribed by a page reader (see `ledger/crowd/README.md`).
-- Registering `calibrated_escape` in `lotteries_core/registry.py` and the Space bundle. Left out
-  on purpose so existing regression fixtures and published leaderboards are untouched.
+- Registering `calibrated_escape` in `lotteries_core/registry.py`. Left out on purpose so existing
+  regression fixtures and published leaderboards are untouched.
+- Scheduled refresh of the Space artifact: `publish-space.yml` does not yet rebuild
+  `data/crowd/euromillions/crowd_forecast.json` or lint `crowd_view.py`.
 - NL Lotto: needs its own tier table and the operator's winner counts.
 - Settled cash check: compare modeled prize-per-winner with published prize amounts per draw.
+
+## Space screen
+
+`publishing/huggingface-space/crowd_view.py` plus a third tab in `app.py`
+("SCREEN C / CROWD FORECAST LAB") display the derived artifact
+`publishing/huggingface-space/data/crowd/euromillions/crowd_forecast.json`. Raw winner counts are
+not shipped to the Space. Rebuild the artifact with `--space-out` (below).
 
 ## Run it
 
 ```bash
-python scripts/build_crowd_forecast.py --out outputs/crowd_forecast/euromillions
-python -m pytest -q tests/test_crowd_forecast.py
+python scripts/build_crowd_forecast.py --out outputs/crowd_forecast/euromillions \
+    --space-out publishing/huggingface-space/data/crowd/euromillions
+python -m pytest -q tests/test_crowd_forecast.py tests/test_space_crowd_view.py
 ```

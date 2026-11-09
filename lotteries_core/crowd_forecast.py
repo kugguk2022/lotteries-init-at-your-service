@@ -562,4 +562,10 @@ def forward_benchmark(
             "draw_date": [str(d) for d in history.dates[eval_index]],
             **{f"loss_{name}": [float(v) for v in losses[name]] for name in forecasters},
         },
+        # Held-out forecasts per tier, so a reader can recompute every number above.
+        "tiers": [f"{a}+{b}" for a, b in history.table.tiers],
+        "actual_winners": [[float(v) for v in row] for row in test_all.winners],
+        "predicted_winners": {
+            name: [[float(v) for v in row] for row in preds[name]] for name in forecasters
+        },
     }

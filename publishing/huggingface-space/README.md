@@ -27,7 +27,7 @@ Three isolated lottery profiles share one forward-only, equal-budget scoring con
    history package.
 3. **Nederlandse Lotto**: primary `6/45` results from the operator API.
 
-Each profile provides two screens:
+Each profile provides three screens:
 
 - **Agent Arena** replays twelve contests, ranks seven agents against the uniform null, charts
   cumulative ROI-alpha movement, animates every committed ticket walk, and exposes the exact
@@ -36,6 +36,11 @@ Each profile provides two screens:
   jackpot-sharing estimates, the transformer + GARCH million-ticket branch set, an exhaustive
   pre-draw historical pair-density raster, and a transparent allocation across frozen agent
   submissions.
+
+- **Crowd Forecast Lab** (EuroMillions) forecasts how many tickets share each prize tier and
+  scores agents against a uniform-crowd null, forward-only, with a bootstrap interval. It then
+  prices what a low-crowd ticket is worth across all 13 pari-mutuel tiers. It forecasts human
+  ticket choice, never the draw; only derived figures are published.
 
 Open the in-Space **START HERE / COMPLETE SPACE WIKI** or read
 [`SPACE_GUIDE.md`](SPACE_GUIDE.md) for the complete profile lifecycle, exact meaning of `PENDING`,

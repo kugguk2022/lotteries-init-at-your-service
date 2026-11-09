@@ -48,6 +48,77 @@ def _ticket_text(ticket) -> str:
     return " ".join(map(str, main)) + (" + " + " ".join(map(str, star)) if star else "")
 
 
+def _space_artifact(bench: dict, model: dict, report: dict, digest: str) -> dict:
+    """Derived, self-contained evidence for the Space's crowd-forecast screen.
+
+    Only derived figures are published (ratios to the uniform-crowd expectation, losses, fitted
+    weights, modeled returns). Raw winner counts stay in the repository ledger.
+    """
+    tiers = bench["tiers"]
+    actual = np.array(bench["actual_winners"])
+    null = np.array(bench["predicted_winners"]["uniform_crowd"])
+    large = null.mean(axis=0) >= 1000.0
+    replay = []
+    for name, rows in bench["predicted_winners"].items():
+        pred = np.array(rows)
+        miss = np.sqrt(np.mean(np.log((actual + 0.5) / (pred + 0.5))[:, large] ** 2, axis=1))
+        for date, value, loss in zip(
+            bench["per_draw"]["draw_date"], miss, bench["per_draw"][f"loss_{name}"]
+        ):
+            replay.append({"draw_date": date, "forecaster": name,
+                           "typical_miss_pct": round(100.0 * float(np.expm1(value)), 3),
+                           "weighted_log_error": round(float(loss), 4)})
+    deviation = []
+    for d, date in enumerate(bench["per_draw"]["draw_date"]):
+        for t, tier in enumerate(tiers):
+            if large[t]:
+                deviation.append({
+                    "draw_date": date, "tier": tier,
+                    "actual_vs_uniform_pct": round(100.0 * (actual[d, t] / null[d, t] - 1), 2),
+                    **{f"{name}_vs_uniform_pct": round(
+                        100.0 * (np.array(rows)[d, t] / null[d, t] - 1), 2)
+                       for name, rows in bench["predicted_winners"].items()
+                       if name != "uniform_crowd"},
+                })
+
+    def relative(theta: list[float]) -> list[float]:
+        weights = np.exp(np.array(theta))
+        return [round(100.0 * float(w / weights.mean() - 1.0), 2) for w in weights]
+
+    return {
+        "schema_version": "1.0.0",
+        "track": "crowd_forecast",
+        "game": bench["game"],
+        "evidence_kind": "historical_forward_replay_not_predraw_publication",
+        "winners_ledger_sha256": digest,
+        "history_draws": bench["history_draws"],
+        "history_cutoff": model["history_cutoff"],
+        "first_evaluated_draw": bench["first_evaluated_draw"],
+        "last_evaluated_draw": bench["last_evaluated_draw"],
+        "min_train": bench["min_train"],
+        "metric": bench["metric"],
+        "leaderboard": bench["leaderboard"],
+        "replay": replay,
+        "large_tier_deviation": deviation,
+        "popularity": {
+            "main_vs_average_pct": relative(model["theta_main"]),
+            "stars_vs_average_pct": relative(model["theta_star"]),
+            "feature_effects": model["feature_effects"],
+        },
+        "payout": report,
+        "data_caveats": [
+            "Non-contiguous sample of draws; forward-only evaluation still trains on earlier "
+            "dates only.",
+            "Winner counts were transcribed from public result pages by an automated reader and "
+            "have not been cell-checked against the operator.",
+            "Prize-fund money per line (1.10 EUR) is an assumption; absolute ROI depends on it.",
+            "The calibrated agent selects the lowest estimated popularity, which biases its "
+            "modeled edge upward.",
+        ],
+        "claims_boundary": bench["claims_boundary"],
+    }
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     parser.add_argument("--winners", default="ledger/crowd/euromillions_tier_winners.csv")
@@ -59,6 +130,9 @@ def main(argv: list[str] | None = None) -> int:
                         help="Advertised jackpot for the payout report (default: median of history)")
     parser.add_argument("--entries", type=float, default=None,
                         help="Expected entries for the payout report (default: median of history)")
+    parser.add_argument("--space-out", default=None,
+                        help="Also write the Space screen artifact (crowd_forecast.json) here, "
+                             "e.g. publishing/huggingface-space/data/crowd/euromillions")
     args = parser.parse_args(argv)
 
     spec = GameSpec.euromillions()
@@ -118,6 +192,14 @@ def main(argv: list[str] | None = None) -> int:
         row["tickets_committed"] = [_ticket_text(t) for t in tickets]
         report["agents"][name] = row
     (out / "payout_report.json").write_text(json.dumps(report, indent=2, sort_keys=True) + "\n")
+
+    if args.space_out:
+        space = Path(args.space_out)
+        space.mkdir(parents=True, exist_ok=True)
+        (space / "crowd_forecast.json").write_text(
+            json.dumps(_space_artifact(bench, payload, report, digest), indent=2, sort_keys=True)
+            + "\n"
+        )
 
     print(pd.DataFrame(bench["leaderboard"]).to_string(index=False))
     for name, row in report["agents"].items():

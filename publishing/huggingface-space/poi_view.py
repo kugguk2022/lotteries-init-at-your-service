@@ -35,19 +35,22 @@ def result_table(summary: dict, budget: int | None = None) -> pd.DataFrame:
             continue
         if budget is not None and result["budget"] != int(budget):
             continue
-        lo, hi = result["hit_rate_ci95"]
-        rows.append({
-            "Tickets per draw": result["budget"],
-            "Measurement": LABELS[result["metric"]],
-            "Draws evaluated": result["draws"],
-            "Draws with match": result["hits"],
+        interval = result["lift_ci95"]
+        row = ({"Tickets per draw": result["budget"],
+                "Universe included (%)": round(100*result["universe_fraction"], 6)}
+               if budget is None else {"Measurement": LABELS[result["metric"]]})
+        row.update({
+            "Draws with match / evaluated": f"{result['hits']} / {result['draws']}",
             "Random expected draws": round(result["random_expected_hits"], 6),
-            "Hit rate / 95% interval": f"{100*result['hits']/result['draws']:.2f}% [{100*lo:.2f}, {100*hi:.2f}]",
-            "Lift over random": round(result["lift"], 3) if result["lift"] is not None else None,
-            "Universe included (%)": round(100*result["universe_fraction"], 6),
-            "Matching tickets": result["matching_tickets"],
-            "Random expected tickets": round(result["random_expected_tickets"], 4),
+            "Lift / descriptive 95% interval": (
+                f"{result['lift']:.3g} [{interval[0]:.3g}, {interval[1]:.3g}]"
+                if interval is not None else "Unassessed"
+            ),
         })
+        if budget is not None:
+            row.update({"Matching tickets": result["matching_tickets"],
+                        "Random expected tickets": round(result["random_expected_tickets"], 4)})
+        rows.append(row)
     return pd.DataFrame(rows)
 
 

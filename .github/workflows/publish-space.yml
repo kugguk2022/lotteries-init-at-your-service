@@ -14,6 +14,7 @@ on:
       - "scripts/build_space_profiles.py"
       - "scripts/publish_space_bundle.sh"
       - "lotteries_core/pair_raster.py"
+      - "lotteries_core/poi_benchmark.py"
       - "lotteries_core/temporal_candidate_set.py"
       - "lotteries_core/forecast_ranges.py"
       - "lotteries_core/crowd_escape_forecast.py"
@@ -272,12 +273,16 @@ jobs:
           pytest -q tests/test_space_publication_audit.py
           pytest -q tests/test_space_lifecycle.py
           pytest -q tests/test_space_results_evidence.py tests/test_temporal_providers.py
+          ruff check lotteries_core/poi_benchmark.py "$bundle/poi_view.py"
+          pytest -q tests/test_poi_benchmark.py tests/test_poi_g.py tests/test_poi_g_artifacts.py
 
           BUNDLE="$bundle" GAME="$GAME" python - <<'PY'
           import hashlib
           import json
           import os
           from pathlib import Path
+
+          from lotteries_core.poi_benchmark import validate_poi_benchmark
 
           root = Path(os.environ["BUNDLE"])
           selected_game = os.environ["GAME"]
@@ -339,6 +344,10 @@ jobs:
               (root / "data" / "refresh_status.json").read_text(encoding="utf-8")
           )
           assert set(status["games"]) >= {"euromillions", "nl-lotto"}
+          if status["games"][selected_game]["available"]:
+              poi = validate_poi_benchmark(selected)
+              assert poi["history_cutoff"] == raster["history_cutoff"]
+              assert poi["budgets"] == [12, 100, 1000, 1000000]
           PY
 
       - name: Publish validated bundle to Hugging Face Space
@@ -468,6 +477,8 @@ jobs:
           pytest -q tests/test_space_publication_audit.py
           pytest -q tests/test_space_lifecycle.py
           pytest -q tests/test_space_results_evidence.py
+          ruff check lotteries_core/poi_benchmark.py "$bundle/poi_view.py"
+          pytest -q tests/test_poi_benchmark.py
           BUNDLE="$bundle" python - <<'PY'
           import json
           import os

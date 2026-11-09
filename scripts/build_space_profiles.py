@@ -21,6 +21,7 @@ from lotteries_core.dataset import content_digest
 from lotteries_core.envelope import InferenceEnvelope
 from lotteries_core.evaluation import evaluate_forward
 from lotteries_core.pair_raster import build_pair_raster
+from lotteries_core.poi_benchmark import build_poi_benchmark
 from lotteries_core.protocol import GameSpec
 from lotteries_core.roi import JackpotModel, default_jackpot_model
 from lotteries_core.temporal_candidate_set import build_temporal_candidate_set
@@ -290,7 +291,12 @@ def _build_profile(key: str, database: Path, output: Path) -> dict:
     pair_raster = None
     temporal_candidates = None
     crowd_escape_forecast = None
+    poi_benchmark = None
     if key != "synthetic":
+        poi_benchmark = build_poi_benchmark(
+            history, spec, output_directory=profile_dir,
+            target_draw_date=target_draw_date, snapshot_sha256=snapshot_sha256,
+        )
         pair_raster = build_pair_raster(
             history,
             spec,
@@ -361,6 +367,7 @@ def _build_profile(key: str, database: Path, output: Path) -> dict:
         },
         "evaluation": {
             "protocol": "forward_only",
+            "poi_fixed_budget": poi_benchmark,
             "budget_per_agent": BUDGET,
             "holdout_contests": HOLDOUT,
             "seed": profile_seed,

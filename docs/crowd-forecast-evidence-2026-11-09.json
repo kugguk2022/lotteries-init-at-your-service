@@ -146,7 +146,7 @@
     "protocol": "forward_only_refit_each_draw",
     "track": "crowd_forecast",
     "version": "crowd-forecast-v1",
-    "winners_sha256": "497f5ad857ff42500cc5eb8df7d7c0d684bedec3cffe6d2aaa35402a08c913e3"
+    "winners_sha256": "b2db035c2d6aec68e038363415fddb4c3a69b41f90940a8ad592214b82b1d5fe"
   },
   "crowd_model": {
     "feature_effects": {
@@ -258,7 +258,7 @@
       -0.23303488215667248
     ],
     "training_draws": 42,
-    "winners_sha256": "497f5ad857ff42500cc5eb8df7d7c0d684bedec3cffe6d2aaa35402a08c913e3"
+    "winners_sha256": "b2db035c2d6aec68e038363415fddb4c3a69b41f90940a8ad592214b82b1d5fe"
   },
   "payout_report": {
     "agents": {

@@ -1,0 +1,721 @@
+{
+  "captured_utc": "2026-11-09",
+  "evidence_kind": "historical_forward_replay_not_predraw_publication",
+  "profiles": {
+    "euromillions": {
+      "validated_history_run": "https://github.com/kugguk2022/lotteries-init-at-your-service/actions/runs/42311047494",
+      "artifact_id": 13547904999,
+      "artifact_zip_sha256": "591157469f5755834153d220e417a8e53dcf8d60e8749fdf8e534aa7e22cf6cc",
+      "summary": {
+        "version": "poi-main-fixed-budget-v1",
+        "source_code_sha256": {
+          "poi_benchmark.py": "8f9850cb636d22032d905aa08455affd2535dd5dc57c4fbd4f345039eaef8be8",
+          "likely_set_generator.py": "66c7ae55fb4d772e085ac93b12fdc709eb2d2a89fd168c9a9952cbcbade728ad",
+          "protocol.py": "ce058181c49342863212e5969688141439b0b18602d6502dcebe4bdfe43d66bf"
+        },
+        "game": {
+          "name": "euromillions",
+          "main_n": 50,
+          "main_k": 5,
+          "star_n": 12,
+          "star_k": 2
+        },
+        "budgets": [
+          12,
+          100,
+          1000,
+          1000000
+        ],
+        "window": 26,
+        "seed": 20261109,
+        "pairing": "main",
+        "target_rule": "trailing mean rescored under training-cutoff matrix",
+        "tie_rule": "distance ascending, G descending, SplitMix64(full_ticket_id+seed)",
+        "evidence_kind": "historical_forward_replay_not_predraw_publication",
+        "source_snapshot_sha256": "2a0e034e67837ffca73caf1cb086b8127b562db420bbea1ec9b6408ecee213f4",
+        "history_cutoff": "2026-11-06",
+        "history_rows": 1056,
+        "first_evaluated_draw": "2026-05-12",
+        "last_evaluated_draw": "2026-11-06",
+        "holdout": 52,
+        "results": [
+          {
+            "budget": 12,
+            "metric": "all_main",
+            "draws": 52,
+            "universe_fraction": 8.58134861042222e-08,
+            "hits": 0,
+            "random_expected_hits": 0.0002945111313833165,
+            "lift": 0.0,
+            "hit_rate_ci95": [
+              0.0,
+              0.06879223612386234
+            ],
+            "lift_ci95": [
+              0.0,
+              12146.217569566143
+            ],
+            "matching_tickets": 0,
+            "random_expected_tickets": 0.0002945118843096907
+          },
+          {
+            "budget": 12,
+            "metric": "full_winner",
+            "draws": 52,
+            "universe_fraction": 8.58134861042222e-08,
+            "hits": 0,
+            "random_expected_hits": 4.462301277419555e-06,
+            "lift": 0.0,
+            "hit_rate_ci95": [
+              0.0,
+              0.06879223612386234
+            ],
+            "lift_ci95": [
+              0.0,
+              801648.31015387
+            ],
+            "matching_tickets": 0,
+            "random_expected_tickets": 4.462301277419555e-06
+          },
+          {
+            "budget": 12,
+            "metric": "main_ge3",
+            "draws": 52,
+            "universe_fraction": 8.58134861042222e-08,
+            "hits": 1,
+            "random_expected_hits": 2.905073122952249,
+            "lift": 0.344225414534062,
+            "hit_rate_ci95": [
+              0.0034028080709451597,
+              0.10120511127892247
+            ],
+            "lift_ci95": [
+              0.06090931697764937,
+              1.811543311913554
+            ],
+            "matching_tickets": 1,
+            "random_expected_tickets": 2.9822273405199278
+          },
+          {
+            "budget": 12,
+            "metric": "main_ge4",
+            "draws": 52,
+            "universe_fraction": 8.58134861042222e-08,
+            "hits": 0,
+            "random_expected_hits": 0.06652065418444994,
+            "lift": 0.0,
+            "hit_rate_ci95": [
+              0.0,
+              0.06879223612386234
+            ],
+            "lift_ci95": [
+              0.0,
+              53.77572307875856
+            ],
+            "matching_tickets": 0,
+            "random_expected_tickets": 0.06655968585399007
+          },
+          {
+            "budget": 100,
+            "metric": "all_main",
+            "draws": 52,
+            "universe_fraction": 7.151123842018516e-07,
+            "hits": 0,
+            "random_expected_hits": 0.0024542092338607955,
+            "lift": 0.0,
+            "hit_rate_ci95": [
+              0.0,
+              0.06879223612386234
+            ],
+            "lift_ci95": [
+              0.0,
+              1457.5759185835345
+            ],
+            "matching_tickets": 0,
+            "random_expected_tickets": 0.002454265702580754
+          },
+          {
+            "budget": 100,
+            "metric": "full_winner",
+            "draws": 52,
+            "universe_fraction": 7.151123842018516e-07,
+            "hits": 0,
+            "random_expected_hits": 3.71858439784963e-05,
+            "lift": 0.0,
+            "hit_rate_ci95": [
+              0.0,
+              0.06879223612386234
+            ],
+            "lift_ci95": [
+              0.0,
+              96197.79721846439
+            ],
+            "matching_tickets": 0,
+            "random_expected_tickets": 3.71858439784963e-05
+          },
+          {
+            "budget": 100,
+            "metric": "main_ge3",
+            "draws": 52,
+            "universe_fraction": 7.151123842018516e-07,
+            "hits": 20,
+            "random_expected_hits": 19.793225906735643,
+            "lift": 1.0104467101137866,
+            "hit_rate_ci95": [
+              0.26470463780216213,
+              0.5204012628418061
+            ],
+            "lift_ci95": [
+              0.6954218190895461,
+              1.3671781343416636
+            ],
+            "matching_tickets": 22,
+            "random_expected_tickets": 24.85189450433272
+          },
+          {
+            "budget": 100,
+            "metric": "main_ge4",
+            "draws": 52,
+            "universe_fraction": 7.151123842018516e-07,
+            "hits": 1,
+            "random_expected_hits": 0.5517458089031498,
+            "lift": 1.8124288102667474,
+            "hit_rate_ci95": [
+              0.0034028080709451597,
+              0.10120511127892247
+            ],
+            "lift_ci95": [
+              0.3207020639466395,
+              9.538207090264905
+            ],
+            "matching_tickets": 1,
+            "random_expected_tickets": 0.5546640487832505
+          },
+          {
+            "budget": 1000,
+            "metric": "all_main",
+            "draws": 52,
+            "universe_fraction": 7.151123842018516e-06,
+            "hits": 0,
+            "random_expected_hits": 0.024536959600899636,
+            "lift": 0.0,
+            "hit_rate_ci95": [
+              0.0,
+              0.06879223612386234
+            ],
+            "lift_ci95": [
+              0.0,
+              145.78808200465414
+            ],
+            "matching_tickets": 0,
+            "random_expected_tickets": 0.02454265702580755
+          },
+          {
+            "budget": 1000,
+            "metric": "full_winner",
+            "draws": 52,
+            "universe_fraction": 7.151123842018516e-06,
+            "hits": 0,
+            "random_expected_hits": 0.0003718584397849628,
+            "lift": 0.0,
+            "hit_rate_ci95": [
+              0.0,
+              0.06879223612386234
+            ],
+            "lift_ci95": [
+              0.0,
+              9619.779721846442
+            ],
+            "matching_tickets": 0,
+            "random_expected_tickets": 0.0003718584397849628
+          },
+          {
+            "budget": 1000,
+            "metric": "main_ge3",
+            "draws": 52,
+            "universe_fraction": 7.151123842018516e-06,
+            "hits": 50,
+            "random_expected_hits": 51.56804802278798,
+            "lift": 0.9695926434505518,
+            "hit_rate_ci95": [
+              0.8701881084254424,
+              0.9893882889986847
+            ],
+            "lift_ci95": [
+              0.8774771078813586,
+              0.9976757507904235
+            ],
+            "matching_tickets": 243,
+            "random_expected_tickets": 248.5189450433272
+          },
+          {
+            "budget": 1000,
+            "metric": "main_ge4",
+            "draws": 52,
+            "universe_fraction": 7.151123842018516e-06,
+            "hits": 2,
+            "random_expected_hits": 5.261348151413287,
+            "lift": 0.3801307084122092,
+            "hit_rate_ci95": [
+              0.010611711001315298,
+              0.12981189157455764
+            ],
+            "lift_ci95": [
+              0.10487976773028607,
+              1.2829826439187024
+            ],
+            "matching_tickets": 2,
+            "random_expected_tickets": 5.546640487832507
+          },
+          {
+            "budget": 1000000,
+            "metric": "all_main",
+            "draws": 52,
+            "universe_fraction": 0.007151123842018516,
+            "hits": 5,
+            "random_expected_hits": 19.61893712092346,
+            "lift": 0.25485580432731675,
+            "hit_rate_ci95": [
+              0.04177435105257249,
+              0.20609630120131633
+            ],
+            "lift_ci95": [
+              0.11072293271265256,
+              0.5462583215600827
+            ],
+            "matching_tickets": 117,
+            "random_expected_tickets": 24.54265702580755
+          },
+          {
+            "budget": 1000000,
+            "metric": "full_winner",
+            "draws": 52,
+            "universe_fraction": 0.007151123842018516,
+            "hits": 1,
+            "random_expected_hits": 0.3718584397849628,
+            "lift": 2.689195384615385,
+            "hit_rate_ci95": [
+              0.0034028080709451597,
+              0.10120511127892247
+            ],
+            "lift_ci95": [
+              0.47584241947412065,
+              14.152336543839768
+            ],
+            "matching_tickets": 1,
+            "random_expected_tickets": 0.3718584397849628
+          },
+          {
+            "budget": 1000000,
+            "metric": "main_ge3",
+            "draws": 52,
+            "universe_fraction": 0.007151123842018516,
+            "hits": 52,
+            "random_expected_hits": 52.0,
+            "lift": 1.0,
+            "hit_rate_ci95": [
+              0.9312077638761376,
+              1.0
+            ],
+            "lift_ci95": [
+              0.9312077638761376,
+              1.0
+            ],
+            "matching_tickets": 254552,
+            "random_expected_tickets": 248518.9450433272
+          },
+          {
+            "budget": 1000000,
+            "metric": "main_ge4",
+            "draws": 52,
+            "universe_fraction": 0.007151123842018516,
+            "hits": 45,
+            "random_expected_hits": 52.0,
+            "lift": 0.8653846153846154,
+            "hit_rate_ci95": [
+              0.747266798348062,
+              0.9332311829460386
+            ],
+            "lift_ci95": [
+              0.747266798348062,
+              0.9332311829460386
+            ],
+            "matching_tickets": 5759,
+            "random_expected_tickets": 5546.640487832506
+          }
+        ],
+        "realized_roi": null,
+        "roi_status": "UNASSESSED_NO_VERIFIED_ALL_PRIZE_PAYOUTS",
+        "predictive_edge_status": "UNESTABLISHED",
+        "uncertainty": "95% Wilson intervals across draws; descriptive, unadjusted for multiple comparisons",
+        "null": "Exact full-universe uniformly sampled unique sets at the identical ticket count",
+        "main_match_boundary": "Main-only match counts are diagnostics, not prize tiers or jackpot wins",
+        "next_manifest": "poi_next_manifest.json",
+        "artifacts": {
+          "poi_benchmark_replay.csv": "c28a2bedb6f79a8c4415aafeb117d47d43329a14cd383f14db31761b1973c76f",
+          "poi_next_preview.csv": "abdde51c63fba613f2c219547678ce7451766270279b2f118213ed9424e24189",
+          "poi_next_candidates.csv.gz": "2dc4da632f5365df0c43767a8e6e8f7c5b4a3eb5f043f2c24ca3738da042f543",
+          "poi_next_manifest.json": "bf35e9bbd20c05b3f1252578c4fbdb747361e5bfed114186479618774b638fc2"
+        }
+      }
+    },
+    "nl-lotto": {
+      "validated_history_run": "https://github.com/kugguk2022/lotteries-init-at-your-service/actions/runs/42462373689",
+      "artifact_id": 13609749667,
+      "artifact_zip_sha256": "fcecaf5896a30c2fdccf647f64736657bac883c249a7eecd4bb226a75d648b6a",
+      "summary": {
+        "version": "poi-main-fixed-budget-v1",
+        "source_code_sha256": {
+          "poi_benchmark.py": "8f9850cb636d22032d905aa08455affd2535dd5dc57c4fbd4f345039eaef8be8",
+          "likely_set_generator.py": "66c7ae55fb4d772e085ac93b12fdc709eb2d2a89fd168c9a9952cbcbade728ad",
+          "protocol.py": "ce058181c49342863212e5969688141439b0b18602d6502dcebe4bdfe43d66bf"
+        },
+        "game": {
+          "name": "nl-lotto",
+          "main_n": 45,
+          "main_k": 6,
+          "star_n": 0,
+          "star_k": 0
+        },
+        "budgets": [
+          12,
+          100,
+          1000,
+          1000000
+        ],
+        "window": 26,
+        "seed": 20261109,
+        "pairing": "main",
+        "target_rule": "trailing mean rescored under training-cutoff matrix",
+        "tie_rule": "distance ascending, G descending, SplitMix64(full_ticket_id+seed)",
+        "evidence_kind": "historical_forward_replay_not_predraw_publication",
+        "source_snapshot_sha256": "9f764df5ddc9d08e4978f8058162eb7ac9597d65e7506003bbee5a95789f2527",
+        "history_cutoff": "2026-11-07",
+        "history_rows": 61,
+        "first_evaluated_draw": "2026-03-14",
+        "last_evaluated_draw": "2026-11-07",
+        "holdout": 35,
+        "results": [
+          {
+            "budget": 12,
+            "metric": "all_main",
+            "draws": 35,
+            "universe_fraction": 1.47328564798786e-06,
+            "hits": 0,
+            "random_expected_hits": 5.15649976795751e-05,
+            "lift": 0.0,
+            "hit_rate_ci95": [
+              6.938893903907228e-18,
+              0.09890099232440402
+            ],
+            "lift_ci95": [
+              4.709808931746552e-12,
+              67129.54304515086
+            ],
+            "matching_tickets": 0,
+            "random_expected_tickets": 5.15649976795751e-05
+          },
+          {
+            "budget": 12,
+            "metric": "full_winner",
+            "draws": 35,
+            "universe_fraction": 1.47328564798786e-06,
+            "hits": 0,
+            "random_expected_hits": 5.15649976795751e-05,
+            "lift": 0.0,
+            "hit_rate_ci95": [
+              6.938893903907228e-18,
+              0.09890099232440402
+            ],
+            "lift_ci95": [
+              4.709808931746552e-12,
+              67129.54304515086
+            ],
+            "matching_tickets": 0,
+            "random_expected_tickets": 5.15649976795751e-05
+          },
+          {
+            "budget": 12,
+            "metric": "main_ge3",
+            "draws": 35,
+            "universe_fraction": 1.47328564798786e-06,
+            "hits": 7,
+            "random_expected_hits": 8.796960984178774,
+            "lift": 0.7957293447804774,
+            "hit_rate_ci95": [
+              0.10042446473798625,
+              0.3589161306566562
+            ],
+            "lift_ci95": [
+              0.39955346762943983,
+              1.4280004873928263
+            ],
+            "matching_tickets": 14,
+            "random_expected_tickets": 10.010312999535916
+          },
+          {
+            "budget": 12,
+            "metric": "main_ge4",
+            "draws": 35,
+            "universe_fraction": 1.47328564798786e-06,
+            "hits": 1,
+            "random_expected_hits": 0.5807983387005784,
+            "lift": 1.7217680102827129,
+            "hit_rate_ci95": [
+              0.005061491855444203,
+              0.14533087233613673
+            ],
+            "lift_ci95": [
+              0.3050150166353613,
+              8.757911641319438
+            ],
+            "matching_tickets": 1,
+            "random_expected_tickets": 0.5852627236631773
+          },
+          {
+            "budget": 100,
+            "metric": "all_main",
+            "draws": 35,
+            "universe_fraction": 1.2277380399898834e-05,
+            "hits": 0,
+            "random_expected_hits": 0.00042970831399645926,
+            "lift": 0.0,
+            "hit_rate_ci95": [
+              6.938893903907228e-18,
+              0.09890099232440402
+            ],
+            "lift_ci95": [
+              5.65177071809586e-13,
+              8055.545165418101
+            ],
+            "matching_tickets": 0,
+            "random_expected_tickets": 0.00042970831399645926
+          },
+          {
+            "budget": 100,
+            "metric": "full_winner",
+            "draws": 35,
+            "universe_fraction": 1.2277380399898834e-05,
+            "hits": 0,
+            "random_expected_hits": 0.00042970831399645926,
+            "lift": 0.0,
+            "hit_rate_ci95": [
+              6.938893903907228e-18,
+              0.09890099232440402
+            ],
+            "lift_ci95": [
+              5.65177071809586e-13,
+              8055.545165418101
+            ],
+            "matching_tickets": 0,
+            "random_expected_tickets": 0.00042970831399645926
+          },
+          {
+            "budget": 100,
+            "metric": "main_ge3",
+            "draws": 35,
+            "universe_fraction": 1.2277380399898834e-05,
+            "hits": 19,
+            "random_expected_hits": 31.86364070280836,
+            "lift": 0.5962909316362396,
+            "hit_rate_ci95": [
+              0.3818972506848375,
+              0.6953398071159278
+            ],
+            "lift_ci95": [
+              0.41948765047401626,
+              0.763782565716431
+            ],
+            "matching_tickets": 109,
+            "random_expected_tickets": 83.41927499613264
+          },
+          {
+            "budget": 100,
+            "metric": "main_ge4",
+            "draws": 35,
+            "universe_fraction": 1.2277380399898834e-05,
+            "hits": 7,
+            "random_expected_hits": 4.555609233311646,
+            "lift": 1.5365672606013736,
+            "hit_rate_ci95": [
+              0.10042446473798625,
+              0.3589161306566562
+            ],
+            "lift_ci95": [
+              0.7715447233990339,
+              2.7574938783437144
+            ],
+            "matching_tickets": 11,
+            "random_expected_tickets": 4.877189363859811
+          },
+          {
+            "budget": 1000,
+            "metric": "all_main",
+            "draws": 35,
+            "universe_fraction": 0.00012277380399898836,
+            "hits": 0,
+            "random_expected_hits": 0.004297083139964593,
+            "lift": 0.0,
+            "hit_rate_ci95": [
+              6.938893903907228e-18,
+              0.09890099232440402
+            ],
+            "lift_ci95": [
+              5.65177071809586e-14,
+              805.55451654181
+            ],
+            "matching_tickets": 0,
+            "random_expected_tickets": 0.004297083139964593
+          },
+          {
+            "budget": 1000,
+            "metric": "full_winner",
+            "draws": 35,
+            "universe_fraction": 0.00012277380399898836,
+            "hits": 0,
+            "random_expected_hits": 0.004297083139964593,
+            "lift": 0.0,
+            "hit_rate_ci95": [
+              6.938893903907228e-18,
+              0.09890099232440402
+            ],
+            "lift_ci95": [
+              5.65177071809586e-14,
+              805.55451654181
+            ],
+            "matching_tickets": 0,
+            "random_expected_tickets": 0.004297083139964593
+          },
+          {
+            "budget": 1000,
+            "metric": "main_ge3",
+            "draws": 35,
+            "universe_fraction": 0.00012277380399898836,
+            "hits": 31,
+            "random_expected_hits": 34.99999999883304,
+            "lift": 0.8857142857438169,
+            "hit_rate_ci95": [
+              0.7404853135378618,
+              0.9546482066690264
+            ],
+            "lift_ci95": [
+              0.7404853135625509,
+              0.9546482067008559
+            ],
+            "matching_tickets": 978,
+            "random_expected_tickets": 834.1927499613264
+          },
+          {
+            "budget": 1000,
+            "metric": "main_ge4",
+            "draws": 35,
+            "universe_fraction": 0.00012277380399898836,
+            "hits": 13,
+            "random_expected_hits": 26.321853196947583,
+            "lift": 0.49388619800932354,
+            "hit_rate_ci95": [
+              0.2316581950336571,
+              0.5366306315640468
+            ],
+            "lift_ci95": [
+              0.3080344216462026,
+              0.7135543217344478
+            ],
+            "matching_tickets": 72,
+            "random_expected_tickets": 48.77189363859812
+          },
+          {
+            "budget": 1000000,
+            "metric": "all_main",
+            "draws": 35,
+            "universe_fraction": 0.12277380399898834,
+            "hits": 8,
+            "random_expected_hits": 4.297083139964593,
+            "lift": 1.8617279999999998,
+            "hit_rate_ci95": [
+              0.12065879834191687,
+              0.3901731689199025
+            ],
+            "lift_ci95": [
+              0.9827731520228132,
+              3.1779838712427404
+            ],
+            "matching_tickets": 8,
+            "random_expected_tickets": 4.297083139964593
+          },
+          {
+            "budget": 1000000,
+            "metric": "full_winner",
+            "draws": 35,
+            "universe_fraction": 0.12277380399898834,
+            "hits": 8,
+            "random_expected_hits": 4.297083139964593,
+            "lift": 1.8617279999999998,
+            "hit_rate_ci95": [
+              0.12065879834191687,
+              0.3901731689199025
+            ],
+            "lift_ci95": [
+              0.9827731520228132,
+              3.1779838712427404
+            ],
+            "matching_tickets": 8,
+            "random_expected_tickets": 4.297083139964593
+          },
+          {
+            "budget": 1000000,
+            "metric": "main_ge3",
+            "draws": 35,
+            "universe_fraction": 0.12277380399898834,
+            "hits": 35,
+            "random_expected_hits": 35.0,
+            "lift": 1.0,
+            "hit_rate_ci95": [
+              0.9010990076755959,
+              0.9999999999999999
+            ],
+            "lift_ci95": [
+              0.9010990076755959,
+              0.9999999999999998
+            ],
+            "matching_tickets": 920122,
+            "random_expected_tickets": 834192.7499613264
+          },
+          {
+            "budget": 1000000,
+            "metric": "main_ge4",
+            "draws": 35,
+            "universe_fraction": 0.12277380399898834,
+            "hits": 35,
+            "random_expected_hits": 35.0,
+            "lift": 1.0,
+            "hit_rate_ci95": [
+              0.9010990076755959,
+              0.9999999999999999
+            ],
+            "lift_ci95": [
+              0.9010990076755959,
+              0.9999999999999998
+            ],
+            "matching_tickets": 59760,
+            "random_expected_tickets": 48771.89363859813
+          }
+        ],
+        "realized_roi": null,
+        "roi_status": "UNASSESSED_NO_VERIFIED_ALL_PRIZE_PAYOUTS",
+        "predictive_edge_status": "UNESTABLISHED",
+        "uncertainty": "95% Wilson intervals across draws; descriptive, unadjusted for multiple comparisons",
+        "null": "Exact full-universe uniformly sampled unique sets at the identical ticket count",
+        "main_match_boundary": "Main-only match counts are diagnostics, not prize tiers or jackpot wins",
+        "next_manifest": "poi_next_manifest.json",
+        "artifacts": {
+          "poi_benchmark_replay.csv": "9ee6e88dab0b1db52dcf735ec9d7b522cb9d09d2f0e5635ce132316f4de375a1",
+          "poi_next_preview.csv": "84f56257039feafaf8492d554f2a3fd04f85fa17bda3570a7b5758c03ec6e85e",
+          "poi_next_candidates.csv.gz": "8bedef7be3b2e84156535da8f4fa40317ee08fa9c6a5bddb535828f9376c7438",
+          "poi_next_manifest.json": "3ff2f052f7123c2fac2e0ec31b83533f44ddcd196e9734a8609ac4f85b955ba3"
+        }
+      }
+    }
+  },
+  "input_history_workflow_commit": "8bbaf76a146f4caf645f031267bb6ce8c7a6182b"
+}

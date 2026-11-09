@@ -10,6 +10,10 @@ from pathlib import Path
 import gradio as gr
 import pandas as pd
 from lifecycle import classify_profile_state
+from poi_view import LABELS as POI_LABELS
+from poi_view import load_evidence as load_poi_evidence
+from poi_view import result_table as poi_result_table
+from poi_view import trend_table as poi_trend_table
 from publication_audit import audit_publication, public_links
 from results_evidence import (
     containment_table,
@@ -1070,6 +1074,71 @@ WIKI_CALLOUT = f"""
 """
 
 
+def _poi_benchmark_panel(profile: Profile) -> None:
+    if profile.key == "synthetic":
+        return
+    gr.Markdown("### PoI / fixed-ticket benchmark")
+    if not (profile.directory / "poi_benchmark_summary.json").exists():
+        gr.Markdown("**PoI evaluation not yet published for this profile.** "
+                    "The next verified refresh builds it; broad-range containment is not a substitute.")
+        return
+    try:
+        summary, manifest, replay = load_poi_evidence(profile.directory)
+    except (ValueError, OSError, KeyError) as error:
+        gr.Markdown(f"**PoI evidence unavailable:** {html.escape(str(error))}")
+        return
+    gr.Markdown(
+        "The owner's **main-pair PoI** scores each combination by the sum of historical pair "
+        "counts. It ranks by distance from the 26-draw mean target using only earlier draws. "
+        "Equal scores use a seeded full-ticket tie order, including stars. This is separate "
+        "from cross-pool GINGERM and from GARCH/Transformer ranges.\n\n"
+        f"**{summary['holdout']} held-out draws: {summary['first_evaluated_draw']} → "
+        f"{summary['last_evaluated_draw']}.** Historical replay, not forecasts published "
+        "before those draws. Every size and every miss remains visible."
+    )
+    gr.Dataframe(poi_result_table(summary), interactive=False, wrap=True,
+                 label="Full winning ticket / exact fixed-size sets versus equal-size uniform random")
+    gr.Markdown(
+        "**Lift 1 = random expectation.** A zero jackpot count at small budgets is not proof "
+        "of failure; uncertainty and partial-match results matter. The random reference is "
+        "computed exactly for distinct tickets sampled without replacement. Main-only matches "
+        "below ignore stars and are not prize-tier wins. Intervals are descriptive 95% Wilson "
+        "intervals, unadjusted for multiple comparisons. No predictive edge is established."
+    )
+    with gr.Row():
+        budget = gr.Dropdown(choices=summary["budgets"], value=100,
+                             label="Tickets per draw / compare identical budgets")
+        metric = gr.Dropdown(choices=[(v, k) for k, v in POI_LABELS.items()], value="main_ge3",
+                             label="Trend measurement")
+    table = gr.Dataframe(poi_result_table(summary, 100), interactive=False, wrap=True,
+                          label="PoI match depth at selected budget")
+    plot = gr.LinePlot(poi_trend_table(replay, 100, "main_ge3"), x="Draw", y="Draws with match",
+                       color="Series", title="Cumulative matches versus random expectation")
+
+    def update_poi(selected_budget, selected_metric):
+        return (poi_result_table(summary, int(selected_budget)),
+                poi_trend_table(replay, int(selected_budget), selected_metric))
+
+    budget.change(update_poi, [budget, metric], [table, plot], api_name=False)
+    metric.change(update_poi, [budget, metric], [table, plot], api_name=False)
+    gr.Markdown(
+        "**Cash ROI: unassessed.** No verified all-prize payout ledger is attached. "
+        "The million-ticket set is a research candidate space; the 12/100/1,000 rows are "
+        "separate fixed-budget prefixes, not an assumption that one million tickets were bought.\n\n"
+        f"**Next set: {manifest['target_draw_date']}**, using history through "
+        f"{manifest['history_cutoff']}. Publication status: `{manifest['publication_status']}`. "
+        "Generation timestamps alone do not prove pre-draw publication; verify the public "
+        "Space commit timestamp and the manifest hashes."
+    )
+    with gr.Accordion("Inspect next PoI tickets and reproducible evidence", open=False):
+        gr.Dataframe(_read_csv_or_empty(profile.directory / "poi_next_preview.csv"),
+                     interactive=False, label="Next PoI set / first 1,000 ranked full tickets")
+        gr.File([str(profile.directory / name) for name in (
+            "poi_next_candidates.csv.gz", "poi_next_manifest.json", "poi_next_preview.csv",
+            "poi_benchmark_replay.csv", "poi_benchmark_summary.json",
+        )], label="Exact candidate set, fixed-budget prefixes, replay and SHA-256 manifests")
+
+
 def _range_benchmark_panel(profile: Profile) -> None:
     if profile.key == "synthetic":
         return
@@ -1140,7 +1209,9 @@ def _build_profile_tab(profile: Profile) -> None:
     gr.HTML(SCREEN_GUIDE)
     with gr.Tabs(elem_classes="screen-switcher"):
         with gr.Tab("SCREEN A / AGENT ARENA"):
-            _range_benchmark_panel(profile)
+            _poi_benchmark_panel(profile)
+            with gr.Accordion("Secondary diagnostic / broad GARCH and hybrid ranges", open=False):
+                _range_benchmark_panel(profile)
             gr.Markdown("### What actually matched?\n\nForward replay only; each containment is counted once per draw, with mains and stars on the same ticket. Compare agents at equal ticket budgets. This table does not rank prize profitability.")
             game = profile.manifest["game"]
             matches = containment_table(profile.tickets, game["main_k"], game["auxiliary_k"])

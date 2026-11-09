@@ -1,0 +1,92 @@
+name: poi-fixed-budget-evidence
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "lotteries_core/poi_benchmark.py"
+      - "scripts/build_poi_benchmark.py"
+      - "tests/test_poi_benchmark.py"
+      - ".github/workflows/poi-benchmark.yml"
+  pull_request:
+    paths:
+      - "lotteries_core/poi_benchmark.py"
+      - "scripts/build_poi_benchmark.py"
+      - "tests/test_poi_benchmark.py"
+      - ".github/workflows/poi-benchmark.yml"
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  poi-evidence:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        game: [euromillions, nl-lotto]
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+          cache: pip
+      - name: Install and verify PoI implementation
+        run: |
+          pip install -e ".[dev]"
+          ruff check lotteries_core/poi_benchmark.py scripts/build_poi_benchmark.py tests/test_poi_benchmark.py
+          pytest -q tests/test_poi_benchmark.py tests/test_poi_g.py tests/test_poi_g_artifacts.py
+      - name: Restore latest validated main-branch history
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GAME: ${{ matrix.game }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh api "/repos/$GITHUB_REPOSITORY/actions/artifacts?name=$GAME-validated-history&per_page=100" > "$RUNNER_TEMP/artifacts.json"
+          jq --arg branch "$DEFAULT_BRANCH" \
+            '[.artifacts[] | select(.expired == false and .workflow_run.head_branch == $branch)] | sort_by(.created_at) | last' \
+            "$RUNNER_TEMP/artifacts.json" > "$RUNNER_TEMP/source.json"
+          artifact_id="$(jq -er '.id' "$RUNNER_TEMP/source.json")"
+          expected="$(jq -er '.digest | select(startswith("sha256:")) | sub("^sha256:"; "")' "$RUNNER_TEMP/source.json")"
+          gh api "/repos/$GITHUB_REPOSITORY/actions/artifacts/$artifact_id/zip" > "$RUNNER_TEMP/history.zip"
+          printf '%s  %s\n' "$expected" "$RUNNER_TEMP/history.zip" | sha256sum --check
+          mkdir -p "$RUNNER_TEMP/history" "$RUNNER_TEMP/poi-output"
+          unzip -q "$RUNNER_TEMP/history.zip" -d "$RUNNER_TEMP/history"
+          test -f "$RUNNER_TEMP/history/lotteries.db"
+          cp "$RUNNER_TEMP/source.json" "$RUNNER_TEMP/poi-output/source-artifact.json"
+      - name: Evaluate every fixed budget and generate exact next-draw set
+        env:
+          GAME: ${{ matrix.game }}
+        run: |
+          python -m scripts.build_poi_benchmark \
+            --history "$RUNNER_TEMP/history/lotteries.db" \
+            --game "$GAME" --holdout 52 --out "$RUNNER_TEMP/poi-output"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: poi-fixed-budget-${{ matrix.game }}-${{ github.sha }}
+          path: ${{ runner.temp }}/poi-output/
+          if-no-files-found: error
+          retention-days: 90
+      - name: Publish comparison summary
+        env:
+          GAME: ${{ matrix.game }}
+        run: |
+          python - <<'PY' >> "$GITHUB_STEP_SUMMARY"
+          import json
+          import os
+          from pathlib import Path
+
+          summary = json.loads((Path(os.environ["RUNNER_TEMP"]) / "poi-output/poi_benchmark_summary.json").read_text())
+          print(f"## PoI / {os.environ['GAME']} / {summary['holdout']} held-out draws")
+          print("Historical forward replay. No verified cash ROI or established predictive edge.\n")
+          print("| Tickets | Measurement | Hits | Equal-size random expected | Lift |")
+          print("|---:|---|---:|---:|---:|")
+          for row in summary["results"]:
+              print(f"| {row['budget']} | {row['metric']} | {row['hits']} | {row['random_expected_hits']:.6f} | {row['lift']:.3f} |")
+          print("\nDownload the artifact for the complete million-ticket set, smaller ranked prefixes, draw-by-draw results and hashes.")
+          PY

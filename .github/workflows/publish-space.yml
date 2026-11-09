@@ -14,6 +14,7 @@ on:
       - "scripts/build_space_profiles.py"
       - "scripts/publish_space_bundle.sh"
       - "lotteries_core/pair_raster.py"
+      - "lotteries_core/poi_benchmark.py"
       - "lotteries_core/temporal_candidate_set.py"
       - "lotteries_core/forecast_ranges.py"
       - "lotteries_core/crowd_escape_forecast.py"
@@ -272,12 +273,16 @@ jobs:
           pytest -q tests/test_space_publication_audit.py
           pytest -q tests/test_space_lifecycle.py
           pytest -q tests/test_space_results_evidence.py tests/test_temporal_providers.py
+          ruff check lotteries_core/poi_benchmark.py "$bundle/poi_view.py"
+          pytest -q tests/test_poi_benchmark.py tests/test_poi_g.py tests/test_poi_g_artifacts.py
 
           BUNDLE="$bundle" GAME="$GAME" python - <<'PY'
           import hashlib
           import json
           import os
           from pathlib import Path
+
+          from lotteries_core.poi_benchmark import validate_poi_benchmark
 
           root = Path(os.environ["BUNDLE"])
           selected_game = os.environ["GAME"]
@@ -339,6 +344,10 @@ jobs:
               (root / "data" / "refresh_status.json").read_text(encoding="utf-8")
           )
           assert set(status["games"]) >= {"euromillions", "nl-lotto"}
+          if status["games"][selected_game]["available"]:
+              poi = validate_poi_benchmark(selected)
+              assert poi["history_cutoff"] == raster["history_cutoff"]
+              assert poi["budgets"] == [12, 100, 1000, 1000000]
           PY
 
       - name: Publish validated bundle to Hugging Face Space
@@ -458,6 +467,31 @@ jobs:
               "$bundle/data/profiles/synthetic/prospective.csv"
           fi
 
+      - name: Build PoI evidence from validated histories for both profiles
+        env:
+          GH_TOKEN: ${{ github.token }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          for game in euromillions nl-lotto; do
+            work="$RUNNER_TEMP/poi-history-$game"
+            mkdir -p "$work"
+            gh api "/repos/$GITHUB_REPOSITORY/actions/artifacts?name=$game-validated-history&per_page=100" > "$work/artifacts.json"
+            jq --arg branch "$DEFAULT_BRANCH" \
+              '[.artifacts[] | select(.expired == false and .workflow_run.head_branch == $branch)] | sort_by(.created_at) | last' \
+              "$work/artifacts.json" > "$work/source.json"
+            artifact_id="$(jq -er '.id' "$work/source.json")"
+            expected="$(jq -er '.digest | select(startswith("sha256:")) | sub("^sha256:"; "")' "$work/source.json")"
+            gh api "/repos/$GITHUB_REPOSITORY/actions/artifacts/$artifact_id/zip" > "$work/history.zip"
+            printf '%s  %s\n' "$expected" "$work/history.zip" | sha256sum --check
+            unzip -q "$work/history.zip" -d "$work"
+            test -f "$work/lotteries.db"
+            python -m scripts.build_poi_benchmark \
+              --history "$work/lotteries.db" --game "$game" \
+              --out "$RUNNER_TEMP/space-bundle/data/profiles/$game"
+          done
+
       - name: Validate hydrated Space bundle
         shell: bash
         run: |
@@ -468,10 +502,14 @@ jobs:
           pytest -q tests/test_space_publication_audit.py
           pytest -q tests/test_space_lifecycle.py
           pytest -q tests/test_space_results_evidence.py
+          ruff check lotteries_core/poi_benchmark.py "$bundle/poi_view.py"
+          pytest -q tests/test_poi_benchmark.py
           BUNDLE="$bundle" python - <<'PY'
           import json
           import os
           from pathlib import Path
+
+          from lotteries_core.poi_benchmark import validate_poi_benchmark
 
           profiles = Path(os.environ["BUNDLE"]) / "data" / "profiles"
           expected = ("synthetic", "euromillions", "nl-lotto")
@@ -486,6 +524,11 @@ jobs:
                   "prospective.csv",
               ):
                   assert (profiles / key / name).is_file(), f"{key}/{name} is missing"
+              if key != "synthetic":
+                  poi = validate_poi_benchmark(profiles / key)
+                  manifest = json.loads((profiles / key / "manifest.json").read_text())
+                  assert poi["history_cutoff"] == manifest["history"]["last_draw"], key
+                  assert poi["budgets"] == [12, 100, 1000, 1000000]
           PY
 
       - name: Publish updated Space code

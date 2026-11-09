@@ -131,7 +131,7 @@ def test_full_winner_requires_both_pools_on_one_ticket():
 
 
 def test_invalid_history_and_targets_fail_closed(tmp_path):
-    bad = history()
+    bad = history().astype({"ball_1": float})
     bad.loc[0, "ball_1"] = 1.5
     with pytest.raises(ValueError, match="Noninteger"):
         build(tmp_path, bad)

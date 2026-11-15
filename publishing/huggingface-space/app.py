@@ -9,6 +9,14 @@ from pathlib import Path
 
 import gradio as gr
 import pandas as pd
+from crowd_view import artifact_path as crowd_artifact_path
+from crowd_view import headline as crowd_headline
+from crowd_view import leaderboard_table as crowd_leaderboard_table
+from crowd_view import load_evidence as load_crowd_evidence
+from crowd_view import payout_table as crowd_payout_table
+from crowd_view import popularity_table as crowd_popularity_table
+from crowd_view import replay_table as crowd_replay_table
+from crowd_view import ticket_table as crowd_ticket_table
 from lifecycle import classify_profile_state
 from poi_view import LABELS as POI_LABELS
 from poi_view import load_evidence as load_poi_evidence
@@ -1203,6 +1211,113 @@ def _range_benchmark_panel(profile: Profile) -> None:
     )], label="Download range results, frozen scoring state and publication evidence")
 
 
+def _crowd_forecast_panel(profile: Profile) -> None:
+    accent = PROFILE_STYLE[profile.key]["accent"]
+    try:
+        evidence = load_crowd_evidence(ROOT, profile.key)
+    except (ValueError, OSError, KeyError) as error:
+        gr.Markdown(f"**Crowd-forecast evidence unavailable:** {html.escape(str(error))}")
+        return
+    if evidence is None:
+        reason = (
+            "The lab control has no human players, so there is no crowd to forecast."
+            if profile.key == "synthetic"
+            else "It needs this operator's published winner counts per prize tier, which are not "
+                 "wired in yet."
+        )
+        gr.HTML(f"""
+        <section class="raster-panel pending" style="--profile:{accent}">
+          <span>CROWD FORECAST LAB</span>
+          <h2>Not published for this profile</h2>
+          <p>{html.escape(reason)} Open <strong>LOTTERY 02 / EUROMILLIONS</strong> to see the track.</p>
+        </section>
+        """)
+        return
+    head = crowd_headline(evidence)
+    verdict = (
+        "interval excludes zero" if head["interval_excludes_zero"] else "interval includes zero"
+    )
+    gr.HTML(f"""
+    <section class="raster-panel" style="--profile:{accent}">
+      <span>CROWD FORECAST LAB / FORECAST THE PLAYERS, NOT THE BALLS</span>
+      <h2>How many tickets share each prize tier?</h2>
+      <p style="color:var(--muted);max-width:940px;line-height:1.6">The draw is fair, so no agent
+      on Screen A beats random at matching numbers. The <strong>crowd</strong> is different: people
+      over-pick some numbers, the operator publishes how many tickets won each tier, and prizes are
+      shared. Here agents forecast those winner counts and are scored against a null where
+      everyone picks at random.</p>
+      <div class="lifecycle-grid">
+        <div><span>FITTED MODEL SKILL VS NULL</span><strong>{head['skill']:+.2f}</strong></div>
+        <div><span>95% INTERVAL</span><strong>{head['ci_low']:+.2f} to {head['ci_high']:+.2f}
+          ({verdict})</strong></div>
+        <div><span>EVALUATED FORWARD-ONLY</span><strong>{head['eval_draws']} draws,
+          {html.escape(head['first'])} to {html.escape(head['last'])}</strong></div>
+      </div>
+    </section>
+    """)
+    gr.Markdown(
+        "### Forecast leaderboard\n\n**Fitted crowd** learns number popularity from winner "
+        "counts. **Uniform null** assumes everyone picks at random. **Static prior** is the "
+        "hand-set model behind today's Crowd Escape agent. Skill is 1 minus error divided by the "
+        "null's error: 0 is the null, 1 is perfect, negative is worse than the null. Each "
+        "forecast uses only earlier draws. *Draws won* counts draws where the entrant beat the "
+        "null. A calibration slope below 1 means the model overstates how uneven the crowd is."
+    )
+    gr.Dataframe(crowd_leaderboard_table(evidence), interactive=False,
+                 label="Winner-count forecasts versus the uniform-crowd null")
+    show_static = gr.Checkbox(
+        value=False, label="Also plot the static prior (it is far off the scale of the others)"
+    )
+    replay_plot = gr.LinePlot(
+        crowd_replay_table(evidence), x="Draw", y="Typical miss (%)",
+        color="Series", title="Per-draw miss on the large prize tiers / lower is better",
+    )
+    show_static.change(
+        lambda include: crowd_replay_table(evidence, bool(include)),
+        [show_static], [replay_plot], api_name=False,
+    )
+    gr.Markdown(
+        "### What the crowd picks\n\nFitted popularity of each number relative to an average "
+        f"number, using winner counts through **{html.escape(head['cutoff'])}**. Positive means "
+        "over-picked (more people to share a prize with). This describes ticket choice only; it "
+        "says nothing about which numbers will be drawn."
+    )
+    gr.BarPlot(crowd_popularity_table(evidence, "main"), x="Number", y="Picked vs average (%)",
+               title="Main numbers 1-50")
+    gr.BarPlot(crowd_popularity_table(evidence, "stars"), x="Lucky Star",
+               y="Picked vs average (%)", title="Lucky Stars 1-12")
+    gr.Markdown(
+        "### What that is worth: all-tier modeled return\n\nEvery EuroMillions tier is shared "
+        "among its winners, so a low-crowd ticket is paid more at all 13 tiers. Modeled for a "
+        f"12-ticket budget at a EUR {head['jackpot_eur'] / 1e6:.1f}M jackpot and "
+        f"{head['entries'] / 1e6:.1f}M entries. The haircut multiplies the edge by the "
+        f"out-of-sample calibration slope ({head['slope']:.2f})."
+    )
+    gr.Dataframe(crowd_payout_table(evidence), interactive=False,
+                 label="Modeled expected return per ticket / same odds for every agent")
+    with gr.Accordion("Inspect the Calibrated Escape example tickets", open=False):
+        gr.Markdown(
+            "Example output of the calibrated agent at the history cutoff above. This is a static "
+            "illustration, **not** a dated pre-draw publication, and these tickets have the same "
+            "probability of winning as any other."
+        )
+        gr.Dataframe(crowd_ticket_table(evidence), interactive=False,
+                     label="Calibrated Escape / 12 low-crowd tickets")
+    caveats = "".join(f"<li>{html.escape(item)}</li>" for item in evidence.get("data_caveats", []))
+    gr.HTML(f"""
+    <section class="claims-note">
+      <strong>Modeled return, not cash. ROI stays strongly negative.</strong>
+      <p>{html.escape(evidence['claims_boundary'])} "Edge" means less negative than random
+      tickets under the stated crowd model and prize-fund assumptions; it is not profit and not
+      betting advice. This is a historical forward replay, not a forecast published before the
+      draws.</p>
+      <ul style="color:#b7c4c4;font-size:12px;line-height:1.6;margin:8px 0 0 18px">{caveats}</ul>
+    </section>
+    """)
+    gr.File(str(crowd_artifact_path(ROOT, profile.key)),
+            label="Download the crowd-forecast evidence (leaderboard, replay, model, payout)")
+
+
 def _build_profile_tab(profile: Profile) -> None:
     gr.HTML(_profile_identity(profile))
     gr.HTML(CLAIMS_NOTE)
@@ -1430,6 +1545,8 @@ def _build_profile_tab(profile: Profile) -> None:
                 outputs=[candidate_summary, candidate_map, candidate_table, candidate_download],
             )
             gr.HTML(CLAIMS_NOTE)
+        with gr.Tab("SCREEN C / CROWD FORECAST LAB"):
+            _crowd_forecast_panel(profile)
 
 
 CSS = """

@@ -1322,14 +1322,12 @@ def _contest_atlas(profile: Profile) -> str:
     frame = profile.contests.sort_values("contest_number")
     if frame.empty:
         return ""
+    present_agents = set(frame["agent"])
     agents = [
         {"id": agent, "name": meta["name"], "color": meta["color"]}
         for agent, meta in AGENTS.items()
-        if agent in set(frame["agent"])
+        if agent in present_agents
     ]
-    colors = ("#b6a49b", "#fcb567", "#ff7b57", "#a8baff", "#ef9bb5", "#81d6df", "#f7db75")
-    for agent, color in zip(agents, colors):
-        agent["color"] = color
     rounds = []
     for number, group in frame.groupby("contest_number", sort=True):
         scores = {}
@@ -1348,8 +1346,9 @@ def _contest_atlas(profile: Profile) -> str:
         })
     data = html.escape(json.dumps({"agents": agents, "rounds": rounds}, allow_nan=False), quote=True)
     ledger = f"https://huggingface.co/spaces/kugguk/lottobench-community-leaderboard/blob/main/data/profiles/{profile.key}/contests.csv"
+    accent = PROFILE_STYLE[profile.key]["accent"]
     return f"""
-    <section class="contest-atlas" data-contest-atlas="{data}" aria-label="Contest Atlas">
+    <section class="contest-atlas" style="--atlas-accent:{accent}" data-contest-atlas="{data}" aria-label="Contest Atlas">
       <div class="contest-atlas-head">
         <div><p class="contest-atlas-kicker">Forward replay · {len(rounds)} scored contests</p>
         <h3>Contest Atlas</h3><p>Follow the agents through the published holdout.</p></div>
@@ -1378,10 +1377,18 @@ def _contest_atlas(profile: Profile) -> str:
         </div>
         <div class="contest-atlas-matrix" data-matrix hidden></div>
       </div>
-      <p class="contest-atlas-key" data-key></p>
+      <div class="contest-atlas-key">
+        <p data-key></p>
+        <div class="contest-atlas-scale" data-scale hidden aria-label="Heatmap scale">
+          <div class="contest-atlas-ramp" data-ramp aria-hidden="true"></div>
+          <div class="contest-atlas-scale-labels">
+            <span data-low></span><span data-zero hidden>0 pp</span><span data-high></span>
+          </div>
+        </div>
+      </div>
       <label class="contest-atlas-slider">Contest <input type="range" min="0"
         max="{len(rounds) - 1}" value="{len(rounds) - 1}" data-round></label>
-      <h4 data-date></h4>
+      <h4 data-date aria-live="polite"></h4>
       <div class="contest-atlas-scores" data-scores></div>
       <p class="contest-atlas-source">Modeled alpha compares jackpot sharing at equal ticket budgets. Cash returns are unmeasured in this view.
         <a href="{ledger}" target="_blank" rel="noreferrer">Open contest ledger ↗</a></p>
@@ -1394,6 +1401,15 @@ CONTEST_ATLAS_JS = r"""
   const instances = new Map();
   const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
   const defaultAngle = -.47;
+  const heatStops = [[235, 112, 105], [247, 164, 95], [244, 211, 109], [126, 205, 144]];
+  function heatColor(fraction) {
+    const position = Math.max(0, Math.min(1, fraction)) * (heatStops.length - 1);
+    const lower = Math.floor(position);
+    const mix = position - lower;
+    const start = heatStops[lower];
+    const end = heatStops[Math.ceil(position)];
+    return `rgb(${start.map((value, index) => Math.round(value + (end[index] - value) * mix)).join(', ')})`;
+  }
   function hydrate(root) {
     const {agents, rounds} = JSON.parse(root.dataset.contestAtlas);
     const select = selector => root.querySelector(selector);
@@ -1407,6 +1423,12 @@ CONTEST_ATLAS_JS = r"""
     const date = select('[data-date]');
     const scoreList = select('[data-scores]');
     const key = select('[data-key]');
+    const scale = select('[data-scale]');
+    const ramp = select('[data-ramp]');
+    const scaleLow = select('[data-low]');
+    const scaleZero = select('[data-zero]');
+    const scaleHigh = select('[data-high]');
+    const accent = getComputedStyle(root).getPropertyValue('--atlas-accent').trim() || '#ffd84d';
     let angle = defaultAngle;
     let timer = null;
     let drag = null;
@@ -1468,17 +1490,17 @@ CONTEST_ATLAS_JS = r"""
       const laneFor = agent => agents.indexOf(agent) / Math.max(agents.length - 1, 1);
       for (const agent of agents) {
         const lane = laneFor(agent);
-        line([project(0, lane, 0), project(1, lane, 0)], '#d2a5843a', 1);
+        line([project(0, lane, 0), project(1, lane, 0)], '#b9d1d73b', 1);
       }
       const selected = Number(slider.value);
       for (const [index, round] of rounds.entries()) {
         const fraction = progress(index);
         const start = project(fraction, 0, 0);
         const end = project(fraction, 1, 0);
-        line([start, end], selected === index ? '#ffd485c9' : '#d2a58435', selected === index ? 2 : 1);
+        line([start, end], selected === index ? accent : '#b9d1d72a', selected === index ? 2 : 1);
         if (index === 0 || index === rounds.length - 1 || index === selected) {
           const label = start.y > end.y ? start : end;
-          ctx.fillStyle = selected === index ? '#ffe0a4' : '#d7bdad';
+          ctx.fillStyle = selected === index ? accent : '#9bafb6';
           ctx.font = '11px system-ui';
           ctx.fillText(String(round.number), label.x - 4, label.y + 13);
         }
@@ -1500,7 +1522,7 @@ CONTEST_ATLAS_JS = r"""
         ctx.fillStyle = mark.agent.color;
         ctx.fill();
         if (active) {
-          ctx.strokeStyle = '#fff1cf';
+          ctx.strokeStyle = '#f4f8f8';
           ctx.lineWidth = 1.3;
           ctx.stroke();
         }
@@ -1513,6 +1535,19 @@ CONTEST_ATLAS_JS = r"""
     }
     function rebuildMatrix() {
       const [low, high] = domain();
+      const counts = metric.value === 'main';
+      const neutral = 2 / 3;
+      function heatPosition(value) {
+        if (counts) return (value - low) / (high - low);
+        return value < 0 ? neutral * (1 - value / low) : neutral + (1 - neutral) * (high > 0 ? value / high : 0);
+      }
+      const stops = counts ? [0, 1 / 3, neutral, 1]
+        : [...(low < 0 ? [0, 1 / 3] : []), neutral, ...(high > 0 ? [1] : [])];
+      const rampColors = stops.map(heatColor);
+      ramp.style.background = rampColors.length === 1 ? rampColors[0] : `linear-gradient(90deg, ${rampColors.join(', ')})`;
+      scaleLow.textContent = format(low);
+      scaleHigh.textContent = high > low ? format(high) : '';
+      scaleZero.hidden = counts || low >= 0 || high <= 0;
       const table = element('table');
       table.append(element('caption', 'Agent scores by contest'));
       const heading = element('tr');
@@ -1540,8 +1575,8 @@ CONTEST_ATLAS_JS = r"""
           button.title = `${agent.name} · ${round.date} · ${format(value)}`;
           button.setAttribute('aria-label', button.title);
           if (Number.isFinite(value)) {
-            const share = value < 0 ? value / low : value / high;
-            button.style.background = value < 0 ? `rgba(146,177,255,${.12 + share * .65})` : `rgba(255,150,66,${.12 + share * .67})`;
+            button.style.background = heatColor(heatPosition(value));
+            button.classList.add('has-score');
           }
           cell.append(button);
           row.append(cell);
@@ -1556,9 +1591,11 @@ CONTEST_ATLAS_JS = r"""
       const round = rounds[selected];
       slider.setAttribute('aria-valuetext', `Contest ${round.number}, ${round.date}`);
       date.textContent = `Contest ${round.number} · ${round.date}`;
+      scale.hidden = view !== 'matrix';
       key.textContent = view === 'orbit'
         ? 'Time runs along each lane. Height shows the selected metric. Drag to rotate or choose a dot.'
-        : (metric.value === 'main' ? 'Stronger orange marks more matched main numbers.' : 'Orange is above the house reference. Blue is below. Figures are in percentage points.');
+        : (metric.value === 'main' ? 'Select a cell to inspect a contest. The color scale shows match counts.'
+          : 'Select a cell to inspect a contest. Yellow marks the house reference at 0 pp.');
       const ordered = filtered().sort((a, b) => (score(selected, b) ?? -Infinity) - (score(selected, a) ?? -Infinity));
       scoreList.replaceChildren(...ordered.map(agent => {
         const card = element('div');
@@ -1675,40 +1712,48 @@ CONTEST_ATLAS_JS = r"""
 
 
 CONTEST_ATLAS_CSS = """
-.contest-atlas{background:#241a1a;color:#fff2e1;border:1px solid #795746;border-radius:20px;padding:clamp(14px,2.6vw,25px)}
+.contest-atlas{background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:17px;padding:clamp(14px,2.6vw,25px)}
 .contest-atlas [hidden]{display:none!important}
 .contest-atlas-head,.contest-atlas-modes,.contest-atlas-controls,.contest-atlas-camera{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 .contest-atlas-head{justify-content:space-between;margin-bottom:13px}
-.contest-atlas-head h3{margin:0!important;color:#fff0d3!important;font-size:clamp(30px,4.3vw,48px)!important;letter-spacing:-.06em;line-height:1}
-.contest-atlas-head p{margin:5px 0!important;color:#e4cdbb;font-size:13px}
-.contest-atlas-head .contest-atlas-kicker{margin-top:0!important;color:#ffbb77;font-weight:750;font-size:11px;letter-spacing:.1em;text-transform:uppercase}
-.contest-atlas button,.contest-atlas select{background:#342522;color:#fff2de;border:1px solid #845d49;border-radius:9px;padding:6px 9px;font-size:12px;cursor:pointer}
-.contest-atlas-modes button[aria-pressed=true],.contest-atlas [data-play]{background:#ffb366;color:#301c12;border-color:#ffb366;font-weight:750}
+.contest-atlas-head h3{margin:0!important;font-size:clamp(27px,4vw,42px)!important;letter-spacing:-.045em;line-height:1.06}
+.contest-atlas-head p{margin:5px 0!important;color:var(--muted);font-size:13px}
+.contest-atlas-head .contest-atlas-kicker{margin-top:0!important;color:var(--atlas-accent);font:500 10px 'DM Mono',monospace;letter-spacing:.13em;text-transform:uppercase}
+.contest-atlas button,.contest-atlas select{background:var(--panel-2);color:var(--ink);border:1px solid #38505a;border-radius:8px;padding:6px 9px;font:500 11px 'DM Mono',monospace;cursor:pointer}
+.contest-atlas-modes button[aria-pressed=true],.contest-atlas [data-play]{background:var(--acid);color:var(--bg);border-color:var(--acid);font-weight:700}
+.contest-atlas-modes button:hover,.contest-atlas [data-play]:hover{background:var(--gold);color:var(--bg);border-color:var(--gold)}
 .contest-atlas-controls{align-items:end;margin:0 0 10px}
-.contest-atlas-controls label{display:grid;gap:4px;font-size:12px;color:#ffdec4}
+.contest-atlas-controls label{display:grid;gap:4px;font-size:12px;color:var(--muted)}
 .contest-atlas-controls select{max-width:100%}
-.contest-atlas-stage{position:relative;background:radial-gradient(ellipse,#462c25,#1b1517 80%);border-radius:13px;border:1px solid #593a30;overflow:hidden}
+.contest-atlas-stage{position:relative;background:radial-gradient(ellipse at 50% 40%,var(--panel-2),#09171e 80%);border-radius:13px;border:1px solid var(--line);overflow:hidden}
 .contest-atlas-stage canvas{display:block;width:100%;height:clamp(245px,34vw,365px);touch-action:pan-y;cursor:grab}
 .contest-atlas-stage canvas:active{cursor:grabbing}
 .contest-atlas-camera{position:absolute;bottom:9px;left:50%;transform:translateX(-50%);white-space:nowrap;flex-wrap:nowrap}
-.contest-atlas-matrix{overflow-x:auto;padding:6px;color:#fff0dd}
-.contest-atlas-matrix table{border-collapse:separate;border-spacing:3px;width:100%;min-width:635px;font-size:11px}
+.contest-atlas-matrix{overflow-x:auto;padding:6px;color:var(--ink)}
+.contest-atlas-matrix table{border-collapse:separate;border-spacing:3px;width:100%;min-width:635px;font:500 11px 'DM Mono',monospace}
 .contest-atlas-matrix th,.contest-atlas-matrix td{padding:0!important;background:transparent!important;color:inherit!important;border:0!important}
 .contest-atlas-matrix th{white-space:nowrap}
-.contest-atlas-matrix caption{text-align:left;color:#ffdec4;padding:5px;font-size:12px}
-.contest-atlas-matrix button{width:100%;font-variant-numeric:tabular-nums;font-size:10px;padding:5px}
-.contest-atlas-matrix button[aria-pressed=true]{outline:1px solid #ffca76;outline-offset:-1px;font-weight:750}
-.contest-atlas-key,.contest-atlas-source{margin:8px 0!important;color:#e5cabb;font-size:12px}
-.contest-atlas-source a{color:#ffbd7a!important;text-underline-offset:3px}
-.contest-atlas-slider{display:grid;grid-template-columns:auto 1fr;align-items:center;gap:10px;color:#ffdec4;font-size:12px}
-.contest-atlas-slider input{width:100%;accent-color:#ffa653}
-.contest-atlas h4{margin:9px 0!important;color:#ffe6c2!important;font-size:15px}
+.contest-atlas-matrix caption{text-align:left;color:var(--muted);padding:5px;font-size:12px}
+.contest-atlas-matrix button{width:100%;border:1px solid transparent;border-radius:4px;font-variant-numeric:tabular-nums;font-size:10px;padding:5px}
+.contest-atlas-matrix button.has-score{color:var(--bg)}
+.contest-atlas-matrix button[aria-pressed=true]{outline:1px solid var(--ink);outline-offset:0;box-shadow:inset 0 0 0 1px var(--bg);font-weight:750}
+.contest-atlas-key{display:flex;align-items:center;justify-content:space-between;gap:7px 16px;flex-wrap:wrap;margin:8px 0}
+.contest-atlas-key p,.contest-atlas-source{margin:0!important;color:var(--muted);font-size:12px}
+.contest-atlas-scale{width:clamp(132px,20vw,200px)}
+.contest-atlas-ramp{height:6px;border-radius:99px;margin:0 0 4px}
+.contest-atlas-scale-labels{display:flex;justify-content:space-between;position:relative;color:var(--muted);white-space:nowrap;font:500 10px 'DM Mono',monospace}
+.contest-atlas-scale-labels [data-zero]{position:absolute;left:66.666%;transform:translateX(-50%)}
+.contest-atlas-source{margin-top:10px!important}
+.contest-atlas-source a{color:var(--atlas-accent)!important;text-underline-offset:3px}
+.contest-atlas-slider{display:grid;grid-template-columns:auto 1fr;align-items:center;gap:10px;color:var(--muted);font-size:12px}
+.contest-atlas-slider input{width:100%;accent-color:var(--atlas-accent)}
+.contest-atlas h4{margin:9px 0!important;font-size:15px}
 .contest-atlas-scores{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:7px}
-.contest-atlas-scores div{display:grid;gap:4px;background:#382823;padding:8px 9px;border-radius:8px;border-top:2px solid var(--agent-color)}
-.contest-atlas-scores span{color:#ffdec4;font-size:11px}
-.contest-atlas-scores strong{color:#fff0d3;font-size:17px}
-.contest-atlas-scores small{color:#e5cabb;font-size:10px}
-.contest-atlas button:focus-visible,.contest-atlas select:focus-visible,.contest-atlas input:focus-visible,.contest-atlas a:focus-visible{outline:2px solid #ffd290;outline-offset:2px}
+.contest-atlas-scores div{display:grid;gap:4px;background:var(--panel-2);padding:8px 9px;border-radius:8px;border:1px solid var(--line);border-top:2px solid var(--agent-color)}
+.contest-atlas-scores span{color:var(--ink);font-size:11px}
+.contest-atlas-scores strong{color:var(--ink);font-size:17px}
+.contest-atlas-scores small{color:var(--muted);font-size:10px}
+.contest-atlas button:focus-visible,.contest-atlas select:focus-visible,.contest-atlas input:focus-visible,.contest-atlas a:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
 """
 
 

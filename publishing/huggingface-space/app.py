@@ -1318,12 +1318,407 @@ def _crowd_forecast_panel(profile: Profile) -> None:
             label="Download the crowd-forecast evidence (leaderboard, replay, model, payout)")
 
 
+def _contest_atlas(profile: Profile) -> str:
+    frame = profile.contests.sort_values("contest_number")
+    if frame.empty:
+        return ""
+    agents = [
+        {"id": agent, "name": meta["name"], "color": meta["color"]}
+        for agent, meta in AGENTS.items()
+        if agent in set(frame["agent"])
+    ]
+    colors = ("#b6a49b", "#fcb567", "#ff7b57", "#a8baff", "#ef9bb5", "#81d6df", "#f7db75")
+    for agent, color in zip(agents, colors):
+        agent["color"] = color
+    rounds = []
+    for number, group in frame.groupby("contest_number", sort=True):
+        scores = {}
+        for row in group.itertuples(index=False):
+            matches = _best_ticket_match(profile, int(number), row.agent)
+            scores[row.agent] = {
+                "round": float(row.roi_alpha_vs_house_pp) if pd.notna(row.roi_alpha_vs_house_pp) else None,
+                "running": float(row.mean_roi_alpha_vs_house_pp) if pd.notna(row.mean_roi_alpha_vs_house_pp) else None,
+                "main": int(matches.split("+")[0]) if matches != "unavailable" else None,
+                "match": matches,
+            }
+        rounds.append({
+            "number": int(number),
+            "date": str(group.iloc[0]["draw_date"]),
+            "scores": scores,
+        })
+    data = html.escape(json.dumps({"agents": agents, "rounds": rounds}, allow_nan=False), quote=True)
+    ledger = f"https://huggingface.co/spaces/kugguk/lottobench-community-leaderboard/blob/main/data/profiles/{profile.key}/contests.csv"
+    return f"""
+    <section class="contest-atlas" data-contest-atlas="{data}" aria-label="Contest Atlas">
+      <div class="contest-atlas-head">
+        <div><p class="contest-atlas-kicker">Forward replay · {len(rounds)} scored contests</p>
+        <h3>Contest Atlas</h3><p>Follow the agents through the published holdout.</p></div>
+        <div class="contest-atlas-modes" role="group" aria-label="Visualization">
+          <button type="button" data-view="orbit" aria-pressed="true">3D lanes</button>
+          <button type="button" data-view="matrix" aria-pressed="false">Heatmap</button>
+        </div>
+      </div>
+      <div class="contest-atlas-controls">
+        <label>Metric
+          <select data-metric>
+            <option value="round">Contest modeled alpha · pp</option>
+            <option value="running">Running modeled alpha · pp</option>
+            <option value="main">Best main-number match</option>
+          </select>
+        </label>
+        <label>Agents<select data-agent><option value="">All agents</option></select></label>
+        <button type="button" data-play>Play replay</button>
+      </div>
+      <div class="contest-atlas-stage">
+        <canvas aria-label="3D replay by contest and agent. The contest slider and score list provide the same values."></canvas>
+        <div class="contest-atlas-camera" aria-label="Rotate 3D lanes">
+          <button type="button" data-turn="-1" aria-label="Rotate left">←</button>
+          <button type="button" data-turn="0">Reset view</button>
+          <button type="button" data-turn="1" aria-label="Rotate right">→</button>
+        </div>
+        <div class="contest-atlas-matrix" data-matrix hidden></div>
+      </div>
+      <p class="contest-atlas-key" data-key></p>
+      <label class="contest-atlas-slider">Contest <input type="range" min="0"
+        max="{len(rounds) - 1}" value="{len(rounds) - 1}" data-round></label>
+      <h4 data-date></h4>
+      <div class="contest-atlas-scores" data-scores></div>
+      <p class="contest-atlas-source">Modeled alpha compares jackpot sharing at equal ticket budgets. Cash returns are unmeasured in this view.
+        <a href="{ledger}" target="_blank" rel="noreferrer">Open contest ledger ↗</a></p>
+    </section>
+    """
+
+
+CONTEST_ATLAS_JS = r"""
+() => {
+  const instances = new Map();
+  const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
+  const defaultAngle = -.47;
+  function hydrate(root) {
+    const {agents, rounds} = JSON.parse(root.dataset.contestAtlas);
+    const select = selector => root.querySelector(selector);
+    const metric = select('[data-metric]');
+    const agentFilter = select('[data-agent]');
+    const slider = select('[data-round]');
+    const play = select('[data-play]');
+    const canvas = select('canvas');
+    const camera = select('.contest-atlas-camera');
+    const matrix = select('[data-matrix]');
+    const date = select('[data-date]');
+    const scoreList = select('[data-scores]');
+    const key = select('[data-key]');
+    let angle = defaultAngle;
+    let timer = null;
+    let drag = null;
+    let view = 'orbit';
+    let marks = [];
+    for (const agent of agents) agentFilter.add(new Option(agent.name, agent.id));
+    function filtered() {
+      return agents.filter(agent => !agentFilter.value || agent.id === agentFilter.value || agent.id === 'uniform_random');
+    }
+    function score(round, agent) {
+      return rounds[round].scores[agent.id]?.[metric.value];
+    }
+    function format(value) {
+      if (!Number.isFinite(value)) return 'Unavailable';
+      if (metric.value === 'main') return String(value);
+      return `${value > 0 ? '+' : ''}${value.toFixed(3)} pp`;
+    }
+    function domain() {
+      const values = rounds.flatMap((_, index) => agents.map(agent => score(index, agent)).filter(Number.isFinite));
+      const low = Math.min(0, ...values);
+      return [low, Math.max(metric.value === 'main' ? 1 : low + .01, ...values)];
+    }
+    function draw() {
+      if (view !== 'orbit') return;
+      const width = canvas.clientWidth;
+      const height = canvas.clientHeight;
+      if (!width || !height) return;
+      const pixelRatio = window.devicePixelRatio || 1;
+      canvas.width = Math.round(width * pixelRatio);
+      canvas.height = Math.round(height * pixelRatio);
+      const ctx = canvas.getContext('2d');
+      ctx.scale(pixelRatio, pixelRatio);
+      const [low, high] = domain();
+      function project(x, lane, value) {
+        const x0 = x * 2 - 1;
+        const z0 = lane * 2 - 1;
+        const side = x0 * Math.cos(angle) + z0 * Math.sin(angle) * .48;
+        const depth = x0 * Math.sin(angle) + z0 * Math.cos(angle) * .74;
+        return {
+          x: width * .51 + side * width * .37,
+          y: height * .67 + depth * height * .17 - (value - low) / (high - low) * height * .44,
+          depth,
+        };
+      }
+      function line(points, color, weight) {
+        ctx.beginPath();
+        let connected = false;
+        for (const point of points) {
+          if (!point) { connected = false; continue; }
+          if (connected) ctx.lineTo(point.x, point.y);
+          else ctx.moveTo(point.x, point.y);
+          connected = true;
+        }
+        ctx.lineWidth = weight;
+        ctx.strokeStyle = color;
+        ctx.stroke();
+      }
+      const progress = index => index / Math.max(rounds.length - 1, 1);
+      const laneFor = agent => agents.indexOf(agent) / Math.max(agents.length - 1, 1);
+      for (const agent of agents) {
+        const lane = laneFor(agent);
+        line([project(0, lane, 0), project(1, lane, 0)], '#d2a5843a', 1);
+      }
+      const selected = Number(slider.value);
+      for (const [index, round] of rounds.entries()) {
+        const fraction = progress(index);
+        const start = project(fraction, 0, 0);
+        const end = project(fraction, 1, 0);
+        line([start, end], selected === index ? '#ffd485c9' : '#d2a58435', selected === index ? 2 : 1);
+        if (index === 0 || index === rounds.length - 1 || index === selected) {
+          const label = start.y > end.y ? start : end;
+          ctx.fillStyle = selected === index ? '#ffe0a4' : '#d7bdad';
+          ctx.font = '11px system-ui';
+          ctx.fillText(String(round.number), label.x - 4, label.y + 13);
+        }
+      }
+      marks = [];
+      for (const agent of filtered()) {
+        const nodes = rounds.map((_, index) => {
+          const value = score(index, agent);
+          return Number.isFinite(value) ? {...project(progress(index), laneFor(agent), value), index, agent} : null;
+        });
+        line(nodes, agent.color, 1.7);
+        marks.push(...nodes.filter(Boolean));
+      }
+      marks.sort((a, b) => a.depth - b.depth);
+      for (const mark of marks) {
+        const active = mark.index === selected;
+        ctx.beginPath();
+        ctx.arc(mark.x, mark.y, active ? 5.5 : 2.7, 0, Math.PI * 2);
+        ctx.fillStyle = mark.agent.color;
+        ctx.fill();
+        if (active) {
+          ctx.strokeStyle = '#fff1cf';
+          ctx.lineWidth = 1.3;
+          ctx.stroke();
+        }
+      }
+    }
+    function element(tag, content) {
+      const node = document.createElement(tag);
+      if (content !== undefined) node.textContent = content;
+      return node;
+    }
+    function rebuildMatrix() {
+      const [low, high] = domain();
+      const table = element('table');
+      table.append(element('caption', 'Agent scores by contest'));
+      const heading = element('tr');
+      heading.append(element('th', 'Agent'));
+      for (const round of rounds) {
+        const label = element('th', String(round.number));
+        label.title = round.date;
+        heading.append(label);
+      }
+      const thead = element('thead');
+      thead.append(heading);
+      table.append(thead);
+      const tbody = element('tbody');
+      for (const agent of filtered()) {
+        const row = element('tr');
+        const label = element('th', agent.name);
+        label.scope = 'row';
+        row.append(label);
+        rounds.forEach((round, index) => {
+          const cell = element('td');
+          const value = score(index, agent);
+          const button = element('button', Number.isFinite(value) ? (metric.value === 'main' ? String(value) : value.toFixed(1)) : '—');
+          button.type = 'button';
+          button.dataset.index = index;
+          button.title = `${agent.name} · ${round.date} · ${format(value)}`;
+          button.setAttribute('aria-label', button.title);
+          if (Number.isFinite(value)) {
+            const share = value < 0 ? value / low : value / high;
+            button.style.background = value < 0 ? `rgba(146,177,255,${.12 + share * .65})` : `rgba(255,150,66,${.12 + share * .67})`;
+          }
+          cell.append(button);
+          row.append(cell);
+        });
+        tbody.append(row);
+      }
+      table.append(tbody);
+      matrix.replaceChildren(table);
+    }
+    function update() {
+      const selected = Number(slider.value);
+      const round = rounds[selected];
+      slider.setAttribute('aria-valuetext', `Contest ${round.number}, ${round.date}`);
+      date.textContent = `Contest ${round.number} · ${round.date}`;
+      key.textContent = view === 'orbit'
+        ? 'Time runs along each lane. Height shows the selected metric. Drag to rotate or choose a dot.'
+        : (metric.value === 'main' ? 'Stronger orange marks more matched main numbers.' : 'Orange is above the house reference. Blue is below. Figures are in percentage points.');
+      const ordered = filtered().sort((a, b) => (score(selected, b) ?? -Infinity) - (score(selected, a) ?? -Infinity));
+      scoreList.replaceChildren(...ordered.map(agent => {
+        const card = element('div');
+        card.style.setProperty('--agent-color', agent.color);
+        const values = round.scores[agent.id];
+        const description = values?.match && values.match !== 'unavailable'
+          ? `Best same-ticket match ${values.match}` : 'Match unavailable';
+        card.append(element('span', agent.name), element('strong', format(score(selected, agent))), element('small', description));
+        return card;
+      }));
+      if (view === 'matrix') {
+        matrix.querySelectorAll('button[data-index]').forEach(button =>
+          button.setAttribute('aria-pressed', String(Number(button.dataset.index) === selected)));
+      }
+      draw();
+    }
+    function stop() {
+      clearInterval(timer);
+      timer = null;
+      play.textContent = 'Play replay';
+    }
+    function seek(index) {
+      stop();
+      slider.value = index;
+      update();
+    }
+    play.addEventListener('click', () => {
+      if (timer) { stop(); return; }
+      if (Number(slider.value) === rounds.length - 1) slider.value = 0;
+      update();
+      if (rounds.length < 2) return;
+      play.textContent = 'Pause replay';
+      timer = setInterval(() => {
+        if (!root.getClientRects().length) { stop(); return; }
+        slider.value = Number(slider.value) + 1;
+        update();
+        if (Number(slider.value) === rounds.length - 1) stop();
+      }, reducedMotion.matches ? 1700 : 1050);
+    });
+    slider.addEventListener('input', () => { stop(); update(); });
+    for (const control of [metric, agentFilter]) {
+      control.addEventListener('change', () => {
+        if (view === 'matrix') rebuildMatrix();
+        update();
+      });
+    }
+    for (const button of root.querySelectorAll('[data-view]')) {
+      button.addEventListener('click', () => {
+        view = button.dataset.view;
+        root.querySelectorAll('[data-view]').forEach(tab => tab.setAttribute('aria-pressed', String(tab === button)));
+        matrix.hidden = view !== 'matrix';
+        canvas.hidden = camera.hidden = view !== 'orbit';
+        if (view === 'matrix') rebuildMatrix();
+        update();
+      });
+    }
+    matrix.addEventListener('click', event => {
+      const button = event.target.closest('button[data-index]');
+      if (button) seek(Number(button.dataset.index));
+    });
+    camera.addEventListener('click', event => {
+      const button = event.target.closest('[data-turn]');
+      if (!button) return;
+      const turn = Number(button.dataset.turn);
+      angle = turn ? angle + turn * .26 : defaultAngle;
+      draw();
+    });
+    canvas.addEventListener('pointerdown', event => {
+      drag = {x: event.clientX, angle, moved: false};
+      canvas.setPointerCapture(event.pointerId);
+    });
+    canvas.addEventListener('pointermove', event => {
+      if (!drag) return;
+      const shift = event.clientX - drag.x;
+      drag.moved ||= Math.abs(shift) > 5;
+      if (drag.moved) { angle = drag.angle + shift / 130; draw(); }
+    });
+    canvas.addEventListener('pointercancel', () => { drag = null; });
+    canvas.addEventListener('pointerup', event => {
+      const wasClick = drag && !drag.moved;
+      drag = null;
+      if (!wasClick) return;
+      const bounds = canvas.getBoundingClientRect();
+      let distance = 14;
+      let nearest = null;
+      for (const mark of marks) {
+        const gap = Math.hypot(mark.x - event.clientX + bounds.left, mark.y - event.clientY + bounds.top);
+        if (gap <= distance) { distance = gap; nearest = mark; }
+      }
+      if (nearest) seek(nearest.index);
+    });
+    const resize = new ResizeObserver(draw);
+    resize.observe(canvas);
+    update();
+    return () => { stop(); resize.disconnect(); };
+  }
+  function reconcile() {
+    const roots = new Set(document.querySelectorAll('[data-contest-atlas]'));
+    for (const [root, dispose] of instances) {
+      if (!roots.has(root)) { dispose(); instances.delete(root); }
+    }
+    for (const root of roots) {
+      if (!instances.has(root)) instances.set(root, hydrate(root));
+    }
+  }
+  new MutationObserver(records => {
+    if (records.some(record => [...record.addedNodes, ...record.removedNodes].some(node =>
+      node.nodeType === Node.ELEMENT_NODE && (node.matches('[data-contest-atlas]') || node.querySelector('[data-contest-atlas]'))
+    ))) reconcile();
+  }).observe(document.body, {childList: true, subtree: true});
+  reconcile();
+}
+"""
+
+
+CONTEST_ATLAS_CSS = """
+.contest-atlas{background:#241a1a;color:#fff2e1;border:1px solid #795746;border-radius:20px;padding:clamp(14px,2.6vw,25px)}
+.contest-atlas [hidden]{display:none!important}
+.contest-atlas-head,.contest-atlas-modes,.contest-atlas-controls,.contest-atlas-camera{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.contest-atlas-head{justify-content:space-between;margin-bottom:13px}
+.contest-atlas-head h3{margin:0!important;color:#fff0d3!important;font-size:clamp(30px,4.3vw,48px)!important;letter-spacing:-.06em;line-height:1}
+.contest-atlas-head p{margin:5px 0!important;color:#e4cdbb;font-size:13px}
+.contest-atlas-head .contest-atlas-kicker{margin-top:0!important;color:#ffbb77;font-weight:750;font-size:11px;letter-spacing:.1em;text-transform:uppercase}
+.contest-atlas button,.contest-atlas select{background:#342522;color:#fff2de;border:1px solid #845d49;border-radius:9px;padding:6px 9px;font-size:12px;cursor:pointer}
+.contest-atlas-modes button[aria-pressed=true],.contest-atlas [data-play]{background:#ffb366;color:#301c12;border-color:#ffb366;font-weight:750}
+.contest-atlas-controls{align-items:end;margin:0 0 10px}
+.contest-atlas-controls label{display:grid;gap:4px;font-size:12px;color:#ffdec4}
+.contest-atlas-controls select{max-width:100%}
+.contest-atlas-stage{position:relative;background:radial-gradient(ellipse,#462c25,#1b1517 80%);border-radius:13px;border:1px solid #593a30;overflow:hidden}
+.contest-atlas-stage canvas{display:block;width:100%;height:clamp(245px,34vw,365px);touch-action:pan-y;cursor:grab}
+.contest-atlas-stage canvas:active{cursor:grabbing}
+.contest-atlas-camera{position:absolute;bottom:9px;left:50%;transform:translateX(-50%);white-space:nowrap;flex-wrap:nowrap}
+.contest-atlas-matrix{overflow-x:auto;padding:6px;color:#fff0dd}
+.contest-atlas-matrix table{border-collapse:separate;border-spacing:3px;width:100%;min-width:635px;font-size:11px}
+.contest-atlas-matrix th,.contest-atlas-matrix td{padding:0!important;background:transparent!important;color:inherit!important;border:0!important}
+.contest-atlas-matrix th{white-space:nowrap}
+.contest-atlas-matrix caption{text-align:left;color:#ffdec4;padding:5px;font-size:12px}
+.contest-atlas-matrix button{width:100%;font-variant-numeric:tabular-nums;font-size:10px;padding:5px}
+.contest-atlas-matrix button[aria-pressed=true]{outline:1px solid #ffca76;outline-offset:-1px;font-weight:750}
+.contest-atlas-key,.contest-atlas-source{margin:8px 0!important;color:#e5cabb;font-size:12px}
+.contest-atlas-source a{color:#ffbd7a!important;text-underline-offset:3px}
+.contest-atlas-slider{display:grid;grid-template-columns:auto 1fr;align-items:center;gap:10px;color:#ffdec4;font-size:12px}
+.contest-atlas-slider input{width:100%;accent-color:#ffa653}
+.contest-atlas h4{margin:9px 0!important;color:#ffe6c2!important;font-size:15px}
+.contest-atlas-scores{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:7px}
+.contest-atlas-scores div{display:grid;gap:4px;background:#382823;padding:8px 9px;border-radius:8px;border-top:2px solid var(--agent-color)}
+.contest-atlas-scores span{color:#ffdec4;font-size:11px}
+.contest-atlas-scores strong{color:#fff0d3;font-size:17px}
+.contest-atlas-scores small{color:#e5cabb;font-size:10px}
+.contest-atlas button:focus-visible,.contest-atlas select:focus-visible,.contest-atlas input:focus-visible,.contest-atlas a:focus-visible{outline:2px solid #ffd290;outline-offset:2px}
+"""
+
+
 def _build_profile_tab(profile: Profile) -> None:
     gr.HTML(_profile_identity(profile))
     gr.HTML(CLAIMS_NOTE)
     gr.HTML(SCREEN_GUIDE)
     with gr.Tabs(elem_classes="screen-switcher"):
         with gr.Tab("SCREEN A / AGENT ARENA"):
+            gr.HTML(_contest_atlas(profile))
             _poi_benchmark_panel(profile)
             with gr.Accordion("Secondary diagnostic / broad GARCH and hybrid ranges", open=False):
                 _range_benchmark_panel(profile)
@@ -1704,7 +2099,10 @@ THEME = gr.themes.Base().set(
 )
 
 
-with gr.Blocks(title="LottoBench Lottery Agent Arena", css=CSS, theme=THEME) as demo:
+with gr.Blocks(
+    title="LottoBench Lottery Agent Arena", css=CSS + CONTEST_ATLAS_CSS, theme=THEME,
+    js=CONTEST_ATLAS_JS,
+) as demo:
     gr.HTML(_global_hero())
     gr.HTML(_availability_notice())
     gr.HTML(PROTOCOL)
